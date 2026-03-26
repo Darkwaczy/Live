@@ -137,6 +137,13 @@ export default function App() {
   );
   const { connected } = useSync(session.id, liveState, applyLiveState);
 
+  const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+     if (transcriptScrollRef.current) {
+        transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
+     }
+  }, [liveState.current_text, interimText]);
+
   const [fetchedVerse, setFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
 
   useEffect(() => {
@@ -313,21 +320,7 @@ export default function App() {
       : { reference: `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}${currentVerse.verse_end && currentVerse.verse_end > currentVerse.verse_start ? `-${currentVerse.verse_end}` : ''}`, text: 'Retrieving passage from the cloud...', translation: settings.bibleVersion } 
     : null;
 
-  // Real data splitting with interim buffers
   const fullTranscript = (liveState.current_text + ' ' + (interimText || '')).trim();
-  const sentencesRefined: string[] = [];
-  fullTranscript.split(/(?<=[.?!])\s+/).forEach(s => {
-      const words = s.split(' ').filter(Boolean);
-      for (let i = 0; i < words.length; i += 15) {
-          sentencesRefined.push(words.slice(i, i + 15).join(' '));
-      }
-  });
-
-  const sentencesCount = sentencesRefined.length;
-  // If empty, show instructions, otherwise show the last 3 lines.
-  const sentence1 = sentencesCount > 0 ? sentencesRefined[sentencesCount - 1] : (isListening ? 'Listening...' : 'Click Play to start the live transcription.');
-  const sentence2 = sentencesCount > 1 ? sentencesRefined[sentencesCount - 2] : '';
-  const sentence3 = sentencesCount > 2 ? sentencesRefined[sentencesCount - 3] : '';
 
   // Calculate actual line of song
   const baseLineIndex = settings.autoSyncLyrics ? (currentLine ?? 0) : 0;
@@ -364,10 +357,10 @@ export default function App() {
               </div>
            )}
            {settings.showTranscript && settings.enableTranscription && (
-             <div className="w-full space-y-8 pl-12 text-center z-0">
-                {sentence3 && <p className={`${projectorTextClass3} text-gray-600 leading-normal font-medium tracking-tight opacity-50`}>{sentence3}</p>}
-                {sentence2 && <p className={`${projectorTextClass2} text-gray-400 leading-normal font-medium tracking-tight opacity-80`}>{sentence2}</p>}
-                <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight`}>{sentence1}</p>
+             <div className="w-full space-y-8 px-24 text-center z-0">
+                <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
+                  {(liveState.current_text + (interimText ? ' ' + interimText : '')).trim().split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
+                </p>
              </div>
            )}
         </div>
@@ -524,13 +517,24 @@ export default function App() {
 
                 {/* Transcript Area */}
                 {settings.showTranscript && settings.enableTranscription && (
-                  <div className="flex-1 flex flex-col justify-center items-center w-full max-w-4xl mx-auto py-20 z-0">
-                     <div className="w-full space-y-10 pl-64">
-                        {sentence3 && <p className={`${transcriptTextClass} text-gray-600 leading-normal font-medium tracking-tight opacity-50`}>{sentence3}</p>}
-                        {sentence2 && <p className={`${transcriptTextClass} text-gray-400 leading-normal font-medium tracking-tight opacity-80`}>{sentence2}</p>}
-                        <p className={`${transcriptTextClass} text-white leading-normal font-medium tracking-tight`}>
-                          {sentence1}
-                        </p>
+                  <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto py-12 z-0 relative overflow-hidden">
+                     <div 
+                        ref={transcriptScrollRef}
+                        className="flex-1 overflow-y-auto pr-8 scroll-smooth"
+                        style={{ scrollBehavior: 'smooth' }}
+                     >
+                        {liveState.current_text || interimText ? (
+                          <p className={`${transcriptTextClass} pb-32 text-gray-200 leading-[1.8] font-medium tracking-wide whitespace-pre-wrap`}>
+                            {liveState.current_text}
+                            {interimText && <span className="text-gray-500 ml-2 animate-pulse">{interimText}</span>}
+                          </p>
+                        ) : (
+                          <div className="h-full flex items-center justify-center opacity-50">
+                             <p className={`${transcriptTextClass} text-gray-500 font-medium tracking-wide`}>
+                               {isListening ? 'Listening...' : 'Click Play to start the live transcription.'}
+                             </p>
+                          </div>
+                        )}
                      </div>
                   </div>
                 )}

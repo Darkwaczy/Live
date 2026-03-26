@@ -34,6 +34,11 @@ export function useLiveState(
   const [speechStats, setSpeechStats] = useState<SpeechStats[]>([]);
   const audioServiceRef = useRef<AudioService | null>(null);
 
+  const aiConfigRef = useRef(aiConfig);
+  useEffect(() => {
+    aiConfigRef.current = aiConfig;
+  }, [aiConfig]);
+
   useEffect(() => {
     const audioService = new AudioService({
       locale: 'en-NG',
@@ -63,11 +68,12 @@ export function useLiveState(
 
           const newLine = song ? locateCurrentLine(song, updatedText) : prev.current_line;
 
+          const currentAi = aiConfigRef.current;
           if (verse) {
              setCurrentVerse(verse);
-          } else if (aiConfig.enabled && chunk.split(' ').length > 2) {
+          } else if (currentAi.enabled && chunk.split(' ').length > 2) {
              import('../services/bibleParser').then(m => {
-                m.detectBibleVerseAI(rollingWindow, aiConfig.endpointUrl, aiConfig.apiKey, aiConfig.modelName)
+                m.detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
                  .then(aiVerse => {
                    if (aiVerse) {
                      setCurrentVerse(aiVerse);
