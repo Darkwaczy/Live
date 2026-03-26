@@ -80,7 +80,7 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-3">Input Source</label>
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 mb-4">
                     <label className={`flex-1 flex items-center justify-center gap-2 p-4 rounded-xl border cursor-pointer transition-colors ${settings.audioInput === 'live' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-[#1e1e1e] border-white/10 text-gray-400 hover:bg-white/5'}`}>
                       <input type="radio" value="live" checked={settings.audioInput === 'live'} onChange={() => onUpdate('audioInput', 'live')} className="hidden" />
                       <Mic size={18} /> Live Mic (Pastor)
@@ -89,6 +89,13 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <input type="radio" value="system" checked={settings.audioInput === 'system'} onChange={() => onUpdate('audioInput', 'system')} className="hidden" />
                       <Volume2 size={18} /> System Audio (Mixer)
                     </label>
+                  </div>
+                  <div className="text-xs text-gray-500 bg-[#1e1e1e] rounded-lg p-3 border border-white/5">
+                    {settings.audioInput === 'system' ? (
+                      <span><strong>System Audio Setup:</strong> Select this to capture YouTube/Mixer audio. Requires a <strong>Cloud Provider</strong> (Groq, Deepgram, or OpenAI Whisper) with a valid API key. When you start listening, you'll be prompted to select a browser tab and enable audio sharing.</span>
+                    ) : (
+                      <span><strong>Live Mic:</strong> Captures audio from a connected microphone. Works with any speech engine.</span>
+                    )}
                   </div>
                 </div>
 
@@ -143,10 +150,13 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <label className="block text-sm font-medium text-gray-300 mb-2">Primary Speech Engine</label>
                       <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50">
                         <option value="web">Chrome Web Speech API (Free, Requires Internet)</option>
-                        <option value="groq">Groq Cloud API (Ultra-Fast Whisper)</option>
-                        <option value="deepgram">Deepgram Nova Cloud API</option>
-                        <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy)</option>
+                        <option value="groq">Groq Cloud API (Ultra-Fast Whisper) ⭐ System Audio</option>
+                        <option value="deepgram">Deepgram Nova Cloud API ⭐ System Audio</option>
+                        <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy) ⭐ System Audio</option>
                       </select>
+                      {(settings.audioInput === 'system' && !['groq', 'deepgram', 'whisper'].includes(settings.speechEngine)) && (
+                        <p className="text-xs text-yellow-500/80 mt-2 flex items-center gap-1">⚠️ Web Speech API with System Audio: Switch to a starred provider to capture YouTube/mixer audio.</p>
+                      )}
                     </div>
 
                     {['whisper', 'groq', 'deepgram'].includes(settings.speechEngine) && (

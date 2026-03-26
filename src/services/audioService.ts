@@ -72,6 +72,11 @@ export class AudioService {
   }
 
   private startWebSpeechRecognition() {
+    if (this.config.audioInput === 'system') {
+      this.config.onError?.(new Error('Web Speech API does not support system audio. Please switch to "Whisper", "Groq", or "Deepgram" provider in Settings to capture YouTube audio.'));
+      return false;
+    }
+
     const SpeechRecognitionClass = this.getSpeechRecognitionClass();
     if (!SpeechRecognitionClass) return false;
 
@@ -172,12 +177,15 @@ export class AudioService {
        try {
          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
          const audioTrack = stream.getAudioTracks()[0];
-         if (!audioTrack) throw new Error('You must share audio when selecting a tab or screen.');
+         if (!audioTrack) throw new Error('You must enable audio sharing when selecting a tab or screen. Please click "Share", enable audio toggle, then click "Share" again.');
          // We only want the audio, so we drop the video tracks to save resources
          stream.getVideoTracks().forEach(t => t.stop());
          return new MediaStream([audioTrack]);
        } catch (err: any) {
-         throw new Error("System Audio capture failed or was aborted by user.");
+         if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+           throw new Error('System audio capture cancelled. Select a tab/window and enable audio to capture YouTube audio.');
+         }
+         throw new Error("System Audio capture failed: " + (err.message || "Please try again and enable audio sharing."));
        }
     }
     return navigator.mediaDevices.getUserMedia({ audio: true });
@@ -258,7 +266,7 @@ export class AudioService {
   private voskSimInterval?: any;
 
   private async startVoskTranscription() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await this.getAudioStream();
     this.stream = stream;
     
     // Simulate robust WASM Web Worker acoustic processing

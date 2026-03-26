@@ -589,7 +589,7 @@ export default function App() {
               </>
             ) : activeView === 'settings' ? (
               <div className="absolute inset-0 z-10 flex">
-                 <SettingsView settings={settings} onUpdate={updateSetting} />
+                 <SettingsView settings={draftSettings} onUpdate={updateDraftSetting} onSave={commitSettings} />
               </div>
             ) : (
               // Placeholder for other views
