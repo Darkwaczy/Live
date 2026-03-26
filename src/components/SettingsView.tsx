@@ -150,6 +150,7 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <label className="block text-sm font-medium text-gray-300 mb-2">Primary Speech Engine</label>
                       <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50">
                         <option value="web">Chrome Web Speech API (Free, Requires Internet)</option>
+                        <option value="worker">Vosk WASM Engine (Free, 100% Offline)</option>
                         <option value="groq">Groq Cloud API (Ultra-Fast Whisper) ⭐ System Audio</option>
                         <option value="deepgram">Deepgram Nova Cloud API ⭐ System Audio</option>
                         <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy) ⭐ System Audio</option>

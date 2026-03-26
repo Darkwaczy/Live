@@ -7,6 +7,10 @@ export default defineConfig({
     port: 5173,
     watch: {
       usePolling: true
+    },
+    headers: {
+      "Cross-Origin-Embedder-Policy": "unsafe-none", // Allow standard Fetch but strict worker context
+      "Cross-Origin-Opener-Policy": "same-origin",
     }
   },
   build: {
