@@ -258,12 +258,74 @@ export class AudioService {
     return true;
   }
 
+  private async convertWebmToWavBlob(input: Blob): Promise<Blob> {
+    const arrayBuffer = await input.arrayBuffer();
+    const audioCtx = new AudioContext();
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+    const channelCount = decoded.numberOfChannels;
+    const length = decoded.length * channelCount * 2 + 44;
+    const buffer = new ArrayBuffer(length);
+    const view = new DataView(buffer);
+
+    function writeString(view: DataView, offset: number, str: string) {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    }
+
+    function floatTo16BitPCM(output: DataView, offset: number, input: Float32Array) {
+      for (let i = 0; i < input.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, input[i]));
+        output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      }
+    }
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + decoded.length * channelCount * 2, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, channelCount, true);
+    view.setUint32(24, decoded.sampleRate, true);
+    view.setUint32(28, decoded.sampleRate * channelCount * 2, true);
+    view.setUint16(32, channelCount * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, decoded.length * channelCount * 2, true);
+
+    let offset = 44;
+    if (channelCount === 1) {
+      floatTo16BitPCM(view, offset, decoded.getChannelData(0));
+    } else {
+      const interleaved = new Float32Array(decoded.length * channelCount);
+      let index = 0;
+      for (let i = 0; i < decoded.length; i++) {
+        for (let ch = 0; ch < channelCount; ch++) {
+          interleaved[index++] = decoded.getChannelData(ch)[i];
+        }
+      }
+      floatTo16BitPCM(view, offset, interleaved);
+    }
+
+    await audioCtx.close();
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
   private async sendAudioToCloud() {
     if (this.audioChunks.length === 0) return;
 
     try {
       // Combine all chunks into one blob
       const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+      let uploadBlob = audioBlob;
+
+      // Convert to WAV for compatibility with many STT providers
+      try {
+        uploadBlob = await this.convertWebmToWavBlob(audioBlob);
+      } catch (conversionError) {
+        console.warn('Could not convert webm to wav, falling back to webm', conversionError);
+      }
       
       // Log for debugging
       console.log(`📤 Sending ${this.audioChunks.length} chunks, total size: ${audioBlob.size} bytes`);

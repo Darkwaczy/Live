@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('sermonSync', {
     saveLiveState: (liveState: any) => ipcRenderer.invoke('db:save-live-state', liveState),
     saveNote: (note: any) => ipcRenderer.invoke('db:save-note', note),
     getNotes: (sessionId: string) => ipcRenderer.invoke('db:get-notes', sessionId),
-    getLiveState: (sessionId: string) => ipcRenderer.invoke('db:get-live-state', sessionId)
+    getLiveState: (sessionId: string) => ipcRenderer.invoke('db:get-live-state', sessionId),
+    getSession: (sessionId: string) => ipcRenderer.invoke('db:get-session', sessionId)
   }
 });

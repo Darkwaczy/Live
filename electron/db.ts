@@ -27,3 +27,7 @@ export function getNotes(sessionId: string) {
 export function getLiveState(sessionId: string) {
   return store.get(`live_state.${sessionId}`) || null;
 }
+
+export function getSession(sessionId: string) {
+  return store.get(`sessions.${sessionId}`) || null;
+}
