@@ -23,7 +23,8 @@ declare global {
 }
 
 export type AudioServiceConfig = {
-  provider?: 'web' | 'worker' | 'whisper';
+  provider?: 'web' | 'worker' | 'whisper' | 'groq' | 'deepgram';
+  audioInput?: 'live' | 'system';
   locale?: string;
   apiKey?: string;
   endpoint?: string;
@@ -40,6 +41,7 @@ export class AudioService {
   private mediaRecorder?: MediaRecorder;
   private whisperClient?: RealSpeechProvider;
   private config: AudioServiceConfig;
+  private interimInterval?: any;
 
   constructor(config?: AudioServiceConfig) {
     this.config = { provider: 'web', locale: 'en-NG', ...config };
@@ -165,18 +167,35 @@ export class AudioService {
     processor.connect(context.destination);
   }
 
-  private async startWhisperTranscription() {
+  private async getAudioStream() {
+    if (this.config.audioInput === 'system') {
+       try {
+         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+         const audioTrack = stream.getAudioTracks()[0];
+         if (!audioTrack) throw new Error('You must share audio when selecting a tab or screen.');
+         // We only want the audio, so we drop the video tracks to save resources
+         stream.getVideoTracks().forEach(t => t.stop());
+         return new MediaStream([audioTrack]);
+       } catch (err: any) {
+         throw new Error("System Audio capture failed or was aborted by user.");
+       }
+    }
+    return navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+
+  private async startCloudTranscription() {
     if (!this.config.apiKey) {
-      this.config.onError?.(new Error("OpenAI API Key is required for Whisper Cloud integration. Please set it in Settings -> AI & Detection."));
+      this.config.onError?.(new Error("Cloud Provider API Key is required. Please set it in Settings -> AI & Detection."));
       return;
     }
     
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await this.getAudioStream();
     this.stream = stream;
     
     // Interim simulation for the UI since Whisper only returns finalized chunks
-    let interimInterval = setInterval(() => {
-       if (this.config.onTranscript) this.config.onTranscript("Listening (Whisper Model)...", false, Date.now(), 1);
+    this.interimInterval = setInterval(() => {
+       const label = this.config.provider === 'groq' ? 'Groq' : this.config.provider === 'deepgram' ? 'Deepgram' : 'Whisper';
+       if (this.config.onTranscript) this.config.onTranscript(`Listening (${label} Cloud API)...`, false, Date.now(), 1);
     }, 1500);
 
     this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -189,25 +208,38 @@ export class AudioService {
         formData.append("language", "en");
 
         try {
-          const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          let url = "https://api.openai.com/v1/audio/transcriptions";
+          let headers: any = { "Authorization": `Bearer ${this.config.apiKey}` };
+          let bodyData: BodyInit = formData;
+          
+          if (this.config.provider === 'groq') {
+             url = "https://api.groq.com/openai/v1/audio/transcriptions";
+             formData.set("model", "whisper-large-v3");
+          } else if (this.config.provider === 'deepgram') {
+             url = "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true";
+             headers["Content-Type"] = "audio/webm";
+             headers["Authorization"] = `Token ${this.config.apiKey}`;
+             bodyData = e.data;
+          }
+
+          const res = await fetch(url, {
             method: "POST",
-            headers: {
-              "Authorization": `Bearer ${this.config.apiKey}`
-            },
-            body: formData
+            headers,
+            body: bodyData
           });
           
           if (!res.ok) {
-             const errData = await res.json();
-             throw new Error(errData.error?.message || "Invalid API Key or Whisper server error.");
+             const errData = await res.json().catch(() => ({}));
+             throw new Error(errData.error?.message || errData.err_msg || "Invalid API Key or Cloud server error.");
           }
 
           const data = await res.json();
-          if (data && data.text && this.config.onTranscript) {
-            this.config.onTranscript(data.text, true, Date.now(), 1.0);
+          const transcriptText = data.text || (data.results?.channels[0]?.alternatives[0]?.transcript);
+          if (transcriptText && this.config.onTranscript) {
+            this.config.onTranscript(transcriptText, true, Date.now(), 1.0);
           }
         } catch (err: any) {
-          console.error("Whisper API error:", err);
+          console.error("Cloud Provider API error:", err);
           this.config.onError?.(err);
           this.stop();
         }
@@ -215,7 +247,9 @@ export class AudioService {
     };
     
     // Stop interim interval on first real stop
-    this.mediaRecorder.onstop = () => clearInterval(interimInterval);
+    this.mediaRecorder.onstop = () => {
+      if (this.interimInterval) clearInterval(this.interimInterval);
+    };
     
     this.mediaRecorder.start(4000); // Process audio every 4 seconds
     return true;
@@ -273,8 +307,8 @@ export class AudioService {
     try {
       if (this.config.provider === 'worker') {
         await this.startVoskTranscription();
-      } else if (this.config.provider === 'whisper') {
-        await this.startWhisperTranscription();
+      } else if (['whisper', 'groq', 'deepgram'].includes(this.config.provider || '')) {
+        await this.startCloudTranscription();
       } else {
         const hasSpeech = this.startWebSpeechRecognition();
         if (!hasSpeech) {
@@ -289,18 +323,21 @@ export class AudioService {
 
   stop() {
     if (this.recognition) {
-      try {
-        this.recognition.stop();
-      } catch {} // ignore
-      this.recognition = undefined;
+      this.recognition.onend = () => {}; // Prevent restart loops when explicitly stopped
+      this.recognition.stop();
     }
-
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      try { this.mediaRecorder.stop(); } catch {}
-      this.mediaRecorder = undefined;
+      this.mediaRecorder.stop();
     }
-
-    this.processor?.disconnect();
+    if (this.voskSimInterval) {
+      clearInterval(this.voskSimInterval);
+      this.voskSimInterval = undefined;
+    }
+    if (this.interimInterval) {
+      clearInterval(this.interimInterval);
+      this.interimInterval = undefined;
+    }
+    if (this.worker) this.worker.terminate();
     this.context?.close();
     this.stream?.getTracks().forEach((track) => track.stop());
     if (this.worker) {

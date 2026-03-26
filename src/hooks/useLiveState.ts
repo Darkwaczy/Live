@@ -13,8 +13,8 @@ interface SpeechStats {
 
 export function useLiveState(
   sessionId: string,
-  provider: 'web' | 'worker' | 'whisper',
-  whisperConfig: { apiKey?: string; endpoint?: string },
+  provider: 'web' | 'worker' | 'whisper' | 'groq' | 'deepgram',
+  whisperConfig: { apiKey?: string; endpoint?: string; audioInput?: 'live' | 'system' },
   aiConfig: { enabled: boolean; endpointUrl: string; apiKey: string; modelName: string }
 ) {
   const [liveState, setLiveState] = useState<LiveState>({
@@ -31,6 +31,7 @@ export function useLiveState(
   const [songLineIndex, setSongLineIndex] = useState<number | undefined>(undefined);
   const [interimText, setInterimText] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [speechStats, setSpeechStats] = useState<SpeechStats[]>([]);
   const audioServiceRef = useRef<AudioService | null>(null);
 
@@ -43,6 +44,7 @@ export function useLiveState(
     const audioService = new AudioService({
       locale: 'en-NG',
       provider,
+      audioInput: whisperConfig.audioInput,
       apiKey: whisperConfig.apiKey,
       endpoint: whisperConfig.endpoint,
       onTranscript: (chunk, isFinal, timestamp, confidence) => {
@@ -105,7 +107,12 @@ export function useLiveState(
           };
         });
       },
-      onError: (err) => console.error('AudioService error', err)
+      onError: (err) => {
+        console.error('AudioService error', err);
+        setError(err.message || 'Speech recognition error');
+        setInterimText('');
+        setIsListening(false);
+      }
     });
 
     audioServiceRef.current = audioService;
@@ -116,6 +123,7 @@ export function useLiveState(
   }, [sessionId, provider, whisperConfig.apiKey, whisperConfig.endpoint]);
 
   const start = async () => {
+    setError(null);
     if (audioServiceRef.current) {
       await audioServiceRef.current.start();
       setIsListening(true);
@@ -179,7 +187,9 @@ export function useLiveState(
     clearText,
     applyLiveState,
     speechStats,
-    wordRate
+    wordRate,
+    error,
+    setError
   };
 }
 

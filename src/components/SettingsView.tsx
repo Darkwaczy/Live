@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mic, Cpu, Monitor, Activity, Volume2, Save, Database, Bell, Download, Trash2, Cloud } from 'lucide-react';
 
-export default function SettingsView({ settings, onUpdate }: any) {
+export default function SettingsView({ settings, onUpdate, onSave }: any) {
   const [activeTab, setActiveTab] = useState<'audio' | 'ai' | 'display' | 'data' | 'notifications'>('audio');
   const [isTestingAudio, setIsTestingAudio] = useState(false);
 
@@ -48,8 +48,8 @@ export default function SettingsView({ settings, onUpdate }: any) {
         </nav>
         <div className="pt-6 border-t border-white/5">
           <button 
-            onClick={() => alert("Settings saved to local preferences.")}
-            className="w-full bg-[#1e1e1e] hover:bg-[#252525] text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors border border-white/5">
+            onClick={() => onSave()}
+            className="w-full bg-[#1e1e1e] hover:bg-[#252525] text-emerald-400 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors border border-emerald-500/20">
             <Save size={16} /> Save Preferences
           </button>
         </div>
@@ -143,19 +143,22 @@ export default function SettingsView({ settings, onUpdate }: any) {
                       <label className="block text-sm font-medium text-gray-300 mb-2">Primary Speech Engine</label>
                       <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50">
                         <option value="web">Chrome Web Speech API (Free, Requires Internet)</option>
-                        <option value="vosk">Vosk WASM Engine (Free, 100% Offline)</option>
+                        <option value="groq">Groq Cloud API (Ultra-Fast Whisper)</option>
+                        <option value="deepgram">Deepgram Nova Cloud API</option>
                         <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy)</option>
                       </select>
                     </div>
 
-                    {settings.speechEngine === 'whisper' && (
+                    {['whisper', 'groq', 'deepgram'].includes(settings.speechEngine) && (
                       <div className="animate-in fade-in slide-in-from-top-2">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">OpenAI API Key</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          {settings.speechEngine === 'groq' ? 'Groq API Key' : settings.speechEngine === 'deepgram' ? 'Deepgram Token' : 'OpenAI API Key'}
+                        </label>
                         <input 
                           type="password" 
                           value={settings.whisperApiKey} 
                           onChange={e => onUpdate('whisperApiKey', e.target.value)} 
-                          placeholder="sk-proj-..." 
+                          placeholder={settings.speechEngine === 'groq' ? 'gsk_...' : settings.speechEngine === 'deepgram' ? 'Token...' : 'sk-proj-...'} 
                           className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50"
                         />
                         <p className="text-xs text-emerald-400/80 mt-2 mt-flex items-center gap-1">Key is stored securely in local browser storage only.</p>

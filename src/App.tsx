@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
-  Monitor, Cast, LayoutGrid, ChevronRight, X, Save
+  Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { useSync } from './hooks/useSync';
@@ -125,14 +125,21 @@ export default function App() {
     alertVisual: true,
   });
 
-  const updateSetting = (key: string, value: any) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+  const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
+
+  const updateDraftSetting = (key: string, value: any) => {
+    setDraftSettings(prev => ({ ...prev, [key as keyof typeof settings]: value }));
   };
 
-  const { liveState, interimText, currentSong, currentLine, currentVerse, isListening, start, stop, clearText, applyLiveState } = useLiveState(
+  const commitSettings = () => {
+    setSettings(draftSettings);
+    showToast('Settings saved successfully!');
+  };
+
+  const { liveState, interimText, currentSong, currentLine, currentVerse, isListening, start, stop, clearText, applyLiveState, error, setError } = useLiveState(
     session.id, 
-    settings.speechEngine as 'web'|'worker'|'whisper', 
-    { apiKey: settings.whisperApiKey, endpoint: '' },
+    settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
+    { apiKey: settings.whisperApiKey, endpoint: '', audioInput: settings.audioInput as 'live' | 'system' },
     { enabled: settings.aiVerseDetection, endpointUrl: settings.aiEndpoint, apiKey: settings.aiApiKey, modelName: settings.aiModel }
   );
   const { connected } = useSync(session.id, liveState, applyLiveState);
@@ -428,6 +435,18 @@ export default function App() {
       {/* Main Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-[#1a2332]/40 via-[#121212] to-[#121212]">
         
+        {/* API Error Toast */}
+        {error && (
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 flex items-center gap-3 bg-red-500/90 backdrop-blur-md text-white px-5 py-3 rounded-xl shadow-2xl border border-red-400/30">
+            <AlertCircle size={18} className="text-red-100" />
+            <span className="text-sm font-medium pr-2">{error}</span>
+            <div className="w-px h-4 bg-white/20"></div>
+            <button onClick={() => setError(null)} className="p-1 hover:bg-white/20 rounded-md transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Top Navbar */}
         <header className="h-[72px] flex items-center justify-between px-6 border-b border-white/5 bg-transparent z-10 shrink-0">
           <div className="flex items-center gap-6">
