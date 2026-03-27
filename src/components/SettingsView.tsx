@@ -192,13 +192,14 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <label className="block text-sm text-gray-400 mb-2">Detection Sensitivity</label>
                       <input type="range" min="0" max="100" value={settings.verseSensitivity} onChange={e => onUpdate('verseSensitivity', Number(e.target.value))} className="w-full accent-emerald-500 mt-2" />
                     </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Preferred Translation</label>
-                      <select value={settings.bibleVersion} onChange={e => onUpdate('bibleVersion', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
+                    <div className="space-y-4">
+                      <label className="block text-sm text-gray-400">Parallel Translation (Optional)</label>
+                      <select value={settings.secondaryBibleVersion} onChange={e => onUpdate('secondaryBibleVersion', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
+                        <option value="">None (Single Bible)</option>
                         <option value="KJV">KJV</option>
                         <option value="NIV">NIV</option>
-                        <option value="ESV">ESV</option>
-                        <option value="NKJV">NKJV</option>
+                        <option value="NLT">NLT</option>
+                        <option value="TPT">TPT</option>
                       </select>
                     </div>
                   </div>
@@ -213,32 +214,50 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                     <Toggle checked={settings.autoAirVerses} onChange={(v) => onUpdate('autoAirVerses', v)} />
                   </div>
 
-                  <div className={`space-y-4 pt-4 border-t border-white/5 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
-                     <div className="flex items-center justify-between">
-                       <div>
-                         <span className="text-sm font-medium text-gray-200 block">Use AI Inference for References</span>
-                         <span className="text-xs text-emerald-400">Contextual story detection via LLMs</span>
-                       </div>
-                       <Toggle checked={settings.aiVerseDetection} onChange={(v) => onUpdate('aiVerseDetection', v)} />
-                     </div>
-                     {settings.aiVerseDetection && (
-                       <div className="p-4 bg-black/20 rounded-xl space-y-4 border border-white/10 animate-in fade-in">
+                  <div className={`space-y-6 pt-6 border-t border-white/5 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-200 mb-4 flex items-center gap-2">
+                           <Activity size={14} className="text-emerald-400" /> Service Timing & Countdown
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                           <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+                              <label className="block text-xs text-gray-500 mb-2">Timer Duration (Minutes)</label>
+                              <input type="number" value={settings.timerDuration || 45} onChange={e => onUpdate('timerDuration', Number(e.target.value))} className="w-full bg-transparent text-xl font-bold text-white outline-none" />
+                           </div>
+                           <div className="flex flex-col justify-center">
+                              <span className="text-xs text-gray-400 mb-2">Auto-show on Screen</span>
+                              <Toggle checked={settings.autoShowTimer} onChange={(v) => onUpdate('autoShowTimer', v)} />
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-white/5 pt-6 space-y-4">
+                        <div className="flex items-center justify-between">
                           <div>
-                            <label className="block text-xs text-gray-400 mb-1">Ollama / LLM API Endpoint</label>
-                            <input value={settings.aiEndpoint} onChange={e => onUpdate('aiEndpoint', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
+                            <span className="text-sm font-medium text-gray-200 block">Use AI Inference for References</span>
+                            <span className="text-xs text-emerald-400">Contextual story detection via LLMs</span>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-1">LLM Model Name</label>
-                              <input value={settings.aiModel} onChange={e => onUpdate('aiModel', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-1">Authorization Token / API Key</label>
-                              <input type="password" value={settings.aiApiKey} onChange={e => onUpdate('aiApiKey', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
-                            </div>
+                          <Toggle checked={settings.aiVerseDetection} onChange={(v) => onUpdate('aiVerseDetection', v)} />
+                        </div>
+                        {settings.aiVerseDetection && (
+                          <div className="p-4 bg-black/20 rounded-xl space-y-4 border border-white/10 animate-in fade-in">
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-1">Ollama / LLM API Endpoint</label>
+                                <input value={settings.aiEndpoint} onChange={e => onUpdate('aiEndpoint', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs text-gray-400 mb-1">LLM Model Name</label>
+                                  <input value={settings.aiModel} onChange={e => onUpdate('aiModel', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-400 mb-1">Authorization Token / API Key</label>
+                                  <input type="password" value={settings.aiApiKey} onChange={e => onUpdate('aiApiKey', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
+                                </div>
+                              </div>
                           </div>
-                       </div>
-                     )}
+                        )}
+                      </div>
                   </div>
                 </div>
 

@@ -26,6 +26,7 @@ export function useLiveState(
     preview_text: '',
     preview_verse: null,
     is_live_dirty: false,
+    history: [],
     updated_at: new Date().toISOString()
   });
 
@@ -190,11 +191,38 @@ export function useLiveState(
   }, []);
 
   const goLive = useCallback(() => {
+    setLiveState(prev => {
+      const newHistory = [...prev.history];
+      if (prev.preview_verse) {
+        newHistory.push({
+          type: 'scripture',
+          content: '', // Text will be filled by App.tsx fetching
+          reference: `${prev.preview_verse.book} ${prev.preview_verse.chapter}:${prev.preview_verse.verse_start}`,
+          timestamp: new Date().toISOString()
+        });
+      } else if (prev.preview_text && prev.preview_text !== prev.current_text) {
+        newHistory.push({
+          type: 'note',
+          content: prev.preview_text.split(' ').slice(-10).join(' ') + '...',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return {
+        ...prev,
+        current_text: prev.preview_text || '',
+        current_verse: prev.preview_verse,
+        is_live_dirty: false,
+        history: newHistory,
+        updated_at: new Date().toISOString()
+      };
+    });
+  }, []);
+
+  const setSecondaryVerse = useCallback((text: string | null) => {
     setLiveState(prev => ({
       ...prev,
-      current_text: prev.preview_text || '',
-      current_verse: prev.preview_verse,
-      is_live_dirty: false,
+      secondary_verse: text,
       updated_at: new Date().toISOString()
     }));
   }, []);
@@ -222,6 +250,7 @@ export function useLiveState(
     applyLiveState,
     goLive,
     setPreviewVerse,
+    setSecondaryVerse,
     speechStats,
     wordRate,
     error,
