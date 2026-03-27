@@ -86,9 +86,10 @@ export function detectBibleVerse(text: string): BibleVerse | null {
   // Normalize spoken structures from speech-to-text engines
   let normalizedText = text
     .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
-    .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') // "John 3, 16" -> "John 3:16"
+    .replace(/\b(\d+)\s+verses?\s+(\d+)/gi, '$1:$2') // "chapter 3 verses 16" or "3 verse 16"
+    .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') 
     .replace(/verses?\s+(\d+)/gi, ':$1')
-    .replace(/\s+/g, ' '); // Normalize whitespace
+    .replace(/\s+/g, ' '); 
 
   console.log(`  → Normalized: "${normalizedText}"`);
 
@@ -133,6 +134,14 @@ export function detectBibleVerse(text: string): BibleVerse | null {
       const fixedRef = `${book} ${chapter}:${verse}`;
       console.log(`  🔧 Fixed no-colon format "${noColonMatch[0]}" → "${fixedRef}" (split: ch=${chapter}, v=${verse})`);
       match = biblePattern.exec(fixedRef);
+      if (match) {
+        return {
+          book: resolveBookName(match[1]),
+          chapter: parseInt(match[2], 10),
+          verse_start: parseInt(match[3], 10),
+          verse_end: match[4] ? parseInt(match[4], 10) : parseInt(match[3], 10)
+        };
+      }
     }
   }
 

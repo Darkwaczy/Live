@@ -225,6 +225,17 @@ export function useLiveState(
     if (verse) setCurrentVerse(verse);
   }, []);
 
+  const clearPreview = useCallback(() => {
+    setLiveState(prev => ({
+      ...prev,
+      preview_text: '',
+      preview_verse: null,
+      is_live_dirty: false,
+      updated_at: new Date().toISOString()
+    }));
+    setInterimText('');
+  }, []);
+
   return {
     liveState,
     interimText,
@@ -235,6 +246,7 @@ export function useLiveState(
     start,
     stop,
     clearText,
+    clearPreview,
     applyLiveState,
     goLive,
     setPreviewVerse,

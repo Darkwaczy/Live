@@ -7,27 +7,42 @@ const isElectron = typeof window !== 'undefined' && (window as any).sermonSync?.
 const electronDb = isElectron ? (window as any).sermonSync.db : null;
 
 export async function saveNote(note: Note): Promise<Note> {
-  if (electronDb) return electronDb.saveNote(note);
+  if (electronDb) await electronDb.saveNote(note);
   
-  const { data, error } = await supabase.from('notes').insert(note).select().single();
-  if (error) throw error;
-  return data as Note;
+  try {
+    const { data, error } = await supabase.from('notes').upsert(note).select().single();
+    if (error) throw error;
+    return data as Note;
+  } catch (err) {
+    console.warn('Supabase saveNote failed, remaining local-only', err);
+    return note;
+  }
 }
 
 export async function saveSession(session: Session): Promise<Session> {
-  if (electronDb) return electronDb.saveSession(session);
+  if (electronDb) await electronDb.saveSession(session);
 
-  const { data, error } = await supabase.from('sessions').upsert(session).select().single();
-  if (error) throw error;
-  return data as Session;
+  try {
+    const { data, error } = await supabase.from('sessions').upsert(session).select().single();
+    if (error) throw error;
+    return data as Session;
+  } catch (err) {
+    console.warn('Supabase saveSession failed, remaining local-only', err);
+    return session;
+  }
 }
 
 export async function saveLiveState(state: LiveState): Promise<LiveState> {
-  if (electronDb) return electronDb.saveLiveState(state);
+  if (electronDb) await electronDb.saveLiveState(state);
 
-  const { data, error } = await supabase.from('live_state').upsert(state).select().single();
-  if (error) throw error;
-  return data as LiveState;
+  try {
+    const { data, error } = await supabase.from('live_state').upsert(state).select().single();
+    if (error) throw error;
+    return data as LiveState;
+  } catch (err) {
+    console.warn('Supabase saveLiveState failed, remaining local-only', err);
+    return state;
+  }
 }
 
 export async function getSession(session_id: string): Promise<Session | null> {

@@ -17,6 +17,16 @@ describe('Bible parser', () => {
     expect(res?.chapter).toBe(13);
     expect(res?.verse_start).toBe(4);
     expect(res?.verse_end).toBe(7);
+    expect(detectBibleVerse('John 3:16')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
+  });
+
+  it('detects spoken formats without colons', () => {
+    expect(detectBibleVerse('John 316')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
+  });
+
+  it('detects variations like verses keyword', () => {
+    expect(detectBibleVerse('John chapter 3 verses 16')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
+    expect(detectBibleVerse('John 3 verses 16')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
   });
 
   test('returns null when not present', () => {

@@ -75,7 +75,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse
+    start, stop, clearText, clearPreview, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -514,6 +514,14 @@ export default function App() {
                     PREVIEW / STAGING
                   </div>
                   
+                  <button 
+                    onClick={clearPreview}
+                    className="absolute top-4 right-4 p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded-md transition-all"
+                    title="Clear Preview"
+                  >
+                    <X size={16} />
+                  </button>
+                  
                   {displayVersePreview && settings.detectVerses ? (
                     <div className="w-full space-y-6">
                       <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
@@ -595,14 +603,7 @@ export default function App() {
                       <div className="max-h-[250px] overflow-y-auto text-sm whitespace-pre-wrap text-gray-200 font-serif">{chapterText}</div>
                     </div>
 
-                    <div className="space-y-3 pt-4 border-t border-white/5">
-                      <h4 className="text-xs font-bold text-gray-500 uppercase">Aired History</h4>
-                      {liveState.history.slice(-5).reverse().map((item, idx) => (
-                        <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/5">
-                           <p className="text-xs font-bold text-white">{item.reference || 'Transcription'}</p>
-                           <p className="text-[10px] text-gray-400 line-clamp-1">{item.content || item.type}</p>
-                        </div>
-                      ))}
+                    <div className="pt-4 border-t border-white/5">
                       <button 
                         onClick={() => {
                           const content = `SERMON SUMMARY: ${session.name}\n\n` + liveState.history.map(h => `[${new Date(h.timestamp).toLocaleTimeString()}] ${h.type.toUpperCase()}: ${h.reference || ''} ${h.content}`).join('\n');
