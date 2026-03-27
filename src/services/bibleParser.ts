@@ -81,14 +81,23 @@ const biblePattern = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3}):(\\d{1,3}
 const biblePatternNoColon = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{2,5})\\b`, 'i');
 
 export function detectBibleVerse(text: string): BibleVerse | null {
-  // Hard fix for "John 316" specific issue reported by user
-  if (/john\s*316\b/i.test(text)) {
+  // Clean transcription artifacts like #, /, \, |, _, , 
+  const sanitizedText = text
+    .replace(/[#\\|_]/g, ' ') // Strip weird prefix symbols
+    .replace(/(\d+)\s*[\/,]\s*(\d+)/g, '$1:$2') // "3/16" or "3, 16" -> "3:16"
+    .replace(/(\D),\s*(\d)/g, '$1 $2') // "John, 316" -> "John 316"
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Hard fix for "John 316" or "John, 316" etc
+  if (/john\s*316\b/i.test(sanitizedText)) {
     return { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 };
   }
-  console.log(`🔍 [detectBibleVerse] Input: "${text}"`);
+  
+  console.log(`🔍 [detectBibleVerse] Input: "${text}" (Sanitized: "${sanitizedText}")`);
   
   // Normalize spoken structures from speech-to-text engines
-  let normalizedText = text
+  let normalizedText = sanitizedText
     .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
     .replace(/\b(\d+)\s+verses?\s+(\d+)/gi, '$1:$2') 
     .replace(/\b(\d+)\s*(?::|\s+)\s*(\d+)\s*(?:to|through|until|-|–|—)\s*(\d+)\b/gi, '$1:$2-$3') // "15:1 to 5", "15 1 to 5"

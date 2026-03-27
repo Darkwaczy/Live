@@ -24,6 +24,13 @@ describe('Bible parser', () => {
     expect(detectBibleVerse('John 316')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
   });
 
+  it('detects and cleans transcription artifacts like #, /, ,', () => {
+    expect(detectBibleVerse('Numbers #316')).toEqual({ book: 'Numbers', chapter: 3, verse_start: 16, verse_end: 16 });
+    expect(detectBibleVerse('Mark 3/16')).toEqual({ book: 'Mark', chapter: 3, verse_start: 16, verse_end: 16 });
+    expect(detectBibleVerse('John, 316')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
+    expect(detectBibleVerse('John , 316')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
+  });
+
   it('detects variations like verses keyword', () => {
     expect(detectBibleVerse('John chapter 3 verses 16')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
     expect(detectBibleVerse('John 3 verses 16')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });

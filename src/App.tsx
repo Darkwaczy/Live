@@ -17,10 +17,13 @@ import KaraokeLine from './components/KaraokeLine';
 export default function App() {
   const [activeView, setActiveView] = useState<'live' | 'history' | 'documents' | 'settings'>('live');
   const getFontSizeClass = (text: string) => {
-    if (text.length > 500) return 'text-xl sm:text-2xl md:text-3xl font-bold leading-normal';
-    if (text.length > 300) return 'text-2xl sm:text-3xl md:text-4xl font-bold leading-normal';
-    if (text.length > 150) return 'text-3xl sm:text-4xl md:text-5xl font-bold leading-tight';
-    return 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif italic leading-tight';
+    const len = text.length;
+    if (len > 800) return 'text-lg sm:text-xl md:text-2xl font-bold leading-normal';
+    if (len > 500) return 'text-xl sm:text-2xl md:text-3xl font-bold leading-normal';
+    if (len > 300) return 'text-2xl sm:text-3xl md:text-4xl font-bold leading-relaxed';
+    if (len > 150) return 'text-3xl sm:text-4xl md:text-5xl font-bold leading-tight';
+    if (len > 80) return 'text-4xl sm:text-5xl md:text-6xl font-serif italic leading-tight';
+    return 'text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-serif italic leading-tight';
   };
 
   const [isProjector, setProjector] = useState(false);
@@ -393,9 +396,9 @@ export default function App() {
               </div>
            )}
            {(!displayVerseLive || !settings.showVerse) && settings.showTranscript && settings.enableTranscription && (
-             <div className="w-full space-y-8 px-24 text-center z-0">
-                <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
-                   {(liveState.current_text || '').split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Screen is clear')}
+             <div className="w-full px-12 text-center z-0">
+                <p className={`${projectorTextClass1} text-white leading-relaxed font-medium tracking-tight whitespace-pre-wrap transition-all duration-700`}>
+                   {(liveState.current_text || '').split(' ').slice(-40).join(' ') || (isListening ? 'Listening...' : 'Screen is clear')}
                 </p>
              </div>
            )}
@@ -551,26 +554,26 @@ export default function App() {
                   )}
                 </div>
 
-                {/* LIVE PANE */}
-                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-black rounded-3xl border-2 border-red-500/20 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded">
-                    LIVE ON SCREEN
-                  </div>
-
-                  {displayVerseLive && settings.detectVerses ? (
-                    <div className="flex-1 overflow-y-auto relative group custom-scrollbar">
-                       <h4 className={`${colorClass} font-bold text-lg`}>{displayVerseLive.reference}</h4>
-                       <p className={`${getFontSizeClass(displayVerseLive.text)} text-white/90 text-center drop-shadow-md`}>
-{displayVerseLive.text}</p>
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black rounded-3xl border-2 border-red-500/20 shadow-2xl relative">
+                    <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded">
+                      LIVE ON SCREEN
                     </div>
-                  ) : (
-                    <p className="text-white/40 text-lg font-medium text-center">
-                      {(liveState.current_text || '').split(' ').slice(-10).join(' ') || 'Screen is clear'}
-                    </p>
-                  )}
+
+                    {displayVerseLive && settings.detectVerses ? (
+                      <div className="w-full flex flex-col items-center justify-center space-y-4">
+                         <h4 className={`${colorClass} font-bold text-xl mb-2`}>{displayVerseLive.reference}</h4>
+                         <p className={`${getFontSizeClass(displayVerseLive.text)} text-white/90 text-center drop-shadow-2xl`}>
+                            {displayVerseLive.text}
+                         </p>
+                      </div>
+                    ) : (
+                      <p className="text-white/40 text-lg font-medium text-center">
+                        {(liveState.current_text || '').split(' ').slice(-10).join(' ') || 'Screen is clear'}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : activeView === 'settings' ? (
+              ) : activeView === 'settings' ? (
               <div className="absolute inset-0 z-10 flex">
                  <SettingsView settings={draftSettings} onUpdate={updateDraftSetting} onSave={commitSettings} />
               </div>
