@@ -118,11 +118,8 @@ export default function App() {
     saveHistory: true,
     exportFormat: 'txt',
     cloudSync: false,
-    alertVerse: true,
-    alertSong: true,
-    alertSync: true,
-    alertSound: false,
     alertVisual: true,
+    autoAirVerses: false, // New setting
   });
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
@@ -136,7 +133,10 @@ export default function App() {
     showToast('Settings saved successfully!');
   };
 
-  const { liveState, interimText, currentSong, currentLine, currentVerse, isListening, start, stop, clearText, applyLiveState, error, setError } = useLiveState(
+  const { 
+    liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
+    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse 
+  } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
     { apiKey: settings.whisperApiKey, endpoint: '', audioInput: settings.audioInput as 'live' | 'system' },
@@ -287,7 +287,14 @@ export default function App() {
       }
     };
     fetchLocalVerse();
-  }, [currentVerse, settings.bibleVersion]);
+  }, [liveState.preview_verse, settings.bibleVersion]);
+
+  // Hook into auto-air logic
+  useEffect(() => {
+    if (settings.autoAirVerses && liveState.preview_verse && liveState.preview_verse !== liveState.current_verse) {
+      goLive();
+    }
+  }, [liveState.preview_verse, settings.autoAirVerses, goLive, liveState.current_verse]);
 
   useEffect(() => {
     (async () => {
@@ -386,10 +393,16 @@ export default function App() {
     } catch (e) {}
   };
 
-  const displayVerse = currentVerse 
+  const displayVersePreview = liveState.preview_verse 
     ? fetchedVerse 
       ? fetchedVerse
-      : { reference: `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}${currentVerse.verse_end && currentVerse.verse_end > currentVerse.verse_start ? `-${currentVerse.verse_end}` : ''}`, text: 'Retrieving passage from the cloud...', translation: settings.bibleVersion } 
+      : { reference: `${liveState.preview_verse.book} ${liveState.preview_verse.chapter}:${liveState.preview_verse.verse_start}${liveState.preview_verse.verse_end && liveState.preview_verse.verse_end > liveState.preview_verse.verse_start ? `-${liveState.preview_verse.verse_end}` : ''}`, text: 'Retrieving passage...', translation: settings.bibleVersion } 
+    : null;
+
+  const displayVerseLive = liveState.current_verse
+    ? fetchedVerse && fetchedVerse.reference.includes(liveState.current_verse.book)
+      ? fetchedVerse
+      : { reference: `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}${liveState.current_verse.verse_end && liveState.current_verse.verse_end > liveState.current_verse.verse_start ? `-${liveState.current_verse.verse_end}` : ''}`, text: 'Live on Screen', translation: settings.bibleVersion }
     : null;
 
   const fullTranscript = (liveState.current_text + ' ' + (interimText || '')).trim();
@@ -410,7 +423,7 @@ export default function App() {
   const animationClass = settings.highlightAnimation === 'glow' ? `drop-shadow-[0_0_12px_rgba(currentColor,0.4)]` : settings.highlightAnimation === 'fade' ? 'animate-pulse' : '';
   const blurStyle = { backdropFilter: `blur(${settings.transparency/10 + 2}px)`, filter: `opacity(${settings.transparency}%)` };
 
-  const transcriptTextClass = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-[34px]';
+  const transcriptTextClass = settings.transcriptSize === 'small' ? 'text-xl' : settings.transcriptSize === 'medium' ? 'text-2xl' : 'text-3xl';
   const projectorTextClass1 = settings.transcriptSize === 'small' ? 'text-4xl' : settings.transcriptSize === 'medium' ? 'text-5xl' : 'text-6xl';
   const projectorTextClass2 = settings.transcriptSize === 'small' ? 'text-3xl' : settings.transcriptSize === 'medium' ? 'text-4xl' : 'text-5xl';
   const projectorTextClass3 = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-4xl';
@@ -422,16 +435,16 @@ export default function App() {
            <X size={32} />
         </button>
         <div className="flex-1 flex flex-col justify-center items-center w-full max-w-6xl mx-auto space-y-12">
-           {settings.showVerse && displayVerse && settings.detectVerses && (
+           {settings.showVerse && displayVerseLive && settings.detectVerses && (
               <div className="absolute top-12 left-12 z-10 w-[400px] glass-panel p-8 shadow-2xl bg-[#1a1a1a]/90 border-t border-white/10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
-                <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerse.reference} ({settings.bibleVersion})</h4>
-                <p className="text-gray-200 text-2xl leading-relaxed font-serif">{displayVerse.text}</p>
+                <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerseLive.reference} ({settings.bibleVersion})</h4>
+                <p className="text-gray-200 text-2xl leading-relaxed font-serif">{displayVerseLive.text}</p>
               </div>
            )}
            {settings.showTranscript && settings.enableTranscription && (
              <div className="w-full space-y-8 px-24 text-center z-0">
                 <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
-                  {(liveState.current_text + (interimText ? ' ' + interimText : '')).trim().split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
+                  {liveState.current_text.split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
                 </p>
              </div>
            )}
@@ -539,11 +552,11 @@ export default function App() {
                 <SkipBack size={18} fill="currentColor" />
               </button>
               <button 
-                onClick={() => { handleNext(); showToast('Skipped forward one line'); }} 
-                className="p-2 hover:bg-white/10 text-white rounded-md transition-colors"
-                title="Next Lyric/Item"
+                onClick={goLive}
+                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${liveState.is_live_dirty ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-gray-700 text-gray-400 opacity-50 cursor-not-allowed'}`}
+                disabled={!liveState.is_live_dirty}
               >
-                <SkipForward size={18} fill="currentColor" />
+                <SkipForward size={18} fill="currentColor" /> GO LIVE (AIR)
               </button>
             </div>
           </div>
@@ -587,41 +600,50 @@ export default function App() {
           <div className="flex-1 flex flex-col relative px-10 py-8 overflow-hidden z-0">
             {activeView === 'live' ? (
               <>
-                {/* Main Background Glow */}
-                <div className="absolute inset-0 opacity-10 pointer-events-none mix-blend-screen" 
-                     style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #3b82f6 0%, transparent 50%)' }} />
-
-                {/* Floating Verse Card */}
-                {settings.showVerse && settings.detectVerses && displayVerse && (!mainLyric || !settings.showLyrics) && (
-                    <div className={`absolute top-8 left-10 z-10 w-[460px] glass-panel p-8 shadow-2xl bg-[#22272e]/90 border-t ${settings.highlightAnimation === 'glow' ? `border-${colorClass.replace('text-','')}/30 shadow-[0_0_40px_-15px_rgba(52,211,153,0.3)]` : 'border-white/10'}`} style={blurStyle}>
-                      <h4 className={`${colorClass} font-bold text-xl pb-4 border-b border-white/10 mb-4`}>{displayVerse.reference} <span className="opacity-60 text-sm font-normal ml-2">({displayVerse.translation || settings.bibleVersion})</span></h4>
-                      <p className="text-gray-200 text-[21px] leading-relaxed font-serif tracking-tight">{displayVerse.text}</p>
+                {/* Dual Pane View */}
+                <div className="flex-1 flex gap-8 overflow-hidden">
+                  
+                  {/* PREVIEW PANE (Operator Stage) */}
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[#1a1a1e] rounded-3xl border border-white/5 relative overflow-hidden group">
+                    <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                      PREVIEW / STAGING
                     </div>
-                )}
-
-                {/* Transcript Area */}
-                {settings.showTranscript && settings.enableTranscription && (
-                  <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto py-12 z-0 relative overflow-hidden">
-                     <div 
-                        ref={transcriptScrollRef}
-                        className="flex-1 overflow-y-auto pr-8 scroll-smooth"
-                        style={{ scrollBehavior: 'smooth' }}
-                     >
-                        {liveState.current_text || interimText ? (
-                          <p className={`${transcriptTextClass} pb-32 text-gray-200 leading-[1.8] font-medium tracking-wide whitespace-pre-wrap`}>
-                            {liveState.current_text}
-                            {interimText && <span className="text-gray-500 ml-2 animate-pulse">{interimText}</span>}
-                          </p>
-                        ) : (
-                          <div className="h-full flex items-center justify-center opacity-50">
-                             <p className={`${transcriptTextClass} text-gray-500 font-medium tracking-wide`}>
-                               {isListening ? 'Listening...' : 'Click Play to start the live transcription.'}
-                             </p>
-                          </div>
-                        )}
-                     </div>
+                    
+                    {displayVersePreview && settings.detectVerses ? (
+                      <div className="w-full max-w-lg space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                        <h4 className={`${colorClass} font-bold text-2xl pb-2 border-b border-white/10`}>{displayVersePreview.reference}</h4>
+                        <p className="text-white text-2xl leading-relaxed font-serif">{displayVersePreview.text}</p>
+                      </div>
+                    ) : (
+                      <div className="w-full text-center">
+                        <p className={`${transcriptTextClass} text-white/90 leading-relaxed font-medium transition-all`}>
+                          {liveState.preview_text.split(' ').slice(-20).join(' ') || (interimText ? interimText : (isListening ? 'Listening...' : 'Ready...'))}
+                          {interimText && <span className="text-gray-500 ml-2 italic">{interimText}</span>}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {/* LIVE PANE (Audience View) */}
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 bg-black rounded-3xl border-2 border-red-500/20 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-2 py-1 rounded">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                      LIVE ON SCREEN
+                    </div>
+
+                    {displayVerseLive && settings.detectVerses ? (
+                      <div className="w-full max-w-lg space-y-4 opacity-80 scale-95 origin-center">
+                         <h4 className={`${colorClass} font-bold text-xl pb-2 border-b border-white/10`}>{displayVerseLive.reference}</h4>
+                         <p className="text-white/70 text-xl leading-relaxed font-serif line-clamp-4">{displayVerseLive.text}</p>
+                      </div>
+                    ) : (
+                      <p className="text-white/40 text-lg font-medium max-w-md text-center">
+                        {liveState.current_text.split(' ').slice(-10).join(' ') || 'Screen is clear'}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 {/* Bottom Lyric Dock */}
                 {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
@@ -776,6 +798,15 @@ export default function App() {
                       <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500 border rounded-xl border-white/5">
                         <BookOpen size={24} className="mb-3 opacity-40" />
                         <p className="text-sm italic">Waiting for pastor to mention a scripture reference or choose chapter above</p>
+                        <button 
+                          onClick={() => {
+                            // Extract reference from chapterText or dropdowns
+                            setPreviewVerse({ book: selectedBook, chapter: selectedChapter, verse_start: 1, verse_end: 1 });
+                          }}
+                          className="mt-4 px-3 py-1 bg-white/5 hover:bg-white/10 rounded border border-white/10 text-xs text-white"
+                        >
+                          Preview Selection
+                        </button>
                       </div>
                     )}
                   </div>
@@ -855,10 +886,10 @@ export default function App() {
                 {nextLyric && <p className="text-[40px] text-gray-500 italic mt-8">{nextLyric}</p>}
               </div>
             )}
-            {settings.showVerse && settings.detectVerses && displayVerse && (!mainLyric || !settings.showLyrics) && (
+            {settings.showVerse && settings.detectVerses && displayVerseLive && (!mainLyric || !settings.showLyrics) && (
               <div className="w-full absolute inset-0 flex flex-col justify-center px-12">
-                <h2 className={`${colorClass} text-5xl font-semibold mb-10 tracking-wide uppercase`}>{displayVerse.reference} <span className="opacity-50 text-3xl font-normal ml-3">({displayVerse.translation || settings.bibleVersion})</span></h2>
-                <p className="text-white/90 text-[64px] leading-[1.3] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">"{displayVerse.text}"</p>
+                <h2 className={`${colorClass} text-5xl font-semibold mb-10 tracking-wide uppercase`}>{displayVerseLive.reference} <span className="opacity-50 text-3xl font-normal ml-3">({displayVerseLive.translation || settings.bibleVersion})</span></h2>
+                <p className="text-white/90 text-[64px] leading-[1.3] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">"{displayVerseLive.text}"</p>
               </div>
             )}
           </div>

@@ -23,6 +23,9 @@ export function useLiveState(
     current_verse: null,
     current_song: undefined,
     current_line: undefined,
+    preview_text: '',
+    preview_verse: null,
+    is_live_dirty: false,
     updated_at: new Date().toISOString()
   });
 
@@ -101,11 +104,11 @@ export function useLiveState(
           console.log(`📝 [Content Classification] Type: ${contentClassification.type} (${Math.round(contentClassification.confidence * 100)}% confidence)`);
 
           return {
+            ...prev,
             session_id: sessionId,
-            current_text: updatedText,
-            current_verse: verse ?? prev.current_verse,
-            current_song: song?.title ?? prev.current_song,
-            current_line: song ? newLine : prev.current_line,
+            preview_text: updatedText,
+            preview_verse: verse ?? prev.preview_verse,
+            is_live_dirty: true,
             content_type: contentClassification.type,
             updated_at: new Date(timestamp).toISOString()
           };
@@ -176,7 +179,34 @@ export function useLiveState(
 
   const clearText = useCallback(() => {
     setInterimText('');
-    setLiveState(prev => ({ ...prev, current_text: '', updated_at: new Date().toISOString() }));
+    setLiveState(prev => ({ 
+      ...prev, 
+      current_text: '', 
+      preview_text: '',
+      preview_verse: null,
+      is_live_dirty: false,
+      updated_at: new Date().toISOString() 
+    }));
+  }, []);
+
+  const goLive = useCallback(() => {
+    setLiveState(prev => ({
+      ...prev,
+      current_text: prev.preview_text || '',
+      current_verse: prev.preview_verse,
+      is_live_dirty: false,
+      updated_at: new Date().toISOString()
+    }));
+  }, []);
+
+  const setPreviewVerse = useCallback((verse: BibleVerse | null) => {
+    setLiveState(prev => ({
+      ...prev,
+      preview_verse: verse,
+      is_live_dirty: true,
+      updated_at: new Date().toISOString()
+    }));
+    if (verse) setCurrentVerse(verse);
   }, []);
 
   return {
@@ -190,6 +220,8 @@ export function useLiveState(
     stop,
     clearText,
     applyLiveState,
+    goLive,
+    setPreviewVerse,
     speechStats,
     wordRate,
     error,

@@ -203,6 +203,16 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                     </div>
                   </div>
 
+                  <div className={`flex items-center justify-between pt-2 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
+                    <div>
+                      <span className="text-sm font-medium text-gray-200 block">Auto-Air Verses</span>
+                      <span className="text-xs text-red-400 flex items-center gap-1">
+                        <Activity size={10} /> Push to Live immediately on detection
+                      </span>
+                    </div>
+                    <Toggle checked={settings.autoAirVerses} onChange={(v) => onUpdate('autoAirVerses', v)} />
+                  </div>
+
                   <div className={`space-y-4 pt-4 border-t border-white/5 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
                      <div className="flex items-center justify-between">
                        <div>
