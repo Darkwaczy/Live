@@ -80,7 +80,8 @@ export function detectBibleVerse(text: string): BibleVerse | null {
   const normalizedText = text
     .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verse\s+|\s+)(\d+)/gi, '$1:$2')
     .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') // "John 3, 16" -> "John 3:16"
-    .replace(/verse\s+(\d+)/gi, ':$1');
+    .replace(/verse\s+(\d+)/gi, ':$1')
+    .replace(/\s+/g, ' '); // Normalize whitespace
 
   const match = biblePattern.exec(normalizedText);
   if (!match) return null;
@@ -91,6 +92,8 @@ export function detectBibleVerse(text: string): BibleVerse | null {
   const verse_end = match[4] ? parseInt(match[4], 10) : verse_start;
 
   const normalizedBook = resolveBookName(rawBook);
+
+  console.log(`✅ Bible verse detected: ${normalizedBook} ${chapter}:${verse_start}${verse_end > verse_start ? `-${verse_end}` : ''}`);
 
   return {
     book: normalizedBook,

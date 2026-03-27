@@ -10,8 +10,10 @@ export function useSync(
   const [connected, setConnected] = useState(false);
   const syncInstRef = useRef<SupabaseRealtimeSync | null>(null);
   const lastPublished = useRef<string>('');
+  const isElectron = typeof window !== 'undefined' && (window as any).sermonSync?.db;
 
   useEffect(() => {
+    if (isElectron) return;
     const sync = new SupabaseRealtimeSync();
     syncInstRef.current = sync;
 
@@ -34,7 +36,7 @@ export function useSync(
   }, [sessionId, onRemoteUpdate]);
 
   useEffect(() => {
-    if (!connected) return;
+    if (isElectron || !connected) return;
 
     const currentKey = JSON.stringify(state);
     if (currentKey === lastPublished.current) return;

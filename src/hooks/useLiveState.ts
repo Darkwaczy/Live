@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LiveState, BibleVerse } from '../models/liveState';
 import { detectBibleVerse } from '../services/bibleParser';
 import { findSongByWords, locateCurrentLine } from '../services/lyricsService';
@@ -120,7 +120,7 @@ export function useLiveState(
     return () => {
       audioService.stop();
     };
-  }, [sessionId, provider, whisperConfig.apiKey, whisperConfig.endpoint]);
+  }, [sessionId, provider, whisperConfig.audioInput, whisperConfig.apiKey, whisperConfig.endpoint]);
 
   const start = async () => {
     setError(null);
@@ -130,14 +130,14 @@ export function useLiveState(
     }
   };
 
-  const stop = () => {
+  const stop = useCallback(() => {
     if (audioServiceRef.current) {
       audioServiceRef.current.stop();
       setIsListening(false);
     }
-  };
+  }, []);
 
-  const applyLiveState = (updatedState: LiveState) => {
+  const applyLiveState = useCallback((updatedState: LiveState) => {
     setLiveState(updatedState);
     if (updatedState.current_verse) {
       setCurrentVerse(updatedState.current_verse);
@@ -150,7 +150,7 @@ export function useLiveState(
       });
     }
     setSongLineIndex(updatedState.current_line);
-  };
+  }, [sessionId]);
 
   const wordRate = useMemo(() => {
     const now = Date.now();
@@ -170,10 +170,10 @@ export function useLiveState(
     return perSecond;
   }, [speechStats]);
 
-  const clearText = () => {
+  const clearText = useCallback(() => {
     setInterimText('');
     setLiveState(prev => ({ ...prev, current_text: '', updated_at: new Date().toISOString() }));
-  };
+  }, []);
 
   return {
     liveState,

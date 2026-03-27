@@ -159,6 +159,7 @@ export default function App() {
       return;
     }
     
+    console.log(`📖 Fetching verse: ${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}...`);
     setFetchedVerse(null);
     const fetchLocalVerse = async () => {
       const version = settings.bibleVersion.toLowerCase();
@@ -166,11 +167,13 @@ export default function App() {
       
       try {
         // Primary: Cloud API
+        console.log(`🌐 Trying cloud API: bible-api.com...`);
         const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${version}`);
         if (!apiRes.ok) throw new Error("Bible API fetch failed");
         const apiData = await apiRes.json();
         
         if (apiData.text) {
+           console.log(`✅ Cloud API success!`);
            setFetchedVerse({ 
              reference: apiData.reference || reference, 
              text: apiData.text.replace(/\n/g, ' ').trim(), 
@@ -179,15 +182,16 @@ export default function App() {
            return;
         }
       } catch (apiErr) {
-        console.warn("Cloud Bible API failed, falling back to local JSON...", apiErr);
+        console.warn("⚠️ Cloud Bible API failed, falling back to local JSON...", apiErr);
       }
 
       try {
         // Secondary Fallback: Local Offline JSON Datasets
+        console.log(`📁 Trying local JSON: /bibles/${version}.json`);
         const res = await fetch(`/bibles/${version}.json`);
         
         if (!res.ok) {
-           throw new Error(`Local Bible dataset for ${version.toUpperCase()} not found`);
+           throw new Error(`Local Bible dataset for ${version.toUpperCase()} not found. Status: ${res.status}`);
         }
         
         const data = await res.json();
@@ -206,6 +210,7 @@ export default function App() {
         }
         
         if (verseText) {
+           console.log(`✅ Local JSON success!`);
            setFetchedVerse({ 
              reference: reference, 
              text: verseText.trim(), 
@@ -215,10 +220,10 @@ export default function App() {
            throw new Error("Passage not found in local dataset structure.");
         }
       } catch (err: any) {
-        console.warn("Both API and Local Dataset fetching failed.");
+        console.error("❌ Verse fetch error:", err.message);
         setFetchedVerse({ 
            reference: reference, 
-           text: `(Passage text unavailable. Check internet or add local ${settings.bibleVersion}.json dataset)`,
+           text: `(Passage unavailable. Ensure /public/bibles/${version}.json exists or check internet)`,
            translation: settings.bibleVersion
         });
       }
@@ -229,7 +234,9 @@ export default function App() {
   useEffect(() => {
     (async () => {
       const existingUser = await getCurrentUser();
-      if (existingUser) setUser(existingUser);
+      if (existingUser && (!user || existingUser.id !== user.id)) {
+        setUser(existingUser);
+      }
       
       const persistedNotes = await getNotes(session.id);
       setNotes(persistedNotes);

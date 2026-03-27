@@ -8,6 +8,7 @@ exports.saveLiveState = saveLiveState;
 exports.saveNote = saveNote;
 exports.getNotes = getNotes;
 exports.getLiveState = getLiveState;
+exports.getSession = getSession;
 const electron_store_1 = __importDefault(require("electron-store"));
 const store = new electron_store_1.default();
 function saveSession(session) {
@@ -30,4 +31,7 @@ function getNotes(sessionId) {
 }
 function getLiveState(sessionId) {
     return store.get(`live_state.${sessionId}`) || null;
+}
+function getSession(sessionId) {
+    return store.get(`sessions.${sessionId}`) || null;
 }

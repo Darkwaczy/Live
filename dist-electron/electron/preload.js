@@ -20,6 +20,7 @@ electron_1.contextBridge.exposeInMainWorld('sermonSync', {
         saveLiveState: (liveState) => electron_1.ipcRenderer.invoke('db:save-live-state', liveState),
         saveNote: (note) => electron_1.ipcRenderer.invoke('db:save-note', note),
         getNotes: (sessionId) => electron_1.ipcRenderer.invoke('db:get-notes', sessionId),
-        getLiveState: (sessionId) => electron_1.ipcRenderer.invoke('db:get-live-state', sessionId)
+        getLiveState: (sessionId) => electron_1.ipcRenderer.invoke('db:get-live-state', sessionId),
+        getSession: (sessionId) => electron_1.ipcRenderer.invoke('db:get-session', sessionId)
     }
 });

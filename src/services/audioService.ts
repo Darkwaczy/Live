@@ -46,6 +46,7 @@ export class AudioService {
 
   constructor(config?: AudioServiceConfig) {
     this.config = { provider: 'web', locale: 'en-NG', ...config };
+    console.log(`AudioService init provider=${this.config.provider} input=${this.config.audioInput}`);
     if (this.config.provider === 'whisper' && this.config.apiKey && this.config.endpoint) {
       this.whisperClient = new RealSpeechProvider({
         provider: 'whisper',
@@ -215,46 +216,35 @@ export class AudioService {
     
     const stream = await this.getAudioStream();
     this.stream = stream;
-    this.audioChunks = []; // Reset chunk buffer
     
-    // Interim simulation for the UI since cloud providers return finalized chunks
-    this.interimInterval = setInterval(() => {
-       const label = this.config.provider === 'groq' ? 'Groq' : this.config.provider === 'deepgram' ? 'Deepgram' : 'Whisper';
-       if (this.config.onTranscript) this.config.onTranscript(`Listening (${label} Cloud API)...`, false, Date.now(), 1);
-    }, 1500);
+    // No interim 'Listening...' text sent as transcript: keep user text stable and only update with real cloud results.
+    // (UI already renders a listening placeholder when isListening=true.)
 
-    // Use the format most likely to be supported
     const mimeType = 'audio/webm';
-    
     this.mediaRecorder = new MediaRecorder(stream, { mimeType });
-    
-    this.mediaRecorder.ondataavailable = (e) => {
+
+    this.mediaRecorder.ondataavailable = async (e) => {
       if (e.data.size > 0) {
-        // Accumulate chunks instead of sending immediately
-        this.audioChunks.push(e.data);
-        
-        // Once we have enough audio (roughly 15+ seconds), send it
-        const totalSize = this.audioChunks.reduce((sum, blob) => sum + blob.size, 0);
-        const estimatedSeconds = totalSize / 16000 / 2; // Rough estimate for 16kHz mono PCM
-        
-        if (estimatedSeconds >= 15 || this.audioChunks.length >= 5) {
-          this.sendAudioToCloud();
-          this.audioChunks = []; // Reset for next batch
-        }
+        await this.sendAudioToCloud(e.data);
       }
     };
-    
+
+    // Restart every 12s to preserve clean standalone chunks and avoid stale headers.
     this.mediaRecorder.onstop = () => {
-      if (this.interimInterval) clearInterval(this.interimInterval);
-      // Send any remaining audio chunks when stopping
-      if (this.audioChunks.length > 0) {
-        this.sendAudioToCloud();
-        this.audioChunks = [];
+      if (this.stream && this.stream.active) {
+        setTimeout(() => {
+          if (this.stream && this.stream.active && this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
+            try {
+              this.mediaRecorder.start(12000);
+            } catch (err) {
+              console.warn('Could not restart media recorder after stop', err);
+            }
+          }
+        }, 50);
       }
     };
-    
-    // Collect audio every 2 seconds
-    this.mediaRecorder.start(2000);
+
+    this.mediaRecorder.start(12000);
     return true;
   }
 
@@ -312,23 +302,10 @@ export class AudioService {
     return new Blob([buffer], { type: 'audio/wav' });
   }
 
-  private async sendAudioToCloud() {
-    if (this.audioChunks.length === 0) return;
-
+  private async sendAudioToCloud(audioBlob: Blob) {
     try {
-      // Combine all chunks into one blob
-      const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-      let uploadBlob = audioBlob;
-
-      // Convert to WAV for compatibility with many STT providers
-      try {
-        uploadBlob = await this.convertWebmToWavBlob(audioBlob);
-      } catch (conversionError) {
-        console.warn('Could not convert webm to wav, falling back to webm', conversionError);
-      }
-      
       // Log for debugging
-      console.log(`📤 Sending ${this.audioChunks.length} chunks, total size: ${audioBlob.size} bytes`);
+      console.log(`📤 Sending single chunk, size: ${audioBlob.size} bytes`);
 
       let url = "https://api.openai.com/v1/audio/transcriptions";
       let headers: any = { "Authorization": `Bearer ${this.config.apiKey}` };
@@ -337,33 +314,30 @@ export class AudioService {
         url = "https://api.groq.com/openai/v1/audio/transcriptions";
       } else if (this.config.provider === 'deepgram') {
         url = "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true";
-        headers["Content-Type"] = "audio/webm";
-        headers["Authorization"] = `Token ${this.config.apiKey}`;
+        headers = {
+          "Authorization": `Token ${this.config.apiKey}`,
+          "Content-Type": "audio/webm"
+        };
 
-        try {
-          const buffer = await audioBlob.arrayBuffer();
-          const res = await fetch(url, {
-            method: "POST",
-            headers,
-            body: buffer
-          });
-          
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const errorMsg = errData.error?.message || errData.err_msg || `Deepgram error: ${res.status}`;
-            throw new Error(errorMsg);
-          }
+        const buffer = await audioBlob.arrayBuffer();
+        const res = await fetch(url, {
+          method: "POST",
+          headers,
+          body: buffer
+        });
 
-          const data = await res.json();
-          const transcriptText = data.results?.channels[0]?.alternatives[0]?.transcript;
-          if (transcriptText && this.config.onTranscript) {
-            this.config.onTranscript(transcriptText, true, Date.now(), 1.0);
-          }
-          console.log(`✅ Deepgram transcribed: ${transcriptText}`);
-        } catch (err: any) {
-          console.error("❌ Deepgram error:", err.message);
-          this.config.onError?.(err);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errorMsg = errData.error?.message || errData.err_msg || `Deepgram error: ${res.status}`;
+          throw new Error(errorMsg);
         }
+
+        const data = await res.json();
+        const transcriptText = data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
+        if (transcriptText && this.config.onTranscript) {
+          this.config.onTranscript(transcriptText, true, Date.now(), 1.0);
+        }
+        console.log(`✅ Deepgram transcribed: ${transcriptText}`);
         return;
       }
 
@@ -378,7 +352,7 @@ export class AudioService {
         headers,
         body: formData
       });
-      
+
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         const errorMsg = errData.error?.message || errData.err_msg || `API error: ${res.status}`;
@@ -387,7 +361,7 @@ export class AudioService {
       }
 
       const data = await res.json();
-      const transcriptText = data.text;
+      const transcriptText = data.text || data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
       if (transcriptText && this.config.onTranscript) {
         this.config.onTranscript(transcriptText, true, Date.now(), 1.0);
       }

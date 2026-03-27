@@ -92,4 +92,7 @@ electron_1.ipcMain.handle('db:get-notes', async (event, sessionId) => {
 electron_1.ipcMain.handle('db:get-live-state', async (event, sessionId) => {
     return db.getLiveState(sessionId);
 });
+electron_1.ipcMain.handle('db:get-session', async (event, sessionId) => {
+    return db.getSession(sessionId);
+});
 // Placeholder: could forward system settings, persistence API, offline sync and audio device info.
