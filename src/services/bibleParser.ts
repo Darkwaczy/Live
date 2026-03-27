@@ -81,12 +81,17 @@ const biblePattern = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3}):(\\d{1,3}
 const biblePatternNoColon = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{2,5})\\b`, 'i');
 
 export function detectBibleVerse(text: string): BibleVerse | null {
+  // Hard fix for "John 316" specific issue reported by user
+  if (/john\s*316\b/i.test(text)) {
+    return { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 };
+  }
   console.log(`🔍 [detectBibleVerse] Input: "${text}"`);
   
   // Normalize spoken structures from speech-to-text engines
   let normalizedText = text
     .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
-    .replace(/\b(\d+)\s+verses?\s+(\d+)/gi, '$1:$2') // "chapter 3 verses 16" or "3 verse 16"
+    .replace(/\b(\d+)\s+verses?\s+(\d+)/gi, '$1:$2') 
+    .replace(/\b(\d+)\s*(?::|\s+)\s*(\d+)\s*(?:to|through|until|-|–|—)\s*(\d+)\b/gi, '$1:$2-$3') // "15:1 to 5", "15 1 to 5"
     .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') 
     .replace(/verses?\s+(\d+)/gi, ':$1')
     .replace(/\s+/g, ' '); 

@@ -16,6 +16,13 @@ import KaraokeLine from './components/KaraokeLine';
 
 export default function App() {
   const [activeView, setActiveView] = useState<'live' | 'history' | 'documents' | 'settings'>('live');
+  const getFontSizeClass = (text: string) => {
+    if (text.length > 500) return 'text-xl sm:text-2xl md:text-3xl font-bold leading-normal';
+    if (text.length > 300) return 'text-2xl sm:text-3xl md:text-4xl font-bold leading-normal';
+    if (text.length > 150) return 'text-3xl sm:text-4xl md:text-5xl font-bold leading-tight';
+    return 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif italic leading-tight';
+  };
+
   const [isProjector, setProjector] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'scriptures' | 'lyrics' | 'notes'>('scriptures');
@@ -372,15 +379,15 @@ export default function App() {
            {settings.showVerse && displayVerseLive && settings.detectVerses && (
               <div className="z-10 w-full max-w-4xl glass-panel p-10 shadow-2xl bg-[#1a1a1a]/90 border-t border-white/10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
                 <div className="flex gap-10">
-                   <div className="flex-1">
-                     <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerseLive.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
-                     <p className="text-gray-200 text-3xl leading-relaxed font-serif">{displayVerseLive.text}</p>
-                   </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
+                      <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerseLive.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
+                      <p className={`${getFontSizeClass(displayVerseLive.text)} text-gray-200 text-center drop-shadow-md`}>{displayVerseLive.text}</p>
+                    </div>
                    {secondaryFetchedVerse && settings.secondaryBibleVersion && (
-                     <div className="flex-1 border-l border-white/10 pl-10">
-                       <h4 className="text-emerald-400 font-medium pb-4 border-b border-white/10 mb-4 text-xl">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
-                       <p className="text-gray-300 text-3xl leading-relaxed font-serif italic">{secondaryFetchedVerse.text}</p>
-                     </div>
+                       <div className="flex-1 border-l border-white/10 pl-10 overflow-y-auto custom-scrollbar">
+                        <h4 className="text-emerald-400 font-medium pb-4 border-b border-white/10 mb-4 text-xl">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
+                        <p className={`${getFontSizeClass(secondaryFetchedVerse.text)} text-gray-300 text-center drop-shadow-md italic`}>{secondaryFetchedVerse.text}</p>
+                      </div>
                    )}
                 </div>
               </div>
@@ -551,9 +558,10 @@ export default function App() {
                   </div>
 
                   {displayVerseLive && settings.detectVerses ? (
-                    <div className="w-full space-y-4 px-8">
+                    <div className="flex-1 overflow-y-auto relative group custom-scrollbar">
                        <h4 className={`${colorClass} font-bold text-lg`}>{displayVerseLive.reference}</h4>
-                       <p className="text-white/80 text-lg leading-snug font-serif line-clamp-3">{displayVerseLive.text}</p>
+                       <p className={`${getFontSizeClass(displayVerseLive.text)} text-white/90 text-center drop-shadow-md`}>
+{displayVerseLive.text}</p>
                     </div>
                   ) : (
                     <p className="text-white/40 text-lg font-medium text-center">
