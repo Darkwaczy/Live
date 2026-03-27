@@ -1,157 +1,82 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Menu, Play, Pause, SkipForward, SkipBack, 
-  BookOpen, Music, FileText, Settings, 
-  Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle
+  Mic, Play, Pause, Square, Settings, Monitor, BookOpen, 
+  Music, FileText, Save, History, Download, X, AlertCircle,
+  Menu, ChevronRight, Cast, LayoutGrid, SkipBack, SkipForward,
+  Activity, Clock, Trash2, Globe
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { useSync } from './hooks/useSync';
-import { Session } from './models/session';
+import { saveLiveState, getLiveState, saveNote, getNotes, saveSession, getSession } from './services/dbService';
+import { getCurrentUser } from './services/authService';
 import { Note } from './models/note';
-import { User } from './models/user';
-import { login, logout, getCurrentUser } from './services/authService';
-import { getNotes, saveNote, saveLiveState, getLiveState, saveSession, getSession } from './services/dbService';
+import { Session } from './models/session';
 import SettingsView from './components/SettingsView';
-
-const SESSION_ID = 'service-001';
-
-type ViewMode = 'live' | 'history' | 'documents' | 'settings';
-type RightPanelTab = 'scriptures' | 'lyrics' | 'notes';
-const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass }: { lyric: string, spokenText: string, colorClass: string, animationClass: string, sizeClass: string }) => {
-  const words = lyric.split(' ');
-  const recentSpoken = spokenText.toLowerCase().replace(/[^a-z0-9 \']/g, '').split(' ').filter(w => w.length > 0).slice(-20);
-  
-  let highestMatchIdx = -1;
-  let spokenSearchStart = 0;
-  const normalizedLyricWords = words.map(w => w.toLowerCase().replace(/[^a-z0-9 \']/g, ''));
-  
-  for (let i = 0; i < normalizedLyricWords.length; i++) {
-    const target = normalizedLyricWords[i];
-    if (!target) continue;
-    
-    let foundIdx = -1;
-    for (let j = spokenSearchStart; j < recentSpoken.length; j++) {
-       const spoken = recentSpoken[j];
-       if (spoken === target || (target.length > 3 && (target.includes(spoken) || spoken.includes(target)))) {
-          foundIdx = j;
-          break;
-       }
-    }
-    if (foundIdx !== -1) {
-       highestMatchIdx = i;
-       spokenSearchStart = foundIdx + 1;
-    }
-  }
-
-  if (!lyric || lyric === '...') return <span className={`${sizeClass} font-bold text-white/30 tracking-wide`}>...</span>;
-
-  return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 w-full relative z-10">
-      {words.map((word, idx) => {
-         const isSung = idx <= highestMatchIdx;
-         const isNext = idx === highestMatchIdx + 1;
-         
-         let className = "text-white/40 font-bold transition-all duration-300 transform";
-         if (isSung) {
-            className = `${colorClass.replace('text-', 'text-')} font-black ${animationClass === 'glow' ? 'drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]' : ''} transition-all duration-200`;
-         } else if (isNext) {
-            className = "text-white/90 font-bold scale-105 transition-all duration-200 drop-shadow-md";
-         }
-         return <span key={idx} className={`${sizeClass} ${className} tracking-tight`}>{word}</span>
-      })}
-    </div>
-  );
-};
+import KaraokeLine from './components/KaraokeLine';
 
 export default function App() {
+  const [activeView, setActiveView] = useState<'live' | 'history' | 'documents' | 'settings'>('live');
+  const [isProjector, setProjector] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
+  const [rightPanelTab, setRightPanelTab] = useState<'scriptures' | 'lyrics' | 'notes'>('scriptures');
   const [session, setSession] = useState<Session>({
-    id: SESSION_ID,
-    name: 'Sunday Morning Service',
+    id: 'session-' + Date.now(),
+    name: 'Sunday Service - ' + new Date().toLocaleDateString(),
     status: 'live',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   });
-
-  const [selectedNote, setSelectedNote] = useState<string | null>(null);
-
+  const [user, setUser] = useState<any>(null);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [user, setUser] = useState<User | null>(null);
   const [newNote, setNewNote] = useState('');
-
-  // UI Interactive States
-  const [activeView, setActiveView] = useState<ViewMode>('live');
-  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('notes');
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isProjector, setProjector] = useState(false);
   const [manualLineOffset, setManualLineOffset] = useState(0);
 
-  // Global Settings State
-  const [settings, setSettings] = useState({
-    audioInput: 'live',
-    micDevice: 'default',
-    noiseSuppression: true,
-    gain: 75,
-    enableTranscription: true,
-    speechEngine: 'web',
-    whisperApiKey: '',
-    accuracyLevel: 80,
-    languageModel: 'whisper-large',
-    detectVerses: true,
-    verseSensitivity: 60,
-    bibleVersion: 'KJV',
-    aiVerseDetection: false,
-    aiEndpoint: 'https://api.ollama.ai/v1/chat/completions',
-    aiApiKey: '62fb62e21a924e8b840f89eadf63ac60.4oe6yZavxGWszCrtRY3iuLhJ',
-    aiModel: 'mistral',
-    detectSongs: true,
-    lyricsSource: 'local',
-    autoSyncLyrics: true,
-    showTranscript: true,
-    showVerse: true,
-    showLyrics: true,
-    transcriptSize: 'large',
-    highlightColor: 'emerald',
-    highlightAnimation: 'glow',
-    transparency: 50,
-    autoSave: true,
-    saveHistory: true,
-    exportFormat: 'txt',
-    cloudSync: false,
-<<<<<<< HEAD
-    alertVisual: true,
-    autoAirVerses: false,
-    secondaryBibleVersion: '',
-    timerDuration: 45,
-    autoShowTimer: false,
-=======
-    alertVerse: true,
-    alertSong: true,
-    alertSync: true,
-    alertSound: false,
-    alertVisual: true,
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('sermonsync_settings');
+    return saved ? JSON.parse(saved) : {
+      gain: 50,
+      bibleVersion: 'KJV',
+      secondaryBibleVersion: '',
+      speechEngine: 'web',
+      audioInput: 'live',
+      showTranscript: true,
+      showVerse: true,
+      showLyrics: true,
+      enableTranscription: true,
+      verseSensitivity: 80,
+      transcriptSize: 'medium',
+      highlightColor: 'emerald',
+      highlightAnimation: 'glow',
+      transparency: 90,
+      autoSave: true,
+      saveHistory: true,
+      autoAirVerses: false,
+      timerDuration: 45,
+      autoShowTimer: true,
+      detectSongs: true,
+      detectVerses: true,
+      autoSyncLyrics: true,
+      lyricsSource: 'local',
+      aiVerseDetection: false,
+      aiEndpoint: 'http://localhost:11434/api/generate',
+      aiModel: 'llama3',
+      aiApiKey: ''
+    };
   });
 
-  const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
-
-  const updateDraftSetting = (key: string, value: any) => {
-    setDraftSettings(prev => ({ ...prev, [key as keyof typeof settings]: value }));
-  };
-
+  const [draftSettings, setDraftSettings] = useState(settings);
+  const updateDraftSetting = (key: string, val: any) => setDraftSettings((prev: any) => ({ ...prev, [key]: val }));
   const commitSettings = () => {
     setSettings(draftSettings);
+    localStorage.setItem('sermonsync_settings', JSON.stringify(draftSettings));
     showToast('Settings saved successfully!');
   };
 
-<<<<<<< HEAD
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
     start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse
   } = useLiveState(
-=======
-  const { liveState, interimText, currentSong, currentLine, currentVerse, isListening, start, stop, clearText, applyLiveState, error, setError } = useLiveState(
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
     { apiKey: settings.whisperApiKey, endpoint: '', audioInput: settings.audioInput as 'live' | 'system' },
@@ -164,10 +89,9 @@ export default function App() {
      if (transcriptScrollRef.current) {
         transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
      }
-  }, [liveState.current_text, interimText]);
+  }, [liveState.current_text, liveState.preview_text, interimText]);
 
   const [fetchedVerse, setFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
-<<<<<<< HEAD
   const [secondaryFetchedVerse, setSecondaryFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
 
   const [timerSession, setTimerSession] = useState({ 
@@ -185,10 +109,7 @@ export default function App() {
     }
     return () => clearInterval(interval);
   }, [timerSession.isRunning, timerSession.remaining]);
-=======
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
 
-  const bibleVersions = ['KJV', 'NIV', 'NLT', 'TPT'];
   const [bibleData, setBibleData] = useState<any[]>([]);
   const [selectedBook, setSelectedBook] = useState('Genesis');
   const [selectedChapter, setSelectedChapter] = useState(1);
@@ -223,62 +144,8 @@ export default function App() {
     loadBibleData();
   }, [settings.bibleVersion]);
 
+  // Handle Bible Explorer Text
   useEffect(() => {
-<<<<<<< HEAD
-    const fetchVerse = async (ref: string, version: string, isSecondary: boolean) => {
-      try {
-        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(ref)}?translation=${version}`);
-        if (!apiRes.ok) throw new Error("API failed");
-        const apiData = await apiRes.json();
-        if (apiData.text) {
-          const result = { reference: apiData.reference || ref, text: apiData.text.replace(/\n/g, ' ').trim(), translation: version };
-          if (!isSecondary) setFetchedVerse(result);
-          else setSecondaryFetchedVerse(result);
-          return true;
-        }
-      } catch (e) {}
-
-      try {
-        const res = await fetch(`/bibles/${version.toLowerCase()}.json`);
-        if (!res.ok) return false;
-        const bibleDataLocal = await res.json();
-        const verse = liveState.preview_verse;
-        if (!verse) return false;
-        
-        const book = bibleDataLocal.find((b: any) => (b.name || b.book || '').toLowerCase() === verse.book.toLowerCase());
-        if (book && book.chapters && book.chapters[verse.chapter - 1]) {
-           const text = book.chapters[verse.chapter - 1][verse.verse_start - 1];
-           const result = { reference: ref, text, translation: version };
-           if (!isSecondary) setFetchedVerse(result);
-           else setSecondaryFetchedVerse(result);
-           return true;
-        }
-      } catch (e) {}
-      return false;
-    };
-
-    if (liveState.preview_verse) {
-      const mainRef = `${liveState.preview_verse.book} ${liveState.preview_verse.chapter}:${liveState.preview_verse.verse_start}`;
-      fetchVerse(mainRef, settings.bibleVersion, false);
-      
-      if (settings.secondaryBibleVersion) {
-        fetchVerse(mainRef, settings.secondaryBibleVersion, true);
-      } else {
-        setSecondaryFetchedVerse(null);
-      }
-    } else {
-      setFetchedVerse(null);
-      setSecondaryFetchedVerse(null);
-    }
-  }, [liveState.preview_verse, settings.bibleVersion, settings.secondaryBibleVersion]);
-
-  // Hook into auto-air logic
-  useEffect(() => {
-    if (settings.autoAirVerses && liveState.preview_verse && liveState.preview_verse !== liveState.current_verse) {
-      goLive();
-    }
-  }, [liveState.preview_verse, settings.autoAirVerses, goLive, liveState.current_verse]);
-=======
     if (!bibleData || bibleData.length === 0) {
       setChapterText('(Loading locally, or book unavailable for this translation)');
       return;
@@ -302,84 +169,64 @@ export default function App() {
     );
   }, [bibleData, selectedBook, selectedChapter]);
 
+  // Handle Live Detection Verse Fetching
   useEffect(() => {
-    if (!currentVerse) {
-      setFetchedVerse(null);
-      return;
-    }
-    
-    console.log(`📖 Fetching verse: ${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}...`);
-    setFetchedVerse(null);
-    const fetchLocalVerse = async () => {
-      const version = settings.bibleVersion.toLowerCase();
-      const reference = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}${currentVerse.verse_end && currentVerse.verse_end > currentVerse.verse_start ? `-${currentVerse.verse_end}` : ''}`;
-      
+    const fetchVerseAction = async (ref: string, version: string, isSecondary: boolean) => {
       try {
-        // Primary: Cloud API
-        console.log(`🌐 Trying cloud API: bible-api.com...`);
-        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${version}`);
-        if (!apiRes.ok) throw new Error("Bible API fetch failed");
+        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(ref)}?translation=${version}`);
+        if (!apiRes.ok) throw new Error("API failed");
         const apiData = await apiRes.json();
-        
         if (apiData.text) {
-           console.log(`✅ Cloud API success!`);
-           setFetchedVerse({ 
-             reference: apiData.reference || reference, 
-             text: apiData.text.replace(/\n/g, ' ').trim(), 
-             translation: settings.bibleVersion 
-           });
-           return;
+          const result = { reference: apiData.reference || ref, text: apiData.text.replace(/\n/g, ' ').trim(), translation: version };
+          if (!isSecondary) setFetchedVerse(result);
+          else setSecondaryFetchedVerse(result);
+          return true;
         }
-      } catch (apiErr) {
-        console.warn("⚠️ Cloud Bible API failed, falling back to local JSON...", apiErr);
-      }
+      } catch (e) {}
 
       try {
-        // Secondary Fallback: Local Offline JSON Datasets
-        console.log(`📁 Trying local JSON: /bibles/${version}.json`);
-        const res = await fetch(`/bibles/${version}.json`);
+        const res = await fetch(`/bibles/${version.toLowerCase()}.json`);
+        if (!res.ok) return false;
+        const bibleDataLocal = await res.json();
+        const verse = liveState.preview_verse || liveState.current_verse;
+        if (!verse) return false;
         
-        if (!res.ok) {
-           throw new Error(`Local Bible dataset for ${version.toUpperCase()} not found. Status: ${res.status}`);
+        const book = bibleDataLocal.find((b: any) => (b.name || b.book || '').toLowerCase() === verse.book.toLowerCase());
+        if (book && book.chapters && book.chapters[verse.chapter - 1]) {
+           const text = book.chapters[verse.chapter - 1][verse.verse_start - 1];
+           const result = { reference: ref, text, translation: version };
+           if (!isSecondary) setFetchedVerse(result);
+           else setSecondaryFetchedVerse(result);
+           return true;
         }
-        
-        const data = await res.json();
-        let verseText = "";
-        
-        if (Array.isArray(data)) {
-           const bookData = data.find((b: any) => b.name?.toLowerCase() === currentVerse.book.toLowerCase() || b.book?.toLowerCase() === currentVerse.book.toLowerCase());
-           if (bookData && bookData.chapters) {
-              const chapterArr = bookData.chapters[currentVerse.chapter - 1]; // 0-indexed
-              if (chapterArr) {
-                 for (let i = currentVerse.verse_start; i <= (currentVerse.verse_end || currentVerse.verse_start); i++) {
-                    if (chapterArr[i - 1]) verseText += chapterArr[i - 1] + " ";
-                 }
-              }
-           }
-        }
-        
-        if (verseText) {
-           console.log(`✅ Local JSON success!`);
-           setFetchedVerse({ 
-             reference: reference, 
-             text: verseText.trim(), 
-             translation: settings.bibleVersion 
-           });
-        } else {
-           throw new Error("Passage not found in local dataset structure.");
-        }
-      } catch (err: any) {
-        console.error("❌ Verse fetch error:", err.message);
-        setFetchedVerse({ 
-           reference: reference, 
-           text: `(Passage unavailable. Ensure /public/bibles/${version}.json exists or check internet)`,
-           translation: settings.bibleVersion
-        });
-      }
+      } catch (e) {}
+      return false;
     };
-    fetchLocalVerse();
-  }, [currentVerse, settings.bibleVersion]);
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
+
+    if (liveState.preview_verse) {
+      const mainRef = `${liveState.preview_verse.book} ${liveState.preview_verse.chapter}:${liveState.preview_verse.verse_start}`;
+      fetchVerseAction(mainRef, settings.bibleVersion, false);
+      
+      if (settings.secondaryBibleVersion) {
+        fetchVerseAction(mainRef, settings.secondaryBibleVersion, true);
+      } else {
+        setSecondaryFetchedVerse(null);
+      }
+    } else if (liveState.current_verse) {
+       const mainRef = `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}`;
+       fetchVerseAction(mainRef, settings.bibleVersion, false);
+    } else {
+      setFetchedVerse(null);
+      setSecondaryFetchedVerse(null);
+    }
+  }, [liveState.preview_verse, liveState.current_verse, settings.bibleVersion, settings.secondaryBibleVersion]);
+
+  // Hook into auto-air logic
+  useEffect(() => {
+    if (settings.autoAirVerses && liveState.preview_verse && (!liveState.current_verse || liveState.preview_verse.book !== liveState.current_verse.book || liveState.preview_verse.verse_start !== liveState.current_verse.verse_start)) {
+      goLive();
+    }
+  }, [liveState.preview_verse, settings.autoAirVerses, goLive, liveState.current_verse]);
 
   useEffect(() => {
     (async () => {
@@ -434,14 +281,7 @@ export default function App() {
     try {
       await saveNote(noteObj);
     } catch (err) {
-      console.error('Unable to persist note to Supabase DB', err);
-      try {
-        if (window.sermonSync?.db?.saveNote) {
-          await window.sermonSync.db.saveNote(noteObj);
-        }
-      } catch (localErr) {
-        console.error('Unable to persist note to local DB fallback', localErr);
-      }
+      console.error('Unable to persist note', err);
     }
   };
 
@@ -470,7 +310,6 @@ export default function App() {
     clearText();
     showToast('Saved transcript block to Notes and cleared screen!');
     
-    // Attempt local storage fallback
     try {
       if (window.sermonSync?.db?.saveNote) {
         window.sermonSync.db.saveNote(noteObj);
@@ -478,28 +317,21 @@ export default function App() {
     } catch (e) {}
   };
 
-<<<<<<< HEAD
   const displayVersePreview = liveState.preview_verse 
     ? fetchedVerse 
       ? fetchedVerse
-      : { reference: `${liveState.preview_verse.book} ${liveState.preview_verse.chapter}:${liveState.preview_verse.verse_start}${liveState.preview_verse.verse_end && liveState.preview_verse.verse_end > liveState.preview_verse.verse_start ? `-${liveState.preview_verse.verse_end}` : ''}`, text: 'Retrieving passage...', translation: settings.bibleVersion } 
+      : { reference: `${liveState.preview_verse.book} ${liveState.preview_verse.chapter}:${liveState.preview_verse.verse_start}`, text: 'Retrieving passage...', translation: settings.bibleVersion } 
     : null;
 
   const displayVerseLive = liveState.current_verse
     ? fetchedVerse && fetchedVerse.reference.includes(liveState.current_verse.book)
       ? fetchedVerse
-      : { reference: `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}${liveState.current_verse.verse_end && liveState.current_verse.verse_end > liveState.current_verse.verse_start ? `-${liveState.current_verse.verse_end}` : ''}`, text: 'Live on Screen', translation: settings.bibleVersion }
-=======
-  const displayVerse = currentVerse 
-    ? fetchedVerse 
-      ? fetchedVerse
-      : { reference: `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}${currentVerse.verse_end && currentVerse.verse_end > currentVerse.verse_start ? `-${currentVerse.verse_end}` : ''}`, text: 'Retrieving passage from the cloud...', translation: settings.bibleVersion } 
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
+      : { reference: `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}`, text: 'Live on Screen', translation: settings.bibleVersion }
     : null;
 
   const fullTranscript = (liveState.current_text + ' ' + (interimText || '')).trim();
 
-  // Calculate actual line of song
+  // Lyrics calculation
   const baseLineIndex = settings.autoSyncLyrics ? (currentLine ?? 0) : 0;
   const actualLineIndex = Math.max(0, baseLineIndex + manualLineOffset);
   const mainLyric = currentSong?.lyrics?.find(l => l.order === actualLineIndex)?.line || '';
@@ -508,35 +340,24 @@ export default function App() {
   const handleNext = () => setManualLineOffset(prev => prev + 1);
   const handlePrev = () => setManualLineOffset(prev => prev - 1);
 
-  // Dynamic Tailwind Classes based on settings
+  // Styling
   const colorClass = settings.highlightColor === 'gold' ? 'text-amber-400' : settings.highlightColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
   const bgClass = settings.highlightColor === 'gold' ? 'bg-amber-500' : settings.highlightColor === 'blue' ? 'bg-blue-500' : 'bg-emerald-500';
   const borderClass = settings.highlightColor === 'gold' ? 'border-amber-500' : settings.highlightColor === 'blue' ? 'border-blue-500' : 'border-emerald-500';
   const animationClass = settings.highlightAnimation === 'glow' ? `drop-shadow-[0_0_12px_rgba(currentColor,0.4)]` : settings.highlightAnimation === 'fade' ? 'animate-pulse' : '';
-  const blurStyle = { backdropFilter: `blur(${settings.transparency/10 + 2}px)`, filter: `opacity(${settings.transparency}%)` };
-
-<<<<<<< HEAD
+  
   const transcriptTextClass = settings.transcriptSize === 'small' ? 'text-xl' : settings.transcriptSize === 'medium' ? 'text-2xl' : 'text-3xl';
-=======
-  const transcriptTextClass = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-[34px]';
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
   const projectorTextClass1 = settings.transcriptSize === 'small' ? 'text-4xl' : settings.transcriptSize === 'medium' ? 'text-5xl' : 'text-6xl';
-  const projectorTextClass2 = settings.transcriptSize === 'small' ? 'text-3xl' : settings.transcriptSize === 'medium' ? 'text-4xl' : 'text-5xl';
-  const projectorTextClass3 = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-4xl';
 
   if (isProjector) {
-<<<<<<< HEAD
     const minutes = Math.floor(timerSession.remaining / 60);
     const seconds = timerSession.remaining % 60;
     
-=======
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     return (
       <div className="flex h-screen w-full bg-[#000000] text-white font-sans overflow-hidden select-none relative px-12 py-12">
         <button onClick={() => setProjector(false)} className="absolute top-6 right-6 p-4 text-white/20 hover:text-white/80 transition-opacity z-50">
            <X size={32} />
         </button>
-<<<<<<< HEAD
 
         {/* Countdown Timer */}
         {settings.autoShowTimer && (
@@ -555,7 +376,7 @@ export default function App() {
                      <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerseLive.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
                      <p className="text-gray-200 text-3xl leading-relaxed font-serif">{displayVerseLive.text}</p>
                    </div>
-                   {secondaryFetchedVerse && (
+                   {secondaryFetchedVerse && settings.secondaryBibleVersion && (
                      <div className="flex-1 border-l border-white/10 pl-10">
                        <h4 className="text-emerald-400 font-medium pb-4 border-b border-white/10 mb-4 text-xl">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
                        <p className="text-gray-300 text-3xl leading-relaxed font-serif italic">{secondaryFetchedVerse.text}</p>
@@ -567,29 +388,21 @@ export default function App() {
            {(!displayVerseLive || !settings.showVerse) && settings.showTranscript && settings.enableTranscription && (
              <div className="w-full space-y-8 px-24 text-center z-0">
                 <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
-                  {liveState.current_text.split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
-=======
-        <div className="flex-1 flex flex-col justify-center items-center w-full max-w-6xl mx-auto space-y-12">
-           {settings.showVerse && displayVerse && settings.detectVerses && (
-              <div className="absolute top-12 left-12 z-10 w-[400px] glass-panel p-8 shadow-2xl bg-[#1a1a1a]/90 border-t border-white/10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
-                <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerse.reference} ({settings.bibleVersion})</h4>
-                <p className="text-gray-200 text-2xl leading-relaxed font-serif">{displayVerse.text}</p>
-              </div>
-           )}
-           {settings.showTranscript && settings.enableTranscription && (
-             <div className="w-full space-y-8 px-24 text-center z-0">
-                <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
-                  {(liveState.current_text + (interimText ? ' ' + interimText : '')).trim().split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
+                   {(liveState.current_text || '').split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Screen is clear')}
                 </p>
              </div>
            )}
         </div>
-        {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
+        
+        {settings.showLyrics && settings.detectSongs && currentSong && (
            <div className="absolute bottom-12 left-12 right-12 glass-panel p-8 bg-[#111111]/90 border border-white/10 text-center" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
-              <p className={`text-5xl font-bold ${colorClass} tracking-wide mb-4 ${animationClass}`}>
-                {mainLyric || '...'}
-              </p>
+              <KaraokeLine 
+                lyric={mainLyric || '...'} 
+                spokenText={fullTranscript} 
+                colorClass={colorClass} 
+                animationClass={settings.highlightAnimation} 
+                sizeClass="text-5xl"
+              />
               {nextLyric && <p className="text-3xl text-gray-500 italic mt-4">{nextLyric}</p>}
            </div>
         )}
@@ -610,37 +423,17 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className="w-[72px] flex flex-col items-center py-6 bg-[#161616] border-r border-white/5 z-20 shrink-0">
-        <button onClick={() => showToast('Menu opened')} className="p-3 hover:bg-white/5 rounded-xl mb-8 transition-colors">
+        <button className="p-3 hover:bg-white/5 rounded-xl mb-8 transition-colors">
           <Menu size={24} className={activeView === 'settings' ? 'text-white' : 'text-gray-400'} />
         </button>
         <nav className="flex flex-col gap-6 w-full px-3">
-          <button 
-            onClick={() => setActiveView('live')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors ${activeView === 'live' ? 'bg-red-500/10 text-red-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
-            title="Live Session">
-            {activeView === 'live' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-red-500 rounded-r-lg"></div>}
+          <button onClick={() => setActiveView('live')} className={`flex justify-center p-3 rounded-xl relative transition-colors ${activeView === 'live' ? 'bg-red-500/10 text-red-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} title="Live Session">
             <Monitor size={22} />
           </button>
-          <button 
-            onClick={() => setActiveView('history')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors ${activeView === 'history' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
-            title="History">
-            {activeView === 'history' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-emerald-500 rounded-r-lg"></div>}
+          <button onClick={() => setActiveView('history')} className={`flex justify-center p-3 rounded-xl relative transition-colors ${activeView === 'history' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} title="History">
             <BookOpen size={22} />
           </button>
-          <button 
-            onClick={() => setActiveView('documents')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors ${activeView === 'documents' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
-            title="Documents">
-            {activeView === 'documents' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-emerald-500 rounded-r-lg"></div>}
-            <FileText size={22} />
-          </button>
-          <div className="flex-1" />
-          <button 
-            onClick={() => setActiveView('settings')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors mt-auto ${activeView === 'settings' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
-            title="Settings">
-            {activeView === 'settings' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-white rounded-r-lg"></div>}
+          <button onClick={() => setActiveView('settings')} className={`flex justify-center p-3 rounded-xl relative transition-colors mt-auto ${activeView === 'settings' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} title="Settings">
             <Settings size={22} />
           </button>
         </nav>
@@ -649,527 +442,197 @@ export default function App() {
       {/* Main Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-[#1a2332]/40 via-[#121212] to-[#121212]">
         
-        {/* API Error Toast */}
+        {/* Error Toast */}
         {error && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 flex items-center gap-3 bg-red-500/90 backdrop-blur-md text-white px-5 py-3 rounded-xl shadow-2xl border border-red-400/30">
-            <AlertCircle size={18} className="text-red-100" />
-            <span className="text-sm font-medium pr-2">{error}</span>
-            <div className="w-px h-4 bg-white/20"></div>
-            <button onClick={() => setError(null)} className="p-1 hover:bg-white/20 rounded-md transition-colors">
-              <X size={14} />
-            </button>
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in flex items-center gap-3 bg-red-500/90 backdrop-blur-md text-white px-5 py-3 rounded-xl border border-red-400/30">
+            <AlertCircle size={18} />
+            <span className="text-sm font-medium">{error}</span>
+            <button onClick={() => setError(null)}><X size={14} /></button>
           </div>
         )}
 
         {/* Top Navbar */}
         <header className="h-[72px] flex items-center justify-between px-6 border-b border-white/5 bg-transparent z-10 shrink-0">
           <div className="flex items-center gap-6">
-            <button onClick={() => showToast('Burger menu clicked')} className="text-gray-400 hover:text-white transition-colors">
-              <Menu size={24} />
-            </button>
-            <div className="flex items-center gap-2 bg-red-500 rounded-md px-2.5 py-1" title="Session is live">
+            <div className="flex items-center gap-2 bg-red-500 rounded-md px-2.5 py-1">
               <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
               <span className="text-[11px] font-bold text-white tracking-widest uppercase">LIVE</span>
             </div>
             
             <div className="flex items-center gap-1 bg-[#1e1e24]/80 p-0.5 rounded-lg border border-white/5">
-<<<<<<< HEAD
               <button 
                 onClick={() => setTimerSession(prev => ({ ...prev, isRunning: !prev.isRunning }))}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${timerSession.isRunning ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'}`}
-                title={timerSession.isRunning ? "Pause Stage Timer" : "Start Stage Timer"}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${timerSession.isRunning ? 'bg-red-400 animate-pulse' : 'bg-gray-500'}`}></div>
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${timerSession.isRunning ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/5 text-gray-400 border border-white/5'}`}>
                 Timer
               </button>
-              <button 
-                onClick={() => setTimerSession(prev => ({ ...prev, remaining: (settings.timerDuration || 45) * 60, isRunning: false }))}
-                className="p-1.5 text-gray-500 hover:text-white transition-colors"
-                title="Reset Timer"
-              >
-                <X size={12} />
-              </button>
+              <button onClick={() => setTimerSession(prev => ({ ...prev, remaining: (settings.timerDuration || 45) * 60, isRunning: false }))} className="p-1.5 text-gray-500 hover:text-white"><X size={12} /></button>
+              
               <div className="w-px h-5 bg-white/10 mx-1"></div>
-=======
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
-              <button onClick={handleSnapshotToNotes} className="px-3 py-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 rounded-md transition-all mr-1" title="Save current text to Notes and clear screen">
-                <Save size={14} /> Save & Clear
+              
+              <button onClick={handleSnapshotToNotes} className="px-3 py-1.5 flex items-center gap-2 text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-md">
+                <Save size={14} /> Clear Screen
               </button>
+              
               <div className="w-px h-5 bg-white/10 mx-1"></div>
-              <button onClick={isListening ? stop : start} className={`p-2 hover:bg-white/10 rounded-md transition-colors ${colorClass}`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
+              
+              <button onClick={isListening ? stop : start} className={`p-2 transition-colors ${colorClass}`}>
                 {isListening ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
-              <button 
-                onClick={() => { handlePrev(); showToast('Skipped back one line'); }} 
-                className="p-2 hover:bg-white/10 text-white rounded-md transition-colors"
-                title="Previous Lyric/Item"
-              >
-                <SkipBack size={18} fill="currentColor" />
-              </button>
-              <button 
-<<<<<<< HEAD
-                onClick={goLive}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${liveState.is_live_dirty ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-gray-700 text-gray-400 opacity-50 cursor-not-allowed'}`}
-                disabled={!liveState.is_live_dirty}
-              >
-                <SkipForward size={18} fill="currentColor" /> GO LIVE (AIR)
-=======
-                onClick={() => { handleNext(); showToast('Skipped forward one line'); }} 
-                className="p-2 hover:bg-white/10 text-white rounded-md transition-colors"
-                title="Next Lyric/Item"
-              >
-                <SkipForward size={18} fill="currentColor" />
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
+              
+              <button onClick={goLive} className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${liveState.is_live_dirty ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-700 text-gray-400'}`} disabled={!liveState.is_live_dirty}>
+                <SkipForward size={18} fill="currentColor" /> GO LIVE
               </button>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
             <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-gray-400 h-full">
-              <button 
-                onClick={() => { setRightPanelTab('scriptures'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? colorClass : 'hover:text-white'}`}>
+              <button onClick={() => { setRightPanelTab('scriptures'); setIsRightPanelOpen(true); }} className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? colorClass : 'hover:text-white'}`}>
                 <BookOpen size={16} /> Scriptures
-                {rightPanelTab === 'scriptures' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
               </button>
-              <button 
-                onClick={() => { setRightPanelTab('lyrics'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'lyrics' ? colorClass : 'hover:text-white'}`}>
-                <Music size={16} /> Lyrics
-                {rightPanelTab === 'lyrics' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
-              </button>
-              <button 
-                onClick={() => { setRightPanelTab('notes'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'notes' ? colorClass : 'hover:text-white'}`}>
+              <button onClick={() => { setRightPanelTab('notes'); setIsRightPanelOpen(true); }} className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'notes' ? colorClass : 'hover:text-white'}`}>
                 <FileText size={16} /> Notes
-                {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
               </button>
             </nav>
-
-            <div className="w-px h-6 bg-gray-700/50 mx-2 hidden lg:block"></div>
-
-            <div className="flex items-center gap-4 text-gray-400">
-              <button onClick={() => setActiveView('settings')} className={`p-2 transition-colors ${activeView === 'settings' ? 'text-white bg-white/10 rounded-lg' : 'hover:text-white'}`}><Settings size={20} /></button>
-              <button onClick={() => setProjector(true)} title="Cast to Projector" className="p-2 hover:text-white transition-colors"><Cast size={20} /></button>
-              <button onClick={() => setProjector(true)} title="Open Fullscreen Monitor" className="p-2 hover:text-white transition-colors"><Monitor size={20} /></button>
+            <div className="flex items-center gap-4 text-gray-400 font-mono text-xl">
+               {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
             </div>
+            <button onClick={() => setProjector(true)} className="p-2 hover:text-white transition-colors"><Cast size={20} /></button>
           </div>
         </header>
 
         {/* Content Body */}
         <div className="flex-1 flex overflow-hidden">
           
-          {/* Main Content Area based on ViewMode */}
           <div className="flex-1 flex flex-col relative px-10 py-8 overflow-hidden z-0">
             {activeView === 'live' ? (
-              <>
-<<<<<<< HEAD
-                {/* Dual Pane View */}
-                <div className="flex-1 flex gap-8 overflow-hidden">
+              <div className="flex-1 flex gap-8 overflow-hidden">
+                
+                {/* PREVIEW PANE */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[#1a1a1e] rounded-3xl border border-white/5 relative overflow-hidden">
+                  <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
+                    PREVIEW / STAGING
+                  </div>
                   
-                  {/* PREVIEW PANE (Operator Stage) */}
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[#1a1a1e] rounded-3xl border border-white/5 relative overflow-hidden group">
-                    <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                      PREVIEW / STAGING
-                    </div>
-                    
-                    {displayVersePreview && settings.detectVerses ? (
-                      <div className="w-full space-y-6">
-                        <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
-                          <h4 className={`${colorClass} font-bold text-xl mb-2`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
-                          <p className="text-white text-xl leading-relaxed font-serif">{displayVersePreview.text}</p>
+                  {displayVersePreview && settings.detectVerses ? (
+                    <div className="w-full space-y-6">
+                      <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
+                        <h4 className={`${colorClass} font-bold text-xl mb-2`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
+                        <p className="text-white text-xl leading-relaxed font-serif">{displayVersePreview.text}</p>
+                      </div>
+                      {secondaryFetchedVerse && settings.secondaryBibleVersion && (
+                        <div className="p-6 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                          <h4 className="text-emerald-400 font-bold text-xl mb-2">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
+                          <p className="text-gray-200 text-xl leading-relaxed font-serif">{secondaryFetchedVerse.text}</p>
                         </div>
-                        {secondaryFetchedVerse && (
-                          <div className="p-6 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-                            <h4 className="text-emerald-400 font-bold text-xl mb-2">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
-                            <p className="text-gray-200 text-xl leading-relaxed font-serif">{secondaryFetchedVerse.text}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-full text-center">
-                        <p className={`${transcriptTextClass} text-white/90 leading-relaxed font-medium transition-all`}>
-                          {liveState.preview_text.split(' ').slice(-20).join(' ') || (interimText ? interimText : (isListening ? 'Listening...' : 'Ready...'))}
-                          {interimText && <span className="text-gray-500 ml-2 italic">{interimText}</span>}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* LIVE PANE (Audience View) */}
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 bg-black rounded-3xl border-2 border-red-500/20 shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-2 py-1 rounded">
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                      LIVE ON SCREEN
+                      )}
                     </div>
-
-                    {displayVerseLive && settings.detectVerses ? (
-                      <div className="w-full space-y-4 px-8 py-4 opacity-80 scale-95 origin-center">
-                         <div className="space-y-4">
-                            <div className="pb-2 border-b border-white/5">
-                               <h4 className={`${colorClass} font-bold text-lg`}>{displayVerseLive.reference} <span className="opacity-40 font-normal">({settings.bibleVersion})</span></h4>
-                               <p className="text-white/80 text-lg leading-snug font-serif line-clamp-3">{displayVerseLive.text}</p>
-                            </div>
-                            {secondaryFetchedVerse && liveState.secondary_verse && (
-                               <div>
-                                  <h4 className="text-emerald-500 font-bold text-lg">{displayVerseLive.reference} <span className="opacity-40 font-normal">({settings.secondaryBibleVersion})</span></h4>
-                                  <p className="text-white/60 text-lg leading-snug font-serif line-clamp-3 italic">{liveState.secondary_verse}</p>
-                               </div>
-                            )}
-                         </div>
-                      </div>
-                    ) : (
-                      <p className="text-white/40 text-lg font-medium max-w-md text-center">
-                        {liveState.current_text.split(' ').slice(-10).join(' ') || 'Screen is clear'}
+                  ) : (
+                    <div className="w-full text-center">
+                      <p className={`${transcriptTextClass} text-white/90 leading-relaxed font-medium`}>
+                        {(liveState.preview_text || '').split(' ').slice(-20).join(' ') || (interimText ? interimText : 'Listening...')}
                       </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-=======
-                {/* Main Background Glow */}
-                <div className="absolute inset-0 opacity-10 pointer-events-none mix-blend-screen" 
-                     style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #3b82f6 0%, transparent 50%)' }} />
 
-                {/* Floating Verse Card */}
-                {settings.showVerse && settings.detectVerses && displayVerse && (!mainLyric || !settings.showLyrics) && (
-                    <div className={`absolute top-8 left-10 z-10 w-[460px] glass-panel p-8 shadow-2xl bg-[#22272e]/90 border-t ${settings.highlightAnimation === 'glow' ? `border-${colorClass.replace('text-','')}/30 shadow-[0_0_40px_-15px_rgba(52,211,153,0.3)]` : 'border-white/10'}`} style={blurStyle}>
-                      <h4 className={`${colorClass} font-bold text-xl pb-4 border-b border-white/10 mb-4`}>{displayVerse.reference} <span className="opacity-60 text-sm font-normal ml-2">({displayVerse.translation || settings.bibleVersion})</span></h4>
-                      <p className="text-gray-200 text-[21px] leading-relaxed font-serif tracking-tight">{displayVerse.text}</p>
-                    </div>
-                )}
-
-                {/* Transcript Area */}
-                {settings.showTranscript && settings.enableTranscription && (
-                  <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto py-12 z-0 relative overflow-hidden">
-                     <div 
-                        ref={transcriptScrollRef}
-                        className="flex-1 overflow-y-auto pr-8 scroll-smooth"
-                        style={{ scrollBehavior: 'smooth' }}
-                     >
-                        {liveState.current_text || interimText ? (
-                          <p className={`${transcriptTextClass} pb-32 text-gray-200 leading-[1.8] font-medium tracking-wide whitespace-pre-wrap`}>
-                            {liveState.current_text}
-                            {interimText && <span className="text-gray-500 ml-2 animate-pulse">{interimText}</span>}
-                          </p>
-                        ) : (
-                          <div className="h-full flex items-center justify-center opacity-50">
-                             <p className={`${transcriptTextClass} text-gray-500 font-medium tracking-wide`}>
-                               {isListening ? 'Listening...' : 'Click Play to start the live transcription.'}
-                             </p>
-                          </div>
-                        )}
-                     </div>
+                {/* LIVE PANE */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-black rounded-3xl border-2 border-red-500/20 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded">
+                    LIVE ON SCREEN
                   </div>
-                )}
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
 
-                {/* Bottom Lyric Dock */}
-                {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
-                  <div className="absolute bottom-6 left-10 right-10 glass-panel p-6 bg-[#161b22]/90 border border-white/5 flex flex-col gap-4 z-10" style={blurStyle}>
-                    <div className="flex items-center gap-3 text-gray-400 mb-2">
-                      <Music size={16} />
-                      <span className="text-xs uppercase tracking-wider font-semibold">
-                        {currentSong.title}
-                      </span>
-                      <div className="flex-1 h-0.5 bg-white/10 mx-4 rounded-full overflow-hidden">
-                        <div className={`h-full w-2/5 rounded-full ${bgClass}`} />
-                      </div>
+                  {displayVerseLive && settings.detectVerses ? (
+                    <div className="w-full space-y-4 px-8">
+                       <h4 className={`${colorClass} font-bold text-lg`}>{displayVerseLive.reference}</h4>
+                       <p className="text-white/80 text-lg leading-snug font-serif line-clamp-3">{displayVerseLive.text}</p>
                     </div>
-                    
-                    <div className="flex flex-col gap-2 pl-8">
-                      <div className="relative">
-                        <div className={`absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-[2px] rounded-r-md ${bgClass}`}></div>
-                        <KaraokeLine 
-                          lyric={mainLyric || '...'} 
-                          spokenText={fullTranscript} 
-                          colorClass={colorClass} 
-                          animationClass={settings.highlightAnimation} 
-                          sizeClass="text-[26px]"
-                        />
-                      </div>
-                      {nextLyric && <p className="text-xl text-gray-400 italic font-serif opacity-80">{nextLyric}</p>}
-                    </div>
-                  </div>
-                )}
-              </>
+                  ) : (
+                    <p className="text-white/40 text-lg font-medium text-center">
+                      {(liveState.current_text || '').split(' ').slice(-10).join(' ') || 'Screen is clear'}
+                    </p>
+                  )}
+                </div>
+              </div>
             ) : activeView === 'settings' ? (
               <div className="absolute inset-0 z-10 flex">
                  <SettingsView settings={draftSettings} onUpdate={updateDraftSetting} onSave={commitSettings} />
               </div>
             ) : (
-              // Placeholder for other views
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                 <div className="bg-[#1e1e1e] p-12 rounded-2xl border border-white/5 shadow-xl max-w-lg">
-                    <h2 className="text-3xl text-white font-semibold mb-4 capitalize">{activeView} View</h2>
-                    <p className="text-gray-400 text-lg leading-relaxed">
-                      You navigated to the {activeView} module. Functionality for this view will be built out in the relevant subsystem structure. Return to "Live Session" via the sidebar monitor icon.
-                    </p>
-                    <button 
-                      onClick={() => setActiveView('live')}
-                      className="mt-8 bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-xl font-medium transition-colors"
-                    >
-                      Return to Live
-                    </button>
-                 </div>
+                 <h2 className="text-3xl text-white font-semibold mb-4 capitalize">{activeView} View</h2>
               </div>
             )}
           </div>
 
           {/* Right Panel */}
           {isRightPanelOpen && (
-            <aside className="w-[340px] bg-[#161616] border-l border-white/5 flex flex-col shadow-2xl shrink-0 z-20 animate-in slide-in-from-right-8 duration-300">
-              <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/5 font-medium text-sm text-gray-300">
-                <button 
-                  onClick={() => setIsRightPanelOpen(false)}
-                  className="flex items-center gap-2 hover:text-white transition-colors capitalize">
+            <aside className="w-[340px] bg-[#161616] border-l border-white/5 flex flex-col shrink-0 z-20">
+              <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/5 text-sm text-gray-300">
+                <button onClick={() => setIsRightPanelOpen(false)} className="flex items-center gap-2 hover:text-white capitalize">
                   <ChevronRight size={18} /> {rightPanelTab}
-                </button>
-                <button onClick={() => setProjector(true)} title="Launch Projector from Panel" className="p-1.5 hover:bg-white/5 rounded-md transition-colors text-gray-400 hover:text-white">
-                  <LayoutGrid size={18} />
                 </button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-5 pb-8 flex flex-col bg-[#0d0d0d]">
-                
-                {rightPanelTab === 'notes' && (
-                  <div className="space-y-4">
-                    {notes.length === 0 && (
-                       <p className="text-gray-500 text-sm text-center mt-4">No notes for this session yet.</p>
-                    )}
-                    {notes.map(n => (
-                      <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 shadow-sm text-[14px] text-gray-300 leading-relaxed hover:border-emerald-500/30 transition-colors cursor-default">
-                        {n.content}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Scriptures Tab */}
                 {rightPanelTab === 'scriptures' && (
                   <div className="space-y-5">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Bible Translation</label>
-                        <select
-                          value={settings.bibleVersion}
-                          onChange={(e) => setSettings(prev => ({ ...prev, bibleVersion: e.target.value }))}
-                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                        >
-                          {bibleVersions.map(v => <option key={v} value={v}>{v}</option>)}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Selected Book</label>
-                        <select
-                          value={selectedBook}
-                          onChange={(e) => { setSelectedBook(e.target.value); setSelectedChapter(1); }}
-                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                        >
+                        <label className="text-xs text-gray-400 uppercase">Book</label>
+                        <select value={selectedBook} onChange={(e) => { setSelectedBook(e.target.value); setSelectedChapter(1); }} className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white">
                           {bibleBooks.map((book) => <option key={book} value={book}>{book}</option>)}
                         </select>
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Chapter</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={selectedChapter}
-                          onChange={(e) => setSelectedChapter(Math.max(1, Math.min(150, Number(e.target.value) || 1)))}
-                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                        />
-                      </div>
-                      <div className="flex items-end justify-end">
-                        <button
-                          onClick={() => {
-                            if (bibleData.length > 0) {
-                              const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
-                              if (book && book.chapters) {
-                                setSelectedChapter(Math.max(1, Math.min(Number(selectedChapter), book.chapters.length)));
-                                return;
-                              }
-                            }
-                            setSelectedChapter(Number(selectedChapter));
-                          }}
-                          className="px-4 py-2 bg-emerald-500 text-black rounded-lg font-semibold hover:bg-emerald-400 transition-colors"
-                        >
-                          Go
-                        </button>
+                        <label className="text-xs text-gray-400 uppercase">Chapter</label>
+                        <input type="number" min={1} value={selectedChapter} onChange={(e) => setSelectedChapter(Number(e.target.value))} className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white" />
                       </div>
                     </div>
 
-                    <div className="space-y-3 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 shadow-sm">
-                      <h3 className={`${colorClass} font-semibold text-base`}>{selectedBook} {selectedChapter} <span className="text-gray-400 text-xs">({settings.bibleVersion})</span></h3>
-                      <div className="mt-2 max-h-[250px] overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-gray-200 font-serif">
-                        {chapterText}
-                      </div>
+                    <div className="bg-[#1e1e1e] p-4 rounded-xl border border-white/10">
+                      <h3 className={`${colorClass} font-semibold mb-2`}>{selectedBook} {selectedChapter}</h3>
+                      <div className="max-h-[250px] overflow-y-auto text-sm whitespace-pre-wrap text-gray-200 font-serif">{chapterText}</div>
                     </div>
-<<<<<<< HEAD
-                    {displayVersePreview && settings.detectVerses ? (
-                      <div className={`bg-[#1e1e1e] p-5 rounded-xl border shadow-sm animate-in fade-in ${borderClass}/50`}>
-                        <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
-                        <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVersePreview.text}</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-4">
-                          {liveState.history.slice(-10).reverse().map((item, idx) => (
-                            <div key={idx} className="p-4 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-right-2">
-                               <div className="flex items-center justify-between mb-1">
-                                  <span className={`text-[10px] font-bold uppercase tracking-wider ${item.type === 'scripture' ? 'text-emerald-400' : 'text-blue-400'}`}>{item.type}</span>
-                                  <span className="text-[9px] text-gray-500 uppercase">{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                               </div>
-                               {item.reference && <p className="text-xs font-bold text-white mb-1">{item.reference}</p>}
-                               <p className="text-xs text-gray-400 italic line-clamp-2">{item.content || '(Content Aired)'}</p>
-                            </div>
-                          ))}
-                        </div>
-                        <button 
-                          onClick={() => {
-                            const content = `SERMON SUMMARY: ${session.name}\nDate: ${new Date().toLocaleDateString()}\n\n` + 
-                              liveState.history.map(h => `[${new Date(h.timestamp).toLocaleTimeString()}] ${h.type.toUpperCase()}: ${h.reference || ''} ${h.content}`).join('\n');
-                            const blob = new Blob([content], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `sermon-summary-${session.id}.txt`;
-                            a.click();
-                          }}
-                          className="w-full mt-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl font-medium transition-all"
-                        >
-                          Download Session Summary
-                        </button>
-                      </>
-=======
 
-                    {displayVerse && settings.detectVerses ? (
-                      <div className={`bg-[#1e1e1e] p-5 rounded-xl border shadow-sm animate-in fade-in ${borderClass}/50`}>
-                        <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVerse.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVerse.translation || settings.bibleVersion})</span></h3>
-                        <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVerse.text}</p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500 border rounded-xl border-white/5">
-                        <BookOpen size={24} className="mb-3 opacity-40" />
-                        <p className="text-sm italic">Waiting for pastor to mention a scripture reference or choose chapter above</p>
-                      </div>
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
-                    )}
+                    <div className="space-y-3 pt-4 border-t border-white/5">
+                      <h4 className="text-xs font-bold text-gray-500 uppercase">Aired History</h4>
+                      {liveState.history.slice(-5).reverse().map((item, idx) => (
+                        <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/5">
+                           <p className="text-xs font-bold text-white">{item.reference || 'Transcription'}</p>
+                           <p className="text-[10px] text-gray-400 line-clamp-1">{item.content || item.type}</p>
+                        </div>
+                      ))}
+                      <button 
+                        onClick={() => {
+                          const content = `SERMON SUMMARY: ${session.name}\n\n` + liveState.history.map(h => `[${new Date(h.timestamp).toLocaleTimeString()}] ${h.type.toUpperCase()}: ${h.reference || ''} ${h.content}`).join('\n');
+                          const blob = new Blob([content], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `summary-${session.id}.txt`;
+                          a.click();
+                        }}
+                        className="w-full py-2 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg">
+                        Download Summary
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {rightPanelTab === 'lyrics' && (
-                  <div className="space-y-4">
-                    <h3 className="text-white font-medium mb-1">Upcoming Verses</h3>
-                    {!currentSong || !settings.detectSongs ? (
-                      <p className="text-gray-500 text-sm italic">No worship song detected.</p>
-                    ) : (
-                      currentSong?.lyrics?.map((lyricLine) => (
-                        <div 
-                           key={lyricLine.order} 
-                           onClick={() => setManualLineOffset(lyricLine.order - (currentLine ?? 0))}
-                           className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:${borderClass}/50 transition-colors ${lyricLine.order === actualLineIndex ? `bg-[#1e1e1e] ${borderClass}/30` : 'bg-transparent border-white/5'}`}>
-                          {lyricLine.line}
-                          {lyricLine.order === actualLineIndex && <div className={`opacity-50 text-sm italic mt-2 ${colorClass}`}>Current Line</div>}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-
-<<<<<<< HEAD
                 {rightPanelTab === 'notes' && (
                   <div className="space-y-4">
-                    {notes.length === 0 && (
-                       <p className="text-gray-500 text-sm text-center mt-4">No notes for this session yet.</p>
-                    )}
                     {notes.map(n => (
-                      <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 shadow-sm text-[14px] text-gray-300 leading-relaxed hover:border-emerald-500/30 transition-colors cursor-default">
-                        {n.content}
-                      </div>
+                      <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 text-sm text-gray-300">{n.content}</div>
                     ))}
+                    <input type="text" value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveNote()} placeholder="Add a note..." className="w-full bg-[#1c1c1f] text-sm text-white rounded-lg px-4 py-3 outline-none border border-white/5" />
                   </div>
                 )}
-=======
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
               </div>
-
-              {rightPanelTab === 'notes' && (
-                <div className="p-5 border-t border-white/5 bg-[#161616]">
-                  <input 
-                    type="text" 
-                    value={newNote}
-                    onChange={e => setNewNote(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSaveNote()}
-                    placeholder="Add a note..." 
-                    className="w-full bg-[#1c1c1f] text-sm text-white placeholder-gray-500 rounded-lg px-4 py-3 outline-none border border-white/5 focus:border-emerald-500/50 transition-colors shadow-inner"
-                  />
-                </div>
-              )}
             </aside>
           )}
-          
         </div>
       </main>
-
-      {/* Full Screen Projector Mode */}
-      {isProjector && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center p-12">
-          <button 
-            onClick={() => setProjector(false)}
-            className="absolute top-8 right-8 text-gray-500 hover:text-white p-2 transition-colors"
-          >
-            Esc
-          </button>
-          
-          <div className="w-full max-w-7xl relative mx-auto h-[70vh] flex flex-col items-center justify-center text-center">
-            {settings.showLyrics && settings.detectSongs && mainLyric && (
-              <div className="w-full absolute bottom-12 flex flex-col items-center">
-                <KaraokeLine 
-                  lyric={mainLyric} 
-                  spokenText={fullTranscript} 
-                  colorClass={colorClass} 
-                  animationClass={settings.highlightAnimation} 
-                  sizeClass="text-[72px]"
-                />
-                {nextLyric && <p className="text-[40px] text-gray-500 italic mt-8">{nextLyric}</p>}
-              </div>
-            )}
-<<<<<<< HEAD
-            {settings.showVerse && settings.detectVerses && displayVerseLive && (!mainLyric || !settings.showLyrics) && (
-              <div className="w-full absolute inset-0 flex flex-col justify-center px-24 space-y-12">
-                <div className="space-y-6">
-                   <h2 className={`${colorClass} text-5xl font-semibold tracking-wide uppercase`}>{displayVerseLive.reference} <span className="opacity-50 text-3xl font-normal ml-3">({settings.bibleVersion})</span></h2>
-                   <p className="text-white/90 text-[56px] leading-[1.2] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">{displayVerseLive.text}</p>
-                </div>
-                {secondaryFetchedVerse && (
-                   <div className="pt-8 border-t border-white/10 space-y-6">
-                      <h2 className="text-emerald-500 text-4xl font-semibold tracking-wide uppercase">{displayVerseLive.reference} <span className="opacity-50 text-2xl font-normal ml-3">({settings.secondaryBibleVersion})</span></h2>
-                      <p className="text-white/70 text-[48px] leading-[1.2] font-serif italic tracking-tight max-w-6xl mx-auto drop-shadow-xl line-clamp-2">{secondaryFetchedVerse.text}</p>
-                   </div>
-                )}
-              </div>
-            )}
-            {settings.autoShowTimer && (
-              <div className="absolute bottom-12 right-12 glass-panel px-8 py-4 bg-black/80 border border-white/10 rounded-2xl flex items-center gap-4 animate-in fade-in slide-in-from-right-4">
-                 <Activity size={24} className="text-emerald-400 animate-pulse" />
-                 <span className="text-white text-5xl font-mono font-bold tracking-tighter">
-                    {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
-                 </span>
-=======
-            {settings.showVerse && settings.detectVerses && displayVerse && (!mainLyric || !settings.showLyrics) && (
-              <div className="w-full absolute inset-0 flex flex-col justify-center px-12">
-                <h2 className={`${colorClass} text-5xl font-semibold mb-10 tracking-wide uppercase`}>{displayVerse.reference} <span className="opacity-50 text-3xl font-normal ml-3">({displayVerse.translation || settings.bibleVersion})</span></h2>
-                <p className="text-white/90 text-[64px] leading-[1.3] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">"{displayVerse.text}"</p>
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

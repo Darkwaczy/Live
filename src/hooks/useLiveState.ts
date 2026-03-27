@@ -23,13 +23,10 @@ export function useLiveState(
     current_verse: null,
     current_song: undefined,
     current_line: undefined,
-<<<<<<< HEAD
     preview_text: '',
     preview_verse: null,
     is_live_dirty: false,
     history: [],
-=======
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     updated_at: new Date().toISOString()
   });
 
@@ -53,24 +50,15 @@ export function useLiveState(
       provider,
       audioInput: whisperConfig.audioInput,
       apiKey: whisperConfig.apiKey,
-      endpoint: whisperConfig.endpoint,
       onTranscript: (chunk, isFinal, timestamp, confidence) => {
         if (!isFinal) {
           setInterimText(chunk);
-          const tempSong = findSongByWords(chunk);
-          if (tempSong) {
-            setCurrentSong(tempSong);
-            setLiveState((curr) => {
-               setSongLineIndex(locateCurrentLine(tempSong, curr.current_text + ' ' + chunk));
-               return curr;
-            });
-          }
           return;
         }
 
         setInterimText('');
         setLiveState((prev) => {
-          const updatedText = `${prev.current_text} ${chunk}`.trim();
+          const updatedText = `${prev.preview_text} ${chunk}`.trim();
           const rollingWindow = updatedText.split(' ').slice(-20).join(' ');
           const verse = detectBibleVerse(rollingWindow);
           const song = findSongByWords(chunk);
@@ -86,8 +74,7 @@ export function useLiveState(
                 m.detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
                  .then(aiVerse => {
                    if (aiVerse) {
-                     setCurrentVerse(aiVerse);
-                     setLiveState(s => ({ ...s, current_verse: aiVerse }));
+                      setLiveState(s => ({ ...s, preview_verse: aiVerse, is_live_dirty: true }));
                    }
                  });
              });
@@ -105,22 +92,12 @@ export function useLiveState(
             return [...filtered, { timestamp, words, confidence }];
           });
 
-          console.log(`📝 [Content Classification] Type: ${contentClassification.type} (${Math.round(contentClassification.confidence * 100)}% confidence)`);
-
           return {
-<<<<<<< HEAD
             ...prev,
             session_id: sessionId,
             preview_text: updatedText,
             preview_verse: verse ?? prev.preview_verse,
             is_live_dirty: true,
-=======
-            session_id: sessionId,
-            current_text: updatedText,
-            current_verse: verse ?? prev.current_verse,
-            current_song: song?.title ?? prev.current_song,
-            current_line: song ? newLine : prev.current_line,
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
             content_type: contentClassification.type,
             updated_at: new Date(timestamp).toISOString()
           };
@@ -191,7 +168,6 @@ export function useLiveState(
 
   const clearText = useCallback(() => {
     setInterimText('');
-<<<<<<< HEAD
     setLiveState(prev => ({ 
       ...prev, 
       current_text: '', 
@@ -204,11 +180,11 @@ export function useLiveState(
 
   const goLive = useCallback(() => {
     setLiveState(prev => {
-      const newHistory = [...prev.history];
+      const newHistory = [...(prev.history || [])];
       if (prev.preview_verse) {
         newHistory.push({
           type: 'scripture',
-          content: '', // Text will be filled by App.tsx fetching
+          content: '', 
           reference: `${prev.preview_verse.book} ${prev.preview_verse.chapter}:${prev.preview_verse.verse_start}`,
           timestamp: new Date().toISOString()
         });
@@ -247,9 +223,6 @@ export function useLiveState(
       updated_at: new Date().toISOString()
     }));
     if (verse) setCurrentVerse(verse);
-=======
-    setLiveState(prev => ({ ...prev, current_text: '', updated_at: new Date().toISOString() }));
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
   }, []);
 
   return {
@@ -263,16 +236,12 @@ export function useLiveState(
     stop,
     clearText,
     applyLiveState,
-<<<<<<< HEAD
     goLive,
     setPreviewVerse,
     setSecondaryVerse,
-=======
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     speechStats,
     wordRate,
     error,
     setError
   };
 }
-

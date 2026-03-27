@@ -90,8 +90,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <Volume2 size={18} /> System Audio (Mixer)
                     </label>
                   </div>
-<<<<<<< HEAD
-=======
                   <div className="text-xs text-gray-500 bg-[#1e1e1e] rounded-lg p-3 border border-white/5">
                     {settings.audioInput === 'system' ? (
                       <span><strong>System Audio Setup:</strong> Select this to capture YouTube/Mixer audio. Requires a <strong>Cloud Provider</strong> (Groq, Deepgram, or OpenAI Whisper) with a valid API key. When you start listening, you'll be prompted to select a browser tab and enable audio sharing.</span>
@@ -99,26 +97,17 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <span><strong>Live Mic:</strong> Captures audio from a connected microphone. Works with any speech engine.</span>
                     )}
                   </div>
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                 </div>
 
                 <div className="flex items-center justify-between border-t border-white/5 pt-6">
-                  <div>
-                    <span className="text-white font-medium block">Noise Suppression</span>
-                    <span className="text-sm text-gray-400">AI-powered background noise removal</span>
-                  </div>
-                  <Toggle checked={settings.noiseSuppression} onChange={(val) => onUpdate('noiseSuppression', val)} />
+                   <div className="space-y-4 w-full">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-white font-medium">Input Sensitivity / Gain</span>
+                        <span className="text-emerald-400">{settings.gain}%</span>
+                      </div>
+                      <input type="range" min="0" max="100" value={settings.gain} onChange={e => onUpdate('gain', Number(e.target.value))} className="w-full accent-emerald-500" />
+                   </div>
                 </div>
-
-                <div className="space-y-4 border-t border-white/5 pt-6">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white font-medium">Sensitivity / Gain</span>
-                    <span className="text-emerald-400">{settings.gain}%</span>
-                  </div>
-                  <input type="range" min="0" max="100" value={settings.gain} onChange={e => onUpdate('gain', Number(e.target.value))} className="w-full accent-emerald-500" />
-                </div>
-<<<<<<< HEAD
-=======
 
                 <div className="border-t border-white/5 pt-6 flex justify-end">
                   <button 
@@ -128,7 +117,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                     {isTestingAudio ? 'Testing Audio...' : 'Test Audio'}
                   </button>
                 </div>
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
               </div>
             </div>
           )}
@@ -141,10 +129,7 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
               </div>
 
               <div className="bg-[#161616] border border-white/5 rounded-2xl p-6 space-y-8">
-<<<<<<< HEAD
-=======
                 {/* Transcription Section */}
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -157,14 +142,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                   <div className={`space-y-6 transition-opacity ${!settings.enableTranscription && 'opacity-50 pointer-events-none'}`}>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">Primary Speech Engine</label>
-<<<<<<< HEAD
-                      <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white outline-none">
-                        <option value="web">Chrome Web Speech API (Free)</option>
-                        <option value="worker">Vosk Engine (Offline)</option>
-                        <option value="groq">Groq Cloud API (Fastest)</option>
-                      </select>
-                    </div>
-=======
                       <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50">
                         <option value="web">Chrome Web Speech API (Free, Requires Internet)</option>
                         <option value="worker">Vosk WASM Engine (Free, 100% Offline)</option>
@@ -192,37 +169,35 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                         <p className="text-xs text-emerald-400/80 mt-2 mt-flex items-center gap-1">Key is stored securely in local browser storage only.</p>
                       </div>
                     )}
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                   </div>
                 </div>
 
                 <hr className="border-white/5" />
 
-<<<<<<< HEAD
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white font-medium text-lg">Scripture & Parallel View</span>
-=======
                 {/* Bible Verse Section */}
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-medium text-lg">Cross-Reference & Scripture</span>
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
+                    <span className="text-white font-medium text-lg">Scripture & Parallel View</span>
                     <Toggle checked={settings.detectVerses} onChange={(v) => onUpdate('detectVerses', v)} />
                   </div>
                   
                   <div className={`grid grid-cols-2 gap-6 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
                     <div>
-<<<<<<< HEAD
+                      <label className="block text-sm text-gray-400 mb-2">Detection Sensitivity</label>
+                      <input type="range" min="0" max="100" value={settings.verseSensitivity} onChange={e => onUpdate('verseSensitivity', Number(e.target.value))} className="w-full accent-emerald-500 mt-2" />
+                    </div>
+                    <div>
                       <label className="block text-sm text-gray-400 mb-2">Primary Translation</label>
                       <select value={settings.bibleVersion} onChange={e => onUpdate('bibleVersion', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
                         <option value="KJV">KJV</option>
                         <option value="NIV">NIV</option>
                         <option value="NLT">NLT</option>
                         <option value="TPT">TPT</option>
+                        <option value="ESV">ESV</option>
+                        <option value="NKJV">NKJV</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-sm text-gray-400 mb-2">Parallel Translation (Optional)</label>
                       <select value={settings.secondaryBibleVersion} onChange={e => onUpdate('secondaryBibleVersion', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
                         <option value="">None (Single Bible)</option>
@@ -230,23 +205,12 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                         <option value="NIV">NIV</option>
                         <option value="NLT">NLT</option>
                         <option value="TPT">TPT</option>
-=======
-                      <label className="block text-sm text-gray-400 mb-2">Detection Sensitivity</label>
-                      <input type="range" min="0" max="100" value={settings.verseSensitivity} onChange={e => onUpdate('verseSensitivity', Number(e.target.value))} className="w-full accent-emerald-500 mt-2" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Preferred Translation</label>
-                      <select value={settings.bibleVersion} onChange={e => onUpdate('bibleVersion', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
-                        <option value="KJV">KJV</option>
-                        <option value="NIV">NIV</option>
                         <option value="ESV">ESV</option>
                         <option value="NKJV">NKJV</option>
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                       </select>
                     </div>
                   </div>
 
-<<<<<<< HEAD
                   <div className="flex items-center justify-between border-t border-white/5 pt-6">
                     <div>
                       <span className="text-sm font-medium text-gray-200 block">Auto-Air Verses</span>
@@ -269,7 +233,8 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                           <Toggle checked={settings.autoShowTimer} onChange={(v) => onUpdate('autoShowTimer', v)} />
                        </div>
                     </div>
-=======
+                  </div>
+
                   <div className={`space-y-4 pt-4 border-t border-white/5 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
                      <div className="flex items-center justify-between">
                        <div>
@@ -296,19 +261,11 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                           </div>
                        </div>
                      )}
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                   </div>
                 </div>
 
                 <hr className="border-white/5" />
 
-<<<<<<< HEAD
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white font-medium text-lg">Lyrics Detection</span>
-                    <Toggle checked={settings.detectSongs} onChange={(v) => onUpdate('detectSongs', v)} />
-                  </div>
-=======
                 {/* Lyrics Section */}
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
@@ -331,7 +288,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       </div>
                     </div>
                   </div>
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                 </div>
               </div>
             </div>
@@ -340,15 +296,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
           {activeTab === 'display' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
               <div>
-<<<<<<< HEAD
-                <h3 className="text-2xl font-semibold text-white mb-2">Display Settings</h3>
-              </div>
-              <div className="bg-[#161616] border border-white/5 rounded-2xl p-6 space-y-8">
-                 <div className="flex items-center justify-between">
-                    <span className="text-gray-200">Show Transcript</span>
-                    <Toggle checked={settings.showTranscript} onChange={(v) => onUpdate('showTranscript', v)} />
-                 </div>
-=======
                 <h3 className="text-2xl font-semibold text-white mb-2">Display & UI Settings</h3>
                 <p className="text-gray-400">Customize the appearance for operators and projected views.</p>
               </div>
@@ -542,8 +489,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                     </div>
                   </div>
                 </div>
-
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
               </div>
             </div>
           )}
