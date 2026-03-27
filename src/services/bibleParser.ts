@@ -69,23 +69,25 @@ const bookNames = [
   { name: 'Revelation', aliases: ['Rev', 'Re'] }
 ];
 
-const bookRegex = bookNames
-  .map((book) => [book.name, ...book.aliases].join('|'))
+// Sort books by length (desc) to ensure "1 John" matches before "John"
+const sortedBookRegex = bookNames
+  .flatMap(book => [book.name, ...book.aliases])
+  .sort((a, b) => b.length - a.length)
   .join('|');
 
-const biblePattern = new RegExp(`\\b(${bookRegex})\\s+(\\d{1,3}):(\\d{1,3})(?:-(\\d{1,3}))?\\b`, 'i');
+const biblePattern = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3}):(\\d{1,3})(?:-(\\d{1,3}))?\\b`, 'i');
 // Pattern for "john 316" format (no colon, when speech-to-text merges numbers)
 // Matches: book + space + consecutive digits (e.g., "john 316")
-const biblePatternNoColon = new RegExp(`\\b(${bookRegex})\\s+(\\d{2,5})\\b`, 'i');
+const biblePatternNoColon = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{2,5})\\b`, 'i');
 
 export function detectBibleVerse(text: string): BibleVerse | null {
   console.log(`🔍 [detectBibleVerse] Input: "${text}"`);
   
   // Normalize spoken structures from speech-to-text engines
   let normalizedText = text
-    .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verse\s+|\s+)(\d+)/gi, '$1:$2')
+    .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
     .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') // "John 3, 16" -> "John 3:16"
-    .replace(/verse\s+(\d+)/gi, ':$1')
+    .replace(/verses?\s+(\d+)/gi, ':$1')
     .replace(/\s+/g, ' '); // Normalize whitespace
 
   console.log(`  → Normalized: "${normalizedText}"`);
@@ -108,18 +110,24 @@ export function detectBibleVerse(text: string): BibleVerse | null {
       let verse: number;
       
       if (combinedDigits.length === 2) {
-        // If only 2 digits, treat as chapter 1, verse XX
-        chapter = 1;
-        verse = parseInt(combinedDigits, 10);
+        // If only 2 digits, treat as chapter 1, verse XX OR chapter X, verse Y (if book has many chapters)
+        // For safety in speech-to-text, usually single digit chapter + single digit verse
+        if (combinedDigits[0] !== '0') {
+           chapter = parseInt(combinedDigits[0], 10);
+           verse = parseInt(combinedDigits[1], 10);
+        } else {
+           chapter = 1;
+           verse = parseInt(combinedDigits, 10);
+        }
       } else if (combinedDigits.length === 3) {
-        // If 3 digits, likely: single digit chapter + 2 digit verse
-        chapter = parseInt(combinedDigits[0], 10);
-        verse = parseInt(combinedDigits.slice(1), 10);
+        // If 3 digits, likely: single digit chapter + 2 digit verse (e.g., 316)
+        // OR 2 digit chapter + 1 digit verse
+        chapter = parseInt(combinedDigits.slice(0, -2) || combinedDigits[0], 10);
+        verse = parseInt(combinedDigits.slice(-2), 10);
       } else {
-        // If 4+ digits, chapter is first digits, last 2-3 are verse
-        const verseLen = Math.min(3, combinedDigits.length - 1);
-        chapter = parseInt(combinedDigits.slice(0, -verseLen), 10);
-        verse = parseInt(combinedDigits.slice(-verseLen), 10);
+        // If 4+ digits, chapter is first digits, last 2 are verse
+        chapter = parseInt(combinedDigits.slice(0, -2), 10);
+        verse = parseInt(combinedDigits.slice(-2), 10);
       }
       
       const fixedRef = `${book} ${chapter}:${verse}`;
