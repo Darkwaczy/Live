@@ -119,7 +119,10 @@ export default function App() {
     exportFormat: 'txt',
     cloudSync: false,
     alertVisual: true,
-    autoAirVerses: false, // New setting
+    autoAirVerses: false,
+    secondaryBibleVersion: '',
+    timerDuration: 45,
+    autoShowTimer: false,
   });
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
@@ -135,7 +138,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse 
+    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -393,19 +396,42 @@ export default function App() {
   const projectorTextClass3 = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-4xl';
 
   if (isProjector) {
+    const minutes = Math.floor(timerSession.remaining / 60);
+    const seconds = timerSession.remaining % 60;
+    
     return (
       <div className="flex h-screen w-full bg-[#000000] text-white font-sans overflow-hidden select-none relative px-12 py-12">
         <button onClick={() => setProjector(false)} className="absolute top-6 right-6 p-4 text-white/20 hover:text-white/80 transition-opacity z-50">
            <X size={32} />
         </button>
+
+        {/* Countdown Timer */}
+        {settings.autoShowTimer && (
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 px-8 py-4 glass-panel bg-red-600/20 border border-red-500/30 rounded-full z-50">
+            <span className="text-4xl font-mono font-bold text-red-400">
+              {minutes}:{seconds.toString().padStart(2, '0')}
+            </span>
+          </div>
+        )}
+
         <div className="flex-1 flex flex-col justify-center items-center w-full max-w-6xl mx-auto space-y-12">
            {settings.showVerse && displayVerseLive && settings.detectVerses && (
-              <div className="absolute top-12 left-12 z-10 w-[400px] glass-panel p-8 shadow-2xl bg-[#1a1a1a]/90 border-t border-white/10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
-                <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerseLive.reference} ({settings.bibleVersion})</h4>
-                <p className="text-gray-200 text-2xl leading-relaxed font-serif">{displayVerseLive.text}</p>
+              <div className="z-10 w-full max-w-4xl glass-panel p-10 shadow-2xl bg-[#1a1a1a]/90 border-t border-white/10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
+                <div className="flex gap-10">
+                   <div className="flex-1">
+                     <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerseLive.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
+                     <p className="text-gray-200 text-3xl leading-relaxed font-serif">{displayVerseLive.text}</p>
+                   </div>
+                   {secondaryFetchedVerse && (
+                     <div className="flex-1 border-l border-white/10 pl-10">
+                       <h4 className="text-emerald-400 font-medium pb-4 border-b border-white/10 mb-4 text-xl">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
+                       <p className="text-gray-300 text-3xl leading-relaxed font-serif italic">{secondaryFetchedVerse.text}</p>
+                     </div>
+                   )}
+                </div>
               </div>
            )}
-           {settings.showTranscript && settings.enableTranscription && (
+           {(!displayVerseLive || !settings.showVerse) && settings.showTranscript && settings.enableTranscription && (
              <div className="w-full space-y-8 px-24 text-center z-0">
                 <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
                   {liveState.current_text.split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
@@ -501,6 +527,22 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-1 bg-[#1e1e24]/80 p-0.5 rounded-lg border border-white/5">
+              <button 
+                onClick={() => setTimerSession(prev => ({ ...prev, isRunning: !prev.isRunning }))}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${timerSession.isRunning ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'}`}
+                title={timerSession.isRunning ? "Pause Stage Timer" : "Start Stage Timer"}
+              >
+                <div className={`w-1.5 h-1.5 rounded-full ${timerSession.isRunning ? 'bg-red-400 animate-pulse' : 'bg-gray-500'}`}></div>
+                Timer
+              </button>
+              <button 
+                onClick={() => setTimerSession(prev => ({ ...prev, remaining: (settings.timerDuration || 45) * 60, isRunning: false }))}
+                className="p-1.5 text-gray-500 hover:text-white transition-colors"
+                title="Reset Timer"
+              >
+                <X size={12} />
+              </button>
+              <div className="w-px h-5 bg-white/10 mx-1"></div>
               <button onClick={handleSnapshotToNotes} className="px-3 py-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 rounded-md transition-all mr-1" title="Save current text to Notes and clear screen">
                 <Save size={14} /> Save & Clear
               </button>
@@ -771,10 +813,10 @@ export default function App() {
                         {chapterText}
                       </div>
                     </div>
-                    {displayVerse && settings.detectVerses ? (
+                    {displayVersePreview && settings.detectVerses ? (
                       <div className={`bg-[#1e1e1e] p-5 rounded-xl border shadow-sm animate-in fade-in ${borderClass}/50`}>
-                        <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVerse.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVerse.translation || settings.bibleVersion})</span></h3>
-                        <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVerse.text}</p>
+                        <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
+                        <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVersePreview.text}</p>
                       </div>
                     ) : (
                       <>
