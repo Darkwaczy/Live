@@ -152,6 +152,23 @@ export default function App() {
   }, [liveState.current_text, interimText]);
 
   const [fetchedVerse, setFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
+  const [secondaryFetchedVerse, setSecondaryFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
+
+  const [timerSession, setTimerSession] = useState({ 
+    isRunning: false, 
+    remaining: (settings.timerDuration || 45) * 60,
+    startTime: 0
+  });
+
+  useEffect(() => {
+    let interval: any;
+    if (timerSession.isRunning && timerSession.remaining > 0) {
+      interval = setInterval(() => {
+        setTimerSession(prev => ({ ...prev, remaining: prev.remaining - 1 }));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timerSession.isRunning, timerSession.remaining]);
 
   const bibleVersions = ['KJV', 'NIV', 'NLT', 'TPT'];
   const [bibleData, setBibleData] = useState<any[]>([]);
@@ -189,105 +206,52 @@ export default function App() {
   }, [settings.bibleVersion]);
 
   useEffect(() => {
-    if (!bibleData || bibleData.length === 0) {
-      setChapterText('(Loading locally, or book unavailable for this translation)');
-      return;
-    }
-    const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
-    if (!book || !Array.isArray(book.chapters)) {
-      setChapterText('(Selected book data not found in translation)');
-      return;
-    }
-
-    const chapters = book.chapters;
-    const chapterIndex = Math.max(0, selectedChapter - 1);
-    if (chapterIndex >= chapters.length) {
-      setChapterText('(Chapter out of range)');
-      return;
-    }
-
-    const passages = chapters[chapterIndex];
-    setChapterText(
-      passages.map((verse: string, idx: number) => `${selectedChapter}:${idx + 1} ${verse}`).join('\n\n')
-    );
-  }, [bibleData, selectedBook, selectedChapter]);
-  useEffect(() => {
-    if (!currentVerse) {
-      setFetchedVerse(null);
-      return;
-    }
-    
-    console.log(`📖 Fetching verse: ${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}...`);
-    setFetchedVerse(null);
-    const fetchLocalVerse = async () => {
-      const version = settings.bibleVersion.toLowerCase();
-      const reference = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}${currentVerse.verse_end && currentVerse.verse_end > currentVerse.verse_start ? `-${currentVerse.verse_end}` : ''}`;
-      
+    const fetchVerse = async (ref: string, version: string, isSecondary: boolean) => {
       try {
-        // Primary: Cloud API
-        console.log(`🌐 Trying cloud API: bible-api.com...`);
-        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${version}`);
-        if (!apiRes.ok) throw new Error("Bible API fetch failed");
+        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(ref)}?translation=${version}`);
+        if (!apiRes.ok) throw new Error("API failed");
         const apiData = await apiRes.json();
-        
         if (apiData.text) {
-           console.log(`✅ Cloud API success!`);
-           setFetchedVerse({ 
-             reference: apiData.reference || reference, 
-             text: apiData.text.replace(/\n/g, ' ').trim(), 
-             translation: settings.bibleVersion 
-           });
-           return;
+          const result = { reference: apiData.reference || ref, text: apiData.text.replace(/\n/g, ' ').trim(), translation: version };
+          if (!isSecondary) setFetchedVerse(result);
+          else setSecondaryFetchedVerse(result);
+          return true;
         }
-      } catch (apiErr) {
-        console.warn("⚠️ Cloud Bible API failed, falling back to local JSON...", apiErr);
-      }
+      } catch (e) {}
 
       try {
-        // Secondary Fallback: Local Offline JSON Datasets
-        console.log(`📁 Trying local JSON: /bibles/${version}.json`);
-        const res = await fetch(`/bibles/${version}.json`);
+        const res = await fetch(`/bibles/${version.toLowerCase()}.json`);
+        if (!res.ok) return false;
+        const bibleDataLocal = await res.json();
+        const verse = liveState.preview_verse;
+        if (!verse) return false;
         
-        if (!res.ok) {
-           throw new Error(`Local Bible dataset for ${version.toUpperCase()} not found. Status: ${res.status}`);
+        const book = bibleDataLocal.find((b: any) => (b.name || b.book || '').toLowerCase() === verse.book.toLowerCase());
+        if (book && book.chapters && book.chapters[verse.chapter - 1]) {
+           const text = book.chapters[verse.chapter - 1][verse.verse_start - 1];
+           const result = { reference: ref, text, translation: version };
+           if (!isSecondary) setFetchedVerse(result);
+           else setSecondaryFetchedVerse(result);
+           return true;
         }
-        
-        const data = await res.json();
-        let verseText = "";
-        
-        if (Array.isArray(data)) {
-           const bookData = data.find((b: any) => b.name?.toLowerCase() === currentVerse.book.toLowerCase() || b.book?.toLowerCase() === currentVerse.book.toLowerCase());
-           if (bookData && bookData.chapters) {
-              const chapterArr = bookData.chapters[currentVerse.chapter - 1]; // 0-indexed
-              if (chapterArr) {
-                 for (let i = currentVerse.verse_start; i <= (currentVerse.verse_end || currentVerse.verse_start); i++) {
-                    if (chapterArr[i - 1]) verseText += chapterArr[i - 1] + " ";
-                 }
-              }
-           }
-        }
-        
-        if (verseText) {
-           console.log(`✅ Local JSON success!`);
-           setFetchedVerse({ 
-             reference: reference, 
-             text: verseText.trim(), 
-             translation: settings.bibleVersion 
-           });
-        } else {
-           throw new Error("Passage not found in local dataset structure.");
-        }
-      } catch (err: any) {
-        console.error("❌ Verse fetch error:", err.message);
-        setFetchedVerse({ 
-           reference: reference, 
-           text: `(Passage unavailable. Ensure /public/bibles/${version}.json exists or check internet)`,
-           translation: settings.bibleVersion
-        });
-      }
+      } catch (e) {}
+      return false;
     };
-    fetchLocalVerse();
-  }, [liveState.preview_verse, settings.bibleVersion]);
+
+    if (liveState.preview_verse) {
+      const mainRef = `${liveState.preview_verse.book} ${liveState.preview_verse.chapter}:${liveState.preview_verse.verse_start}`;
+      fetchVerse(mainRef, settings.bibleVersion, false);
+      
+      if (settings.secondaryBibleVersion) {
+        fetchVerse(mainRef, settings.secondaryBibleVersion, true);
+      } else {
+        setSecondaryFetchedVerse(null);
+      }
+    } else {
+      setFetchedVerse(null);
+      setSecondaryFetchedVerse(null);
+    }
+  }, [liveState.preview_verse, settings.bibleVersion, settings.secondaryBibleVersion]);
 
   // Hook into auto-air logic
   useEffect(() => {
@@ -611,9 +575,17 @@ export default function App() {
                     </div>
                     
                     {displayVersePreview && settings.detectVerses ? (
-                      <div className="w-full max-w-lg space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                        <h4 className={`${colorClass} font-bold text-2xl pb-2 border-b border-white/10`}>{displayVersePreview.reference}</h4>
-                        <p className="text-white text-2xl leading-relaxed font-serif">{displayVersePreview.text}</p>
+                      <div className="w-full space-y-6">
+                        <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
+                          <h4 className={`${colorClass} font-bold text-xl mb-2`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
+                          <p className="text-white text-xl leading-relaxed font-serif">{displayVersePreview.text}</p>
+                        </div>
+                        {secondaryFetchedVerse && (
+                          <div className="p-6 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                            <h4 className="text-emerald-400 font-bold text-xl mb-2">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
+                            <p className="text-gray-200 text-xl leading-relaxed font-serif">{secondaryFetchedVerse.text}</p>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="w-full text-center">
@@ -633,9 +605,19 @@ export default function App() {
                     </div>
 
                     {displayVerseLive && settings.detectVerses ? (
-                      <div className="w-full max-w-lg space-y-4 opacity-80 scale-95 origin-center">
-                         <h4 className={`${colorClass} font-bold text-xl pb-2 border-b border-white/10`}>{displayVerseLive.reference}</h4>
-                         <p className="text-white/70 text-xl leading-relaxed font-serif line-clamp-4">{displayVerseLive.text}</p>
+                      <div className="w-full space-y-4 px-8 py-4 opacity-80 scale-95 origin-center">
+                         <div className="space-y-4">
+                            <div className="pb-2 border-b border-white/5">
+                               <h4 className={`${colorClass} font-bold text-lg`}>{displayVerseLive.reference} <span className="opacity-40 font-normal">({settings.bibleVersion})</span></h4>
+                               <p className="text-white/80 text-lg leading-snug font-serif line-clamp-3">{displayVerseLive.text}</p>
+                            </div>
+                            {secondaryFetchedVerse && liveState.secondary_verse && (
+                               <div>
+                                  <h4 className="text-emerald-500 font-bold text-lg">{displayVerseLive.reference} <span className="opacity-40 font-normal">({settings.secondaryBibleVersion})</span></h4>
+                                  <p className="text-white/60 text-lg leading-snug font-serif line-clamp-3 italic">{liveState.secondary_verse}</p>
+                               </div>
+                            )}
+                         </div>
                       </div>
                     ) : (
                       <p className="text-white/40 text-lg font-medium max-w-md text-center">
@@ -795,19 +777,35 @@ export default function App() {
                         <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVerse.text}</p>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500 border rounded-xl border-white/5">
-                        <BookOpen size={24} className="mb-3 opacity-40" />
-                        <p className="text-sm italic">Waiting for pastor to mention a scripture reference or choose chapter above</p>
+                      <>
+                        <div className="space-y-4">
+                          {liveState.history.slice(-10).reverse().map((item, idx) => (
+                            <div key={idx} className="p-4 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-right-2">
+                               <div className="flex items-center justify-between mb-1">
+                                  <span className={`text-[10px] font-bold uppercase tracking-wider ${item.type === 'scripture' ? 'text-emerald-400' : 'text-blue-400'}`}>{item.type}</span>
+                                  <span className="text-[9px] text-gray-500 uppercase">{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                               </div>
+                               {item.reference && <p className="text-xs font-bold text-white mb-1">{item.reference}</p>}
+                               <p className="text-xs text-gray-400 italic line-clamp-2">{item.content || '(Content Aired)'}</p>
+                            </div>
+                          ))}
+                        </div>
                         <button 
                           onClick={() => {
-                            // Extract reference from chapterText or dropdowns
-                            setPreviewVerse({ book: selectedBook, chapter: selectedChapter, verse_start: 1, verse_end: 1 });
+                            const content = `SERMON SUMMARY: ${session.name}\nDate: ${new Date().toLocaleDateString()}\n\n` + 
+                              liveState.history.map(h => `[${new Date(h.timestamp).toLocaleTimeString()}] ${h.type.toUpperCase()}: ${h.reference || ''} ${h.content}`).join('\n');
+                            const blob = new Blob([content], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `sermon-summary-${session.id}.txt`;
+                            a.click();
                           }}
-                          className="mt-4 px-3 py-1 bg-white/5 hover:bg-white/10 rounded border border-white/10 text-xs text-white"
+                          className="w-full mt-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl font-medium transition-all"
                         >
-                          Preview Selection
+                          Download Session Summary
                         </button>
-                      </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -887,9 +885,25 @@ export default function App() {
               </div>
             )}
             {settings.showVerse && settings.detectVerses && displayVerseLive && (!mainLyric || !settings.showLyrics) && (
-              <div className="w-full absolute inset-0 flex flex-col justify-center px-12">
-                <h2 className={`${colorClass} text-5xl font-semibold mb-10 tracking-wide uppercase`}>{displayVerseLive.reference} <span className="opacity-50 text-3xl font-normal ml-3">({displayVerseLive.translation || settings.bibleVersion})</span></h2>
-                <p className="text-white/90 text-[64px] leading-[1.3] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">"{displayVerseLive.text}"</p>
+              <div className="w-full absolute inset-0 flex flex-col justify-center px-24 space-y-12">
+                <div className="space-y-6">
+                   <h2 className={`${colorClass} text-5xl font-semibold tracking-wide uppercase`}>{displayVerseLive.reference} <span className="opacity-50 text-3xl font-normal ml-3">({settings.bibleVersion})</span></h2>
+                   <p className="text-white/90 text-[56px] leading-[1.2] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">{displayVerseLive.text}</p>
+                </div>
+                {secondaryFetchedVerse && (
+                   <div className="pt-8 border-t border-white/10 space-y-6">
+                      <h2 className="text-emerald-500 text-4xl font-semibold tracking-wide uppercase">{displayVerseLive.reference} <span className="opacity-50 text-2xl font-normal ml-3">({settings.secondaryBibleVersion})</span></h2>
+                      <p className="text-white/70 text-[48px] leading-[1.2] font-serif italic tracking-tight max-w-6xl mx-auto drop-shadow-xl line-clamp-2">{secondaryFetchedVerse.text}</p>
+                   </div>
+                )}
+              </div>
+            )}
+            {settings.autoShowTimer && (
+              <div className="absolute bottom-12 right-12 glass-panel px-8 py-4 bg-black/80 border border-white/10 rounded-2xl flex items-center gap-4 animate-in fade-in slide-in-from-right-4">
+                 <Activity size={24} className="text-emerald-400 animate-pulse" />
+                 <span className="text-white text-5xl font-mono font-bold tracking-tighter">
+                    {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
+                 </span>
               </div>
             )}
           </div>

@@ -90,13 +90,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <Volume2 size={18} /> System Audio (Mixer)
                     </label>
                   </div>
-                  <div className="text-xs text-gray-500 bg-[#1e1e1e] rounded-lg p-3 border border-white/5">
-                    {settings.audioInput === 'system' ? (
-                      <span><strong>System Audio Setup:</strong> Select this to capture YouTube/Mixer audio. Requires a <strong>Cloud Provider</strong> (Groq, Deepgram, or OpenAI Whisper) with a valid API key. When you start listening, you'll be prompted to select a browser tab and enable audio sharing.</span>
-                    ) : (
-                      <span><strong>Live Mic:</strong> Captures audio from a connected microphone. Works with any speech engine.</span>
-                    )}
-                  </div>
                 </div>
 
                 <div className="flex items-center justify-between border-t border-white/5 pt-6">
@@ -114,15 +107,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                   </div>
                   <input type="range" min="0" max="100" value={settings.gain} onChange={e => onUpdate('gain', Number(e.target.value))} className="w-full accent-emerald-500" />
                 </div>
-
-                <div className="border-t border-white/5 pt-6 flex justify-end">
-                  <button 
-                    onClick={() => setIsTestingAudio(!isTestingAudio)}
-                    className="flex items-center gap-2 bg-[#1e1e1e] hover:bg-[#252525] border border-white/10 px-5 py-2.5 rounded-lg text-white font-medium transition-colors">
-                    <Activity size={18} className={isTestingAudio ? "text-emerald-500 animate-pulse" : "text-gray-400"} />
-                    {isTestingAudio ? 'Testing Audio...' : 'Test Audio'}
-                  </button>
-                </div>
               </div>
             </div>
           )}
@@ -135,7 +119,6 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
               </div>
 
               <div className="bg-[#161616] border border-white/5 rounded-2xl p-6 space-y-8">
-                {/* Transcription Section */}
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -148,52 +131,35 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                   <div className={`space-y-6 transition-opacity ${!settings.enableTranscription && 'opacity-50 pointer-events-none'}`}>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">Primary Speech Engine</label>
-                      <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50">
-                        <option value="web">Chrome Web Speech API (Free, Requires Internet)</option>
-                        <option value="worker">Vosk WASM Engine (Free, 100% Offline)</option>
-                        <option value="groq">Groq Cloud API (Ultra-Fast Whisper) ⭐ System Audio</option>
-                        <option value="deepgram">Deepgram Nova Cloud API ⭐ System Audio</option>
-                        <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy) ⭐ System Audio</option>
+                      <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white outline-none">
+                        <option value="web">Chrome Web Speech API (Free)</option>
+                        <option value="worker">Vosk Engine (Offline)</option>
+                        <option value="groq">Groq Cloud API (Fastest)</option>
                       </select>
-                      {(settings.audioInput === 'system' && !['groq', 'deepgram', 'whisper'].includes(settings.speechEngine)) && (
-                        <p className="text-xs text-yellow-500/80 mt-2 flex items-center gap-1">⚠️ Web Speech API with System Audio: Switch to a starred provider to capture YouTube/mixer audio.</p>
-                      )}
                     </div>
-
-                    {['whisper', 'groq', 'deepgram'].includes(settings.speechEngine) && (
-                      <div className="animate-in fade-in slide-in-from-top-2">
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          {settings.speechEngine === 'groq' ? 'Groq API Key' : settings.speechEngine === 'deepgram' ? 'Deepgram Token' : 'OpenAI API Key'}
-                        </label>
-                        <input 
-                          type="password" 
-                          value={settings.whisperApiKey} 
-                          onChange={e => onUpdate('whisperApiKey', e.target.value)} 
-                          placeholder={settings.speechEngine === 'groq' ? 'gsk_...' : settings.speechEngine === 'deepgram' ? 'Token...' : 'sk-proj-...'} 
-                          className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50"
-                        />
-                        <p className="text-xs text-emerald-400/80 mt-2 mt-flex items-center gap-1">Key is stored securely in local browser storage only.</p>
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 <hr className="border-white/5" />
 
-                {/* Bible Verse Section */}
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-medium text-lg">Cross-Reference & Scripture</span>
+                    <span className="text-white font-medium text-lg">Scripture & Parallel View</span>
                     <Toggle checked={settings.detectVerses} onChange={(v) => onUpdate('detectVerses', v)} />
                   </div>
                   
                   <div className={`grid grid-cols-2 gap-6 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
                     <div>
-                      <label className="block text-sm text-gray-400 mb-2">Detection Sensitivity</label>
-                      <input type="range" min="0" max="100" value={settings.verseSensitivity} onChange={e => onUpdate('verseSensitivity', Number(e.target.value))} className="w-full accent-emerald-500 mt-2" />
+                      <label className="block text-sm text-gray-400 mb-2">Primary Translation</label>
+                      <select value={settings.bibleVersion} onChange={e => onUpdate('bibleVersion', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
+                        <option value="KJV">KJV</option>
+                        <option value="NIV">NIV</option>
+                        <option value="NLT">NLT</option>
+                        <option value="TPT">TPT</option>
+                      </select>
                     </div>
-                    <div className="space-y-4">
-                      <label className="block text-sm text-gray-400">Parallel Translation (Optional)</label>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">Parallel Translation (Optional)</label>
                       <select value={settings.secondaryBibleVersion} onChange={e => onUpdate('secondaryBibleVersion', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
                         <option value="">None (Single Bible)</option>
                         <option value="KJV">KJV</option>
@@ -204,86 +170,37 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                     </div>
                   </div>
 
-                  <div className={`flex items-center justify-between pt-2 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
+                  <div className="flex items-center justify-between border-t border-white/5 pt-6">
                     <div>
                       <span className="text-sm font-medium text-gray-200 block">Auto-Air Verses</span>
-                      <span className="text-xs text-red-400 flex items-center gap-1">
-                        <Activity size={10} /> Push to Live immediately on detection
-                      </span>
+                      <span className="text-xs text-emerald-400">Push to Live immediately on detection</span>
                     </div>
                     <Toggle checked={settings.autoAirVerses} onChange={(v) => onUpdate('autoAirVerses', v)} />
                   </div>
 
-                  <div className={`space-y-6 pt-6 border-t border-white/5 transition-opacity ${!settings.detectVerses && 'opacity-50 pointer-events-none'}`}>
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-200 mb-4 flex items-center gap-2">
-                           <Activity size={14} className="text-emerald-400" /> Service Timing & Countdown
-                        </h4>
-                        <div className="grid grid-cols-2 gap-4">
-                           <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-                              <label className="block text-xs text-gray-500 mb-2">Timer Duration (Minutes)</label>
-                              <input type="number" value={settings.timerDuration || 45} onChange={e => onUpdate('timerDuration', Number(e.target.value))} className="w-full bg-transparent text-xl font-bold text-white outline-none" />
-                           </div>
-                           <div className="flex flex-col justify-center">
-                              <span className="text-xs text-gray-400 mb-2">Auto-show on Screen</span>
-                              <Toggle checked={settings.autoShowTimer} onChange={(v) => onUpdate('autoShowTimer', v)} />
-                           </div>
-                        </div>
-                      </div>
-
-                      <div className="border-t border-white/5 pt-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-sm font-medium text-gray-200 block">Use AI Inference for References</span>
-                            <span className="text-xs text-emerald-400">Contextual story detection via LLMs</span>
-                          </div>
-                          <Toggle checked={settings.aiVerseDetection} onChange={(v) => onUpdate('aiVerseDetection', v)} />
-                        </div>
-                        {settings.aiVerseDetection && (
-                          <div className="p-4 bg-black/20 rounded-xl space-y-4 border border-white/10 animate-in fade-in">
-                              <div>
-                                <label className="block text-xs text-gray-400 mb-1">Ollama / LLM API Endpoint</label>
-                                <input value={settings.aiEndpoint} onChange={e => onUpdate('aiEndpoint', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <label className="block text-xs text-gray-400 mb-1">LLM Model Name</label>
-                                  <input value={settings.aiModel} onChange={e => onUpdate('aiModel', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-gray-400 mb-1">Authorization Token / API Key</label>
-                                  <input type="password" value={settings.aiApiKey} onChange={e => onUpdate('aiApiKey', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500/50" />
-                                </div>
-                              </div>
-                          </div>
-                        )}
-                      </div>
+                  <div className="border-t border-white/5 pt-6 space-y-4">
+                    <h4 className="text-sm font-medium text-gray-200 flex items-center gap-2">
+                       <Activity size={14} className="text-emerald-400" /> Service Timing
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+                          <label className="block text-xs text-gray-500 mb-2">Timer Duration (Minutes)</label>
+                          <input type="number" value={settings.timerDuration || 45} onChange={e => onUpdate('timerDuration', Number(e.target.value))} className="w-full bg-transparent text-xl font-bold text-white outline-none" />
+                       </div>
+                       <div className="flex flex-col justify-center">
+                          <span className="text-xs text-gray-400 mb-2">Auto-show Timer</span>
+                          <Toggle checked={settings.autoShowTimer} onChange={(v) => onUpdate('autoShowTimer', v)} />
+                       </div>
+                    </div>
                   </div>
                 </div>
 
                 <hr className="border-white/5" />
 
-                {/* Lyrics Section */}
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-white font-medium text-lg block mb-1">Choir / Lyrics Detection</span>
-                    </div>
+                    <span className="text-white font-medium text-lg">Lyrics Detection</span>
                     <Toggle checked={settings.detectSongs} onChange={(v) => onUpdate('detectSongs', v)} />
-                  </div>
-                  
-                  <div className={`space-y-4 transition-opacity ${!settings.detectSongs && 'opacity-50 pointer-events-none'}`}>
-                    <div className="flex items-center justify-between">
-                       <span className="text-sm text-gray-300">Auto-sync lyrics to speaker</span>
-                       <Toggle checked={settings.autoSyncLyrics} onChange={(v) => onUpdate('autoSyncLyrics', v)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Lyrics Source</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 text-gray-300"><input type="radio" value="local" checked={settings.lyricsSource === 'local'} onChange={() => onUpdate('lyricsSource', 'local')} className="accent-emerald-500" /> Local Database</label>
-                        <label className="flex items-center gap-2 text-gray-300"><input type="radio" value="api" checked={settings.lyricsSource === 'api'} onChange={() => onUpdate('lyricsSource', 'api')} className="accent-emerald-500" /> Online API</label>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -293,200 +210,13 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
           {activeTab === 'display' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
               <div>
-                <h3 className="text-2xl font-semibold text-white mb-2">Display & UI Settings</h3>
-                <p className="text-gray-400">Customize the appearance for operators and projected views.</p>
+                <h3 className="text-2xl font-semibold text-white mb-2">Display Settings</h3>
               </div>
-
               <div className="bg-[#161616] border border-white/5 rounded-2xl p-6 space-y-8">
-                
-                {/* Visibility Toggles */}
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Module Visibility</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Live Transcript Focus</span>
-                      <Toggle checked={settings.showTranscript} onChange={(v) => onUpdate('showTranscript', v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Floating Scripture Popup</span>
-                      <Toggle checked={settings.showVerse} onChange={(v) => onUpdate('showVerse', v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Lyrics / Worship Dock</span>
-                      <Toggle checked={settings.showLyrics} onChange={(v) => onUpdate('showLyrics', v)} />
-                    </div>
-                  </div>
-                </div>
-
-                <hr className="border-white/5" />
-
-                {/* Typography */}
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Typography Scaling</h4>
-                  <div className="space-y-4">
-                     <div>
-                        <label className="block text-sm text-gray-300 mb-2">Base Text Size</label>
-                        <select value={settings.transcriptSize} onChange={e => onUpdate('transcriptSize', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white">
-                          <option value="small">Small (Standard Density)</option>
-                          <option value="medium">Medium (Ideal for Tablets)</option>
-                          <option value="large">Large (High Legibility)</option>
-                        </select>
-                     </div>
-                  </div>
-                </div>
-
-                <hr className="border-white/5" />
-
-                {/* Aesthetics */}
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Highlight Aesthetics</h4>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm text-gray-300 mb-2">Accent Color</label>
-                      <select value={settings.highlightColor} onChange={e => onUpdate('highlightColor', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white">
-                        <option value="emerald">Emerald Green</option>
-                        <option value="gold">Soft Gold</option>
-                        <option value="blue">Electric Blue</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-300 mb-2">Animation Style</label>
-                      <select value={settings.highlightAnimation} onChange={e => onUpdate('highlightAnimation', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white">
-                        <option value="glow">Subtle Glow</option>
-                        <option value="fade">Quick Fade</option>
-                        <option value="slide">Typing Slide</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 space-y-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-300">UI Glass Transparency / Blur Level</span>
-                      <span className="text-emerald-400">{settings.transparency}%</span>
-                    </div>
-                    <input type="range" min="0" max="100" value={settings.transparency} onChange={e => onUpdate('transparency', Number(e.target.value))} className="w-full accent-emerald-500" />
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'data' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-              <div>
-                <h3 className="text-2xl font-semibold text-white mb-2">Data & Export Settings</h3>
-                <p className="text-gray-400">Manage session storage, backups, and output formats.</p>
-              </div>
-
-              <div className="bg-[#161616] border border-white/5 rounded-2xl p-6 space-y-8">
-                
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Local Storage & History</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Auto-save sessions</span>
-                      <Toggle checked={settings.autoSave} onChange={(v) => onUpdate('autoSave', v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Save transcript history</span>
-                      <Toggle checked={settings.saveHistory} onChange={(v) => onUpdate('saveHistory', v)} />
-                    </div>
-                  </div>
-                </div>
-
-                <hr className="border-white/5" />
-
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Cloud & Sync</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between opacity-80 cursor-not-allowed">
-                       <div className="flex flex-col">
-                          <span className="text-gray-200 flex items-center gap-2">Cloud Sync <span className="bg-emerald-500 text-[10px] text-white px-2 py-0.5 rounded-full uppercase font-bold">Soon</span></span>
-                          <span className="text-gray-400 text-sm">Supabase synchronization architecture integration</span>
-                       </div>
-                       <Toggle checked={settings.cloudSync} onChange={(v) => onUpdate('cloudSync', v)} />
-                    </div>
-                  </div>
-                </div>
-
-                <hr className="border-white/5" />
-
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Export Settings</h4>
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-sm text-gray-300 mb-2">Default Export Format</label>
-                      <select value={settings.exportFormat} onChange={e => onUpdate('exportFormat', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white">
-                        <option value="txt">Plain Text (.txt)</option>
-                        <option value="pdf">PDF Document (.pdf)</option>
-                        <option value="docx">Word (.docx)</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                     <button className="flex-1 bg-[#1e1e1e] hover:bg-[#252525] text-emerald-400 border border-emerald-500/20 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
-                       <Download size={16} /> Export Latest Session
-                     </button>
-                     <button className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
-                       <Trash2 size={16} /> Clear App Cache
-                     </button>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'notifications' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-              <div>
-                <h3 className="text-2xl font-semibold text-white mb-2">Notifications & Alerts</h3>
-                <p className="text-gray-400">Configure visual toasts and sound alerts for system events.</p>
-              </div>
-
-              <div className="bg-[#161616] border border-white/5 rounded-2xl p-6 space-y-8">
-                
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Event Trigger Alerts</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Bible Verse Detected</span>
-                      <Toggle checked={settings.alertVerse} onChange={(v) => onUpdate('alertVerse', v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Worship Song Detected</span>
-                      <Toggle checked={settings.alertSong} onChange={(v) => onUpdate('alertSong', v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-200">Sync Connected Users</span>
-                      <Toggle checked={settings.alertSync} onChange={(v) => onUpdate('alertSync', v)} />
-                    </div>
-                  </div>
-                </div>
-
-                <hr className="border-white/5" />
-
-                <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Alert Delivery Methods</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-gray-200 flex items-center gap-2">Play Sound Alerts</span>
-                        <span className="text-gray-400 text-sm">Chime on successful detection events</span>
-                      </div>
-                      <Toggle checked={settings.alertSound} onChange={(v) => onUpdate('alertSound', v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-gray-200 flex items-center gap-2">Show Visual Toasts</span>
-                        <span className="text-gray-400 text-sm">Slide-down animations at top of screen</span>
-                      </div>
-                      <Toggle checked={settings.alertVisual} onChange={(v) => onUpdate('alertVisual', v)} />
-                    </div>
-                  </div>
-                </div>
-
+                 <div className="flex items-center justify-between">
+                    <span className="text-gray-200">Show Transcript</span>
+                    <Toggle checked={settings.showTranscript} onChange={(v) => onUpdate('showTranscript', v)} />
+                 </div>
               </div>
             </div>
           )}
