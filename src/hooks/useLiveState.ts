@@ -23,10 +23,13 @@ export function useLiveState(
     current_verse: null,
     current_song: undefined,
     current_line: undefined,
+<<<<<<< HEAD
     preview_text: '',
     preview_verse: null,
     is_live_dirty: false,
     history: [],
+=======
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     updated_at: new Date().toISOString()
   });
 
@@ -105,11 +108,19 @@ export function useLiveState(
           console.log(`📝 [Content Classification] Type: ${contentClassification.type} (${Math.round(contentClassification.confidence * 100)}% confidence)`);
 
           return {
+<<<<<<< HEAD
             ...prev,
             session_id: sessionId,
             preview_text: updatedText,
             preview_verse: verse ?? prev.preview_verse,
             is_live_dirty: true,
+=======
+            session_id: sessionId,
+            current_text: updatedText,
+            current_verse: verse ?? prev.current_verse,
+            current_song: song?.title ?? prev.current_song,
+            current_line: song ? newLine : prev.current_line,
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
             content_type: contentClassification.type,
             updated_at: new Date(timestamp).toISOString()
           };
@@ -180,6 +191,7 @@ export function useLiveState(
 
   const clearText = useCallback(() => {
     setInterimText('');
+<<<<<<< HEAD
     setLiveState(prev => ({ 
       ...prev, 
       current_text: '', 
@@ -235,6 +247,9 @@ export function useLiveState(
       updated_at: new Date().toISOString()
     }));
     if (verse) setCurrentVerse(verse);
+=======
+    setLiveState(prev => ({ ...prev, current_text: '', updated_at: new Date().toISOString() }));
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
   }, []);
 
   return {
@@ -248,9 +263,12 @@ export function useLiveState(
     stop,
     clearText,
     applyLiveState,
+<<<<<<< HEAD
     goLive,
     setPreviewVerse,
     setSecondaryVerse,
+=======
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     speechStats,
     wordRate,
     error,

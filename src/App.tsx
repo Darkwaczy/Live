@@ -118,11 +118,19 @@ export default function App() {
     saveHistory: true,
     exportFormat: 'txt',
     cloudSync: false,
+<<<<<<< HEAD
     alertVisual: true,
     autoAirVerses: false,
     secondaryBibleVersion: '',
     timerDuration: 45,
     autoShowTimer: false,
+=======
+    alertVerse: true,
+    alertSong: true,
+    alertSync: true,
+    alertSound: false,
+    alertVisual: true,
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
   });
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
@@ -136,10 +144,14 @@ export default function App() {
     showToast('Settings saved successfully!');
   };
 
+<<<<<<< HEAD
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
     start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse
   } = useLiveState(
+=======
+  const { liveState, interimText, currentSong, currentLine, currentVerse, isListening, start, stop, clearText, applyLiveState, error, setError } = useLiveState(
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
     { apiKey: settings.whisperApiKey, endpoint: '', audioInput: settings.audioInput as 'live' | 'system' },
@@ -155,6 +167,7 @@ export default function App() {
   }, [liveState.current_text, interimText]);
 
   const [fetchedVerse, setFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
+<<<<<<< HEAD
   const [secondaryFetchedVerse, setSecondaryFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
 
   const [timerSession, setTimerSession] = useState({ 
@@ -172,6 +185,8 @@ export default function App() {
     }
     return () => clearInterval(interval);
   }, [timerSession.isRunning, timerSession.remaining]);
+=======
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
 
   const bibleVersions = ['KJV', 'NIV', 'NLT', 'TPT'];
   const [bibleData, setBibleData] = useState<any[]>([]);
@@ -209,6 +224,7 @@ export default function App() {
   }, [settings.bibleVersion]);
 
   useEffect(() => {
+<<<<<<< HEAD
     const fetchVerse = async (ref: string, version: string, isSecondary: boolean) => {
       try {
         const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(ref)}?translation=${version}`);
@@ -262,6 +278,108 @@ export default function App() {
       goLive();
     }
   }, [liveState.preview_verse, settings.autoAirVerses, goLive, liveState.current_verse]);
+=======
+    if (!bibleData || bibleData.length === 0) {
+      setChapterText('(Loading locally, or book unavailable for this translation)');
+      return;
+    }
+    const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+    if (!book || !Array.isArray(book.chapters)) {
+      setChapterText('(Selected book data not found in translation)');
+      return;
+    }
+
+    const chapters = book.chapters;
+    const chapterIndex = Math.max(0, selectedChapter - 1);
+    if (chapterIndex >= chapters.length) {
+      setChapterText('(Chapter out of range)');
+      return;
+    }
+
+    const passages = chapters[chapterIndex];
+    setChapterText(
+      passages.map((verse: string, idx: number) => `${selectedChapter}:${idx + 1} ${verse}`).join('\n\n')
+    );
+  }, [bibleData, selectedBook, selectedChapter]);
+
+  useEffect(() => {
+    if (!currentVerse) {
+      setFetchedVerse(null);
+      return;
+    }
+    
+    console.log(`📖 Fetching verse: ${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}...`);
+    setFetchedVerse(null);
+    const fetchLocalVerse = async () => {
+      const version = settings.bibleVersion.toLowerCase();
+      const reference = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}${currentVerse.verse_end && currentVerse.verse_end > currentVerse.verse_start ? `-${currentVerse.verse_end}` : ''}`;
+      
+      try {
+        // Primary: Cloud API
+        console.log(`🌐 Trying cloud API: bible-api.com...`);
+        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${version}`);
+        if (!apiRes.ok) throw new Error("Bible API fetch failed");
+        const apiData = await apiRes.json();
+        
+        if (apiData.text) {
+           console.log(`✅ Cloud API success!`);
+           setFetchedVerse({ 
+             reference: apiData.reference || reference, 
+             text: apiData.text.replace(/\n/g, ' ').trim(), 
+             translation: settings.bibleVersion 
+           });
+           return;
+        }
+      } catch (apiErr) {
+        console.warn("⚠️ Cloud Bible API failed, falling back to local JSON...", apiErr);
+      }
+
+      try {
+        // Secondary Fallback: Local Offline JSON Datasets
+        console.log(`📁 Trying local JSON: /bibles/${version}.json`);
+        const res = await fetch(`/bibles/${version}.json`);
+        
+        if (!res.ok) {
+           throw new Error(`Local Bible dataset for ${version.toUpperCase()} not found. Status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        let verseText = "";
+        
+        if (Array.isArray(data)) {
+           const bookData = data.find((b: any) => b.name?.toLowerCase() === currentVerse.book.toLowerCase() || b.book?.toLowerCase() === currentVerse.book.toLowerCase());
+           if (bookData && bookData.chapters) {
+              const chapterArr = bookData.chapters[currentVerse.chapter - 1]; // 0-indexed
+              if (chapterArr) {
+                 for (let i = currentVerse.verse_start; i <= (currentVerse.verse_end || currentVerse.verse_start); i++) {
+                    if (chapterArr[i - 1]) verseText += chapterArr[i - 1] + " ";
+                 }
+              }
+           }
+        }
+        
+        if (verseText) {
+           console.log(`✅ Local JSON success!`);
+           setFetchedVerse({ 
+             reference: reference, 
+             text: verseText.trim(), 
+             translation: settings.bibleVersion 
+           });
+        } else {
+           throw new Error("Passage not found in local dataset structure.");
+        }
+      } catch (err: any) {
+        console.error("❌ Verse fetch error:", err.message);
+        setFetchedVerse({ 
+           reference: reference, 
+           text: `(Passage unavailable. Ensure /public/bibles/${version}.json exists or check internet)`,
+           translation: settings.bibleVersion
+        });
+      }
+    };
+    fetchLocalVerse();
+  }, [currentVerse, settings.bibleVersion]);
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
 
   useEffect(() => {
     (async () => {
@@ -360,6 +478,7 @@ export default function App() {
     } catch (e) {}
   };
 
+<<<<<<< HEAD
   const displayVersePreview = liveState.preview_verse 
     ? fetchedVerse 
       ? fetchedVerse
@@ -370,6 +489,12 @@ export default function App() {
     ? fetchedVerse && fetchedVerse.reference.includes(liveState.current_verse.book)
       ? fetchedVerse
       : { reference: `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}${liveState.current_verse.verse_end && liveState.current_verse.verse_end > liveState.current_verse.verse_start ? `-${liveState.current_verse.verse_end}` : ''}`, text: 'Live on Screen', translation: settings.bibleVersion }
+=======
+  const displayVerse = currentVerse 
+    ? fetchedVerse 
+      ? fetchedVerse
+      : { reference: `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse_start}${currentVerse.verse_end && currentVerse.verse_end > currentVerse.verse_start ? `-${currentVerse.verse_end}` : ''}`, text: 'Retrieving passage from the cloud...', translation: settings.bibleVersion } 
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     : null;
 
   const fullTranscript = (liveState.current_text + ' ' + (interimText || '')).trim();
@@ -390,20 +515,28 @@ export default function App() {
   const animationClass = settings.highlightAnimation === 'glow' ? `drop-shadow-[0_0_12px_rgba(currentColor,0.4)]` : settings.highlightAnimation === 'fade' ? 'animate-pulse' : '';
   const blurStyle = { backdropFilter: `blur(${settings.transparency/10 + 2}px)`, filter: `opacity(${settings.transparency}%)` };
 
+<<<<<<< HEAD
   const transcriptTextClass = settings.transcriptSize === 'small' ? 'text-xl' : settings.transcriptSize === 'medium' ? 'text-2xl' : 'text-3xl';
+=======
+  const transcriptTextClass = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-[34px]';
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
   const projectorTextClass1 = settings.transcriptSize === 'small' ? 'text-4xl' : settings.transcriptSize === 'medium' ? 'text-5xl' : 'text-6xl';
   const projectorTextClass2 = settings.transcriptSize === 'small' ? 'text-3xl' : settings.transcriptSize === 'medium' ? 'text-4xl' : 'text-5xl';
   const projectorTextClass3 = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-4xl';
 
   if (isProjector) {
+<<<<<<< HEAD
     const minutes = Math.floor(timerSession.remaining / 60);
     const seconds = timerSession.remaining % 60;
     
+=======
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
     return (
       <div className="flex h-screen w-full bg-[#000000] text-white font-sans overflow-hidden select-none relative px-12 py-12">
         <button onClick={() => setProjector(false)} className="absolute top-6 right-6 p-4 text-white/20 hover:text-white/80 transition-opacity z-50">
            <X size={32} />
         </button>
+<<<<<<< HEAD
 
         {/* Countdown Timer */}
         {settings.autoShowTimer && (
@@ -435,6 +568,19 @@ export default function App() {
              <div className="w-full space-y-8 px-24 text-center z-0">
                 <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
                   {liveState.current_text.split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
+=======
+        <div className="flex-1 flex flex-col justify-center items-center w-full max-w-6xl mx-auto space-y-12">
+           {settings.showVerse && displayVerse && settings.detectVerses && (
+              <div className="absolute top-12 left-12 z-10 w-[400px] glass-panel p-8 shadow-2xl bg-[#1a1a1a]/90 border-t border-white/10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
+                <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerse.reference} ({settings.bibleVersion})</h4>
+                <p className="text-gray-200 text-2xl leading-relaxed font-serif">{displayVerse.text}</p>
+              </div>
+           )}
+           {settings.showTranscript && settings.enableTranscription && (
+             <div className="w-full space-y-8 px-24 text-center z-0">
+                <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
+                  {(liveState.current_text + (interimText ? ' ' + interimText : '')).trim().split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                 </p>
              </div>
            )}
@@ -527,6 +673,7 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-1 bg-[#1e1e24]/80 p-0.5 rounded-lg border border-white/5">
+<<<<<<< HEAD
               <button 
                 onClick={() => setTimerSession(prev => ({ ...prev, isRunning: !prev.isRunning }))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${timerSession.isRunning ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'}`}
@@ -543,6 +690,8 @@ export default function App() {
                 <X size={12} />
               </button>
               <div className="w-px h-5 bg-white/10 mx-1"></div>
+=======
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
               <button onClick={handleSnapshotToNotes} className="px-3 py-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 rounded-md transition-all mr-1" title="Save current text to Notes and clear screen">
                 <Save size={14} /> Save & Clear
               </button>
@@ -558,11 +707,19 @@ export default function App() {
                 <SkipBack size={18} fill="currentColor" />
               </button>
               <button 
+<<<<<<< HEAD
                 onClick={goLive}
                 className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${liveState.is_live_dirty ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-gray-700 text-gray-400 opacity-50 cursor-not-allowed'}`}
                 disabled={!liveState.is_live_dirty}
               >
                 <SkipForward size={18} fill="currentColor" /> GO LIVE (AIR)
+=======
+                onClick={() => { handleNext(); showToast('Skipped forward one line'); }} 
+                className="p-2 hover:bg-white/10 text-white rounded-md transition-colors"
+                title="Next Lyric/Item"
+              >
+                <SkipForward size={18} fill="currentColor" />
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
               </button>
             </div>
           </div>
@@ -606,6 +763,7 @@ export default function App() {
           <div className="flex-1 flex flex-col relative px-10 py-8 overflow-hidden z-0">
             {activeView === 'live' ? (
               <>
+<<<<<<< HEAD
                 {/* Dual Pane View */}
                 <div className="flex-1 flex gap-8 overflow-hidden">
                   
@@ -668,6 +826,43 @@ export default function App() {
                     )}
                   </div>
                 </div>
+=======
+                {/* Main Background Glow */}
+                <div className="absolute inset-0 opacity-10 pointer-events-none mix-blend-screen" 
+                     style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #3b82f6 0%, transparent 50%)' }} />
+
+                {/* Floating Verse Card */}
+                {settings.showVerse && settings.detectVerses && displayVerse && (!mainLyric || !settings.showLyrics) && (
+                    <div className={`absolute top-8 left-10 z-10 w-[460px] glass-panel p-8 shadow-2xl bg-[#22272e]/90 border-t ${settings.highlightAnimation === 'glow' ? `border-${colorClass.replace('text-','')}/30 shadow-[0_0_40px_-15px_rgba(52,211,153,0.3)]` : 'border-white/10'}`} style={blurStyle}>
+                      <h4 className={`${colorClass} font-bold text-xl pb-4 border-b border-white/10 mb-4`}>{displayVerse.reference} <span className="opacity-60 text-sm font-normal ml-2">({displayVerse.translation || settings.bibleVersion})</span></h4>
+                      <p className="text-gray-200 text-[21px] leading-relaxed font-serif tracking-tight">{displayVerse.text}</p>
+                    </div>
+                )}
+
+                {/* Transcript Area */}
+                {settings.showTranscript && settings.enableTranscription && (
+                  <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto py-12 z-0 relative overflow-hidden">
+                     <div 
+                        ref={transcriptScrollRef}
+                        className="flex-1 overflow-y-auto pr-8 scroll-smooth"
+                        style={{ scrollBehavior: 'smooth' }}
+                     >
+                        {liveState.current_text || interimText ? (
+                          <p className={`${transcriptTextClass} pb-32 text-gray-200 leading-[1.8] font-medium tracking-wide whitespace-pre-wrap`}>
+                            {liveState.current_text}
+                            {interimText && <span className="text-gray-500 ml-2 animate-pulse">{interimText}</span>}
+                          </p>
+                        ) : (
+                          <div className="h-full flex items-center justify-center opacity-50">
+                             <p className={`${transcriptTextClass} text-gray-500 font-medium tracking-wide`}>
+                               {isListening ? 'Listening...' : 'Click Play to start the live transcription.'}
+                             </p>
+                          </div>
+                        )}
+                     </div>
+                  </div>
+                )}
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
 
                 {/* Bottom Lyric Dock */}
                 {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
@@ -813,6 +1008,7 @@ export default function App() {
                         {chapterText}
                       </div>
                     </div>
+<<<<<<< HEAD
                     {displayVersePreview && settings.detectVerses ? (
                       <div className={`bg-[#1e1e1e] p-5 rounded-xl border shadow-sm animate-in fade-in ${borderClass}/50`}>
                         <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
@@ -848,6 +1044,19 @@ export default function App() {
                           Download Session Summary
                         </button>
                       </>
+=======
+
+                    {displayVerse && settings.detectVerses ? (
+                      <div className={`bg-[#1e1e1e] p-5 rounded-xl border shadow-sm animate-in fade-in ${borderClass}/50`}>
+                        <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVerse.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVerse.translation || settings.bibleVersion})</span></h3>
+                        <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVerse.text}</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500 border rounded-xl border-white/5">
+                        <BookOpen size={24} className="mb-3 opacity-40" />
+                        <p className="text-sm italic">Waiting for pastor to mention a scripture reference or choose chapter above</p>
+                      </div>
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
                     )}
                   </div>
                 )}
@@ -871,6 +1080,7 @@ export default function App() {
                   </div>
                 )}
 
+<<<<<<< HEAD
                 {rightPanelTab === 'notes' && (
                   <div className="space-y-4">
                     {notes.length === 0 && (
@@ -883,6 +1093,8 @@ export default function App() {
                     ))}
                   </div>
                 )}
+=======
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
               </div>
 
               {rightPanelTab === 'notes' && (
@@ -926,6 +1138,7 @@ export default function App() {
                 {nextLyric && <p className="text-[40px] text-gray-500 italic mt-8">{nextLyric}</p>}
               </div>
             )}
+<<<<<<< HEAD
             {settings.showVerse && settings.detectVerses && displayVerseLive && (!mainLyric || !settings.showLyrics) && (
               <div className="w-full absolute inset-0 flex flex-col justify-center px-24 space-y-12">
                 <div className="space-y-6">
@@ -946,6 +1159,12 @@ export default function App() {
                  <span className="text-white text-5xl font-mono font-bold tracking-tighter">
                     {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
                  </span>
+=======
+            {settings.showVerse && settings.detectVerses && displayVerse && (!mainLyric || !settings.showLyrics) && (
+              <div className="w-full absolute inset-0 flex flex-col justify-center px-12">
+                <h2 className={`${colorClass} text-5xl font-semibold mb-10 tracking-wide uppercase`}>{displayVerse.reference} <span className="opacity-50 text-3xl font-normal ml-3">({displayVerse.translation || settings.bibleVersion})</span></h2>
+                <p className="text-white/90 text-[64px] leading-[1.3] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">"{displayVerse.text}"</p>
+>>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
               </div>
             )}
           </div>
