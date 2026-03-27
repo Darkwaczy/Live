@@ -69,22 +69,25 @@ const bookNames = [
   { name: 'Revelation', aliases: ['Rev', 'Re'] }
 ];
 
-const bookRegex = bookNames
-  .map((book) => [book.name, ...book.aliases].join('|'))
+// Sort books by length (desc) to ensure "1 John" matches before "John"
+const sortedBookRegex = bookNames
+  .flatMap(book => [book.name, ...book.aliases])
+  .sort((a, b) => b.length - a.length)
   .join('|');
 
-const biblePattern = new RegExp(`\\b(${bookRegex})\\s+(\\d{1,3}):(\\d{1,3})(?:-(\\d{1,3}))?\\b`, 'i');
+const biblePattern = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3}):(\\d{1,3})(?:-(\\d{1,3}))?\\b`, 'i');
 // Pattern for "john 316" format (no colon, when speech-to-text merges numbers)
-const biblePatternNoColon = new RegExp(`\\b(${bookRegex})\\s+(\\d+?)\\s*(\\d{3})\\b`, 'i');
+// Matches: book + space + consecutive digits (e.g., "john 316")
+const biblePatternNoColon = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{2,5})\\b`, 'i');
 
 export function detectBibleVerse(text: string): BibleVerse | null {
   console.log(`🔍 [detectBibleVerse] Input: "${text}"`);
   
   // Normalize spoken structures from speech-to-text engines
   let normalizedText = text
-    .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verse\s+|\s+)(\d+)/gi, '$1:$2')
+    .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
     .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') // "John 3, 16" -> "John 3:16"
-    .replace(/verse\s+(\d+)/gi, ':$1')
+    .replace(/verses?\s+(\d+)/gi, ':$1')
     .replace(/\s+/g, ' '); // Normalize whitespace
 
   console.log(`  → Normalized: "${normalizedText}"`);
@@ -95,14 +98,40 @@ export function detectBibleVerse(text: string): BibleVerse | null {
     console.log(`  ✅ Matched colon pattern: ${match[1]} ${match[2]}:${match[3]}`);
   } else {
     // Second try: Handle "john 316" format (speech-to-text merged numbers)
-    // This regex catches patterns like "john 316" and converts to "john 3:16"
+    // Split digits intelligently: last 1-2 digits are verse, rest are chapter
     const noColonMatch = biblePatternNoColon.exec(normalizedText);
     if (noColonMatch) {
       const book = noColonMatch[1];
-      const chapterPart = noColonMatch[2];
-      const versePart = noColonMatch[3];
-      const fixedRef = `${book} ${chapterPart}:${versePart}`;
-      console.log(`  🔧 Fixed no-colon format "${noColonMatch[0]}" → "${fixedRef}"`);
+      const combinedDigits = noColonMatch[2];
+      
+      // Try splitting: last 2 digits as verse, rest as chapter
+      // E.g., "316" → chapter="3", verse="16"; "2310" → chapter="23", verse="10"
+      let chapter: number;
+      let verse: number;
+      
+      if (combinedDigits.length === 2) {
+        // If only 2 digits, treat as chapter 1, verse XX OR chapter X, verse Y (if book has many chapters)
+        // For safety in speech-to-text, usually single digit chapter + single digit verse
+        if (combinedDigits[0] !== '0') {
+           chapter = parseInt(combinedDigits[0], 10);
+           verse = parseInt(combinedDigits[1], 10);
+        } else {
+           chapter = 1;
+           verse = parseInt(combinedDigits, 10);
+        }
+      } else if (combinedDigits.length === 3) {
+        // If 3 digits, likely: single digit chapter + 2 digit verse (e.g., 316)
+        // OR 2 digit chapter + 1 digit verse
+        chapter = parseInt(combinedDigits.slice(0, -2) || combinedDigits[0], 10);
+        verse = parseInt(combinedDigits.slice(-2), 10);
+      } else {
+        // If 4+ digits, chapter is first digits, last 2 are verse
+        chapter = parseInt(combinedDigits.slice(0, -2), 10);
+        verse = parseInt(combinedDigits.slice(-2), 10);
+      }
+      
+      const fixedRef = `${book} ${chapter}:${verse}`;
+      console.log(`  🔧 Fixed no-colon format "${noColonMatch[0]}" → "${fixedRef}" (split: ch=${chapter}, v=${verse})`);
       match = biblePattern.exec(fixedRef);
     }
   }

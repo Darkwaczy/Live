@@ -153,6 +153,64 @@ export default function App() {
 
   const [fetchedVerse, setFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
 
+  const bibleVersions = ['KJV', 'NIV', 'NLT', 'TPT'];
+  const [bibleData, setBibleData] = useState<any[]>([]);
+  const [selectedBook, setSelectedBook] = useState('Genesis');
+  const [selectedChapter, setSelectedChapter] = useState(1);
+  const [chapterText, setChapterText] = useState('Loading book...');
+
+  const bibleBooks = [
+    'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther','Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon','Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi','Matthew','Mark','Luke','John','Acts','Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'
+  ];
+
+  useEffect(() => {
+    const loadBibleData = async () => {
+      const version = settings.bibleVersion.toLowerCase();
+      try {
+        const res = await fetch(`/bibles/${version}.json`);
+        if (!res.ok) throw new Error(`Content not found: /bibles/${version}.json`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setBibleData(data);
+          if (!data.find((b: any) => b.name === selectedBook || b.book === selectedBook)) {
+            setSelectedBook(data[0]?.name || data[0]?.book || 'Genesis');
+            setSelectedChapter(1);
+          }
+          return;
+        }
+        setBibleData([]);
+      } catch (err) {
+        setBibleData([]);
+        console.warn('Bible data load failed:', err);
+      }
+    };
+
+    loadBibleData();
+  }, [settings.bibleVersion]);
+
+  useEffect(() => {
+    if (!bibleData || bibleData.length === 0) {
+      setChapterText('(Loading locally, or book unavailable for this translation)');
+      return;
+    }
+    const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+    if (!book || !Array.isArray(book.chapters)) {
+      setChapterText('(Selected book data not found in translation)');
+      return;
+    }
+
+    const chapters = book.chapters;
+    const chapterIndex = Math.max(0, selectedChapter - 1);
+    if (chapterIndex >= chapters.length) {
+      setChapterText('(Chapter out of range)');
+      return;
+    }
+
+    const passages = chapters[chapterIndex];
+    setChapterText(
+      passages.map((verse: string, idx: number) => `${selectedChapter}:${idx + 1} ${verse}`).join('\n\n')
+    );
+  }, [bibleData, selectedBook, selectedChapter]);
   useEffect(() => {
     if (!currentVerse) {
       setFetchedVerse(null);
@@ -648,16 +706,76 @@ export default function App() {
 
                 {/* Scriptures Tab */}
                 {rightPanelTab === 'scriptures' && (
-                  <div className="space-y-6">
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase tracking-wider">Bible Translation</label>
+                        <select
+                          value={settings.bibleVersion}
+                          onChange={(e) => setSettings(prev => ({ ...prev, bibleVersion: e.target.value }))}
+                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                        >
+                          {bibleVersions.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase tracking-wider">Selected Book</label>
+                        <select
+                          value={selectedBook}
+                          onChange={(e) => { setSelectedBook(e.target.value); setSelectedChapter(1); }}
+                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                        >
+                          {bibleBooks.map((book) => <option key={book} value={book}>{book}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase tracking-wider">Chapter</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={selectedChapter}
+                          onChange={(e) => setSelectedChapter(Math.max(1, Math.min(150, Number(e.target.value) || 1)))}
+                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                        />
+                      </div>
+                      <div className="flex items-end justify-end">
+                        <button
+                          onClick={() => {
+                            if (bibleData.length > 0) {
+                              const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+                              if (book && book.chapters) {
+                                setSelectedChapter(Math.max(1, Math.min(Number(selectedChapter), book.chapters.length)));
+                                return;
+                              }
+                            }
+                            setSelectedChapter(Number(selectedChapter));
+                          }}
+                          className="px-4 py-2 bg-emerald-500 text-black rounded-lg font-semibold hover:bg-emerald-400 transition-colors"
+                        >
+                          Go
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 shadow-sm">
+                      <h3 className={`${colorClass} font-semibold text-base`}>{selectedBook} {selectedChapter} <span className="text-gray-400 text-xs">({settings.bibleVersion})</span></h3>
+                      <div className="mt-2 max-h-[250px] overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-gray-200 font-serif">
+                        {chapterText}
+                      </div>
+                    </div>
                     {displayVerse && settings.detectVerses ? (
                       <div className={`bg-[#1e1e1e] p-5 rounded-xl border shadow-sm animate-in fade-in ${borderClass}/50`}>
                         <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVerse.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVerse.translation || settings.bibleVersion})</span></h3>
                         <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVerse.text}</p>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">
-                         <BookOpen size={24} className="mb-3 opacity-40" />
-                         <p className="text-sm italic">Waiting for pastor to mention<br/>a scripture reference...</p>
+                      <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500 border rounded-xl border-white/5">
+                        <BookOpen size={24} className="mb-3 opacity-40" />
+                        <p className="text-sm italic">Waiting for pastor to mention a scripture reference or choose chapter above</p>
                       </div>
                     )}
                   </div>
@@ -682,6 +800,18 @@ export default function App() {
                   </div>
                 )}
 
+                {rightPanelTab === 'notes' && (
+                  <div className="space-y-4">
+                    {notes.length === 0 && (
+                       <p className="text-gray-500 text-sm text-center mt-4">No notes for this session yet.</p>
+                    )}
+                    {notes.map(n => (
+                      <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 shadow-sm text-[14px] text-gray-300 leading-relaxed hover:border-emerald-500/30 transition-colors cursor-default">
+                        {n.content}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {rightPanelTab === 'notes' && (
