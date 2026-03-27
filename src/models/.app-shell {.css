@@ -1,0 +1,31 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr 1fr;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  min-height: 100vh;
+  background: #030712;
+  color: #e2e8f0;
+}
+
+.panel {
+  border: 1px solid #2e3b55;
+  border-radius: 10px;
+  background: rgba(8, 16, 31, 0.95);
+  padding: 0.75rem;
+  overflow: hidden;
+}
+.panel > header {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #b0c4ff;
+}
+
+.transcript,
+.notes, .live-lyrics {
+  max-height: 300px;
+  overflow-y: auto;
+  word-break: break-word;
+}

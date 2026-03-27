@@ -1,0 +1,22 @@
+# Electron / Build output - NEVER commit these
+dist/
+win-unpacked/
+out/
+build/
+release/
+
+# Large binary files
+*.pak
+*.dll
+*.exe
+*.bin
+*.blob
+*.asar
+*.icd.json
+
+# Dependencies
+node_modules/
+
+# Logs and temp
+*.log
+.DS_Store
