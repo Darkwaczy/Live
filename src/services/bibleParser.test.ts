@@ -31,6 +31,12 @@ describe('Bible parser', () => {
     expect(detectBibleVerse('John , 316')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
   });
 
+  it('handles phonetic/accent misinterpretations', () => {
+    expect(detectBibleVerse('Exitos 1:1')).toEqual({ book: 'Exodus', chapter: 1, verse_start: 1, verse_end: 1 });
+    expect(detectBibleVerse('Georges 3:16')).toEqual({ book: 'Judges', chapter: 3, verse_start: 16, verse_end: 16 });
+    expect(detectBibleVerse('Genests 1:1')).toEqual({ book: 'Genesis', chapter: 1, verse_start: 1, verse_end: 1 }); // Fuzzy match
+  });
+
   it('detects variations like verses keyword', () => {
     expect(detectBibleVerse('John chapter 3 verses 16')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });
     expect(detectBibleVerse('John 3 verses 16')).toEqual({ book: 'John', chapter: 3, verse_start: 16, verse_end: 16 });

@@ -2,12 +2,12 @@ import { BibleVerse } from '../models/liveState';
 
 const bookNames = [
   { name: 'Genesis', aliases: ['Gen'] },
-  { name: 'Exodus', aliases: ['Exod', 'Ex'] },
+  { name: 'Exodus', aliases: ['Exod', 'Ex', 'Exitos', 'Exit'] },
   { name: 'Leviticus', aliases: ['Lev'] },
-  { name: 'Numbers', aliases: ['Num', 'Nu'] },
+  { name: 'Numbers', aliases: ['Num', 'Nu', 'Number'] },
   { name: 'Deuteronomy', aliases: ['Deut', 'Dt'] },
   { name: 'Joshua', aliases: ['Josh', 'Jos'] },
-  { name: 'Judges', aliases: ['Judg', 'Jdg'] },
+  { name: 'Judges', aliases: ['Judg', 'Jdg', 'Georges', 'Judge', 'George'] },
   { name: 'Ruth', aliases: ['Ru'] },
   { name: '1 Samuel', aliases: ['1 Sam', '1Sa', 'I Samuel'] },
   { name: '2 Samuel', aliases: ['2 Sam', '2Sa', 'II Samuel'] },
@@ -79,6 +79,8 @@ const biblePattern = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3}):(\\d{1,3}
 // Pattern for "john 316" format (no colon, when speech-to-text merges numbers)
 // Matches: book + space + consecutive digits (e.g., "john 316")
 const biblePatternNoColon = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{2,5})\\b`, 'i');
+// Generic fallback for misheard books (e.g. "Genests 1:1")
+const genericBiblePattern = /\b([a-z1-3\s]{3,15})\s+(\d{1,3}):(\d{1,3})(?:-(\d{1,3}))?\b/i;
 
 export function detectBibleVerse(text: string): BibleVerse | null {
   // Clean transcription artifacts like #, /, \, |, _, , 
@@ -112,8 +114,21 @@ export function detectBibleVerse(text: string): BibleVerse | null {
   if (match) {
     console.log(`  ✅ Matched colon pattern: ${match[1]} ${match[2]}:${match[3]}`);
   } else {
-    // Second try: Handle "john 316" format (speech-to-text merged numbers)
-    // Split digits intelligently: last 1-2 digits are verse, rest are chapter
+    // Second try: Generic fallback for accents/mishearings
+    match = genericBiblePattern.exec(normalizedText);
+    if (match) {
+      const fuzzyBook = resolveBookName(match[1]);
+      if (fuzzyBook !== match[1]) {
+        console.log(`  ✅ Matched generic pattern with fuzzy resolve: ${match[1]} -> ${fuzzyBook}`);
+      } else {
+        // If it didn't resolve and it's some random word, ignore it to prevent false positives
+        match = null;
+      }
+    }
+  }
+
+  if (!match) {
+    // Third try: Handle "john 316" format
     const noColonMatch = biblePatternNoColon.exec(normalizedText);
     if (noColonMatch) {
       const book = noColonMatch[1];
@@ -183,10 +198,45 @@ export function detectBibleVerse(text: string): BibleVerse | null {
 
 function resolveBookName(rawBook: string): string {
   const normalized = rawBook.trim().toLowerCase();
-  const entry = bookNames.find((book) =>
+  
+  // 1. Exact or Alias match
+  const exactMatch = bookNames.find((book) =>
     [book.name, ...book.aliases].some((alias) => alias.toLowerCase() === normalized)
   );
-  return entry?.name ?? rawBook;
+  if (exactMatch) return exactMatch.name;
+
+  // 2. Fuzzy match fallback for accents/mishearings
+  let bestMatch = null;
+  let highestScore = 0;
+
+  for (const book of bookNames) {
+    const targets = [book.name, ...book.aliases];
+    for (const target of targets) {
+      const distance = getLevenshteinDistance(normalized, target.toLowerCase());
+      const maxLength = Math.max(normalized.length, target.length);
+      const score = 1 - (distance / maxLength);
+      
+      if (score > 0.8 && score > highestScore) {
+        highestScore = score;
+        bestMatch = book.name;
+      }
+    }
+  }
+
+  return bestMatch ?? rawBook;
+}
+
+function getLevenshteinDistance(a: string, b: string): number {
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost);
+    }
+  }
+  return matrix[a.length][b.length];
 }
 
 export async function detectBibleVerseAI(
@@ -195,7 +245,7 @@ export async function detectBibleVerseAI(
   apiKey: string,
   model: string = 'mistral'
 ): Promise<BibleVerse | null> {
-  const prompt = `Analyze the following spoken text from a church sermon. If the speaker is referencing or paraphrasing a specific Bible story, passage, or verse, determine the exact book, chapter, and verse starting point. Return YOUR ENTIRE RESPONSE as a valid JSON object matching this exact schema: {"book": "Genesis", "chapter": 1, "verse_start": 1}. If no biblical reference is present, return exactly {"book": null}. Do not include markdown, backticks, or conversational text. The spoken text is: "${text}"`;
+  const prompt = `Analyze the following spoken text from a church sermon. Handle regional accents, phonetic variations, and common mishearings (e.g., "Georges" for "Judges", "Exitos" for "Exodus"). If the speaker is referencing or paraphrasing a specific Bible story, passage, or verse, determine the exact book, chapter, and verse starting point. Return YOUR ENTIRE RESPONSE as a valid JSON object matching this exact schema: {"book": "Genesis", "chapter": 1, "verse_start": 1}. If no biblical reference is present, return exactly {"book": null}. Do not include markdown, backticks, or conversational text. The spoken text is: "${text}"`;
 
   try {
     const res = await fetch(endpoint, {
