@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LiveState, BibleVerse } from '../models/liveState';
-import { detectBibleVerse } from '../services/bibleParser';
+import { detectBibleVerse, classifyContent } from '../services/bibleParser';
 import { findSongByWords, locateCurrentLine } from '../services/lyricsService';
 import { Song } from '../models/song';
 import { AudioService } from '../services/audioService';
@@ -67,6 +67,7 @@ export function useLiveState(
           const rollingWindow = updatedText.split(' ').slice(-20).join(' ');
           const verse = detectBibleVerse(rollingWindow);
           const song = findSongByWords(chunk);
+          const contentClassification = classifyContent(chunk);
 
           const newLine = song ? locateCurrentLine(song, updatedText) : prev.current_line;
 
@@ -97,12 +98,15 @@ export function useLiveState(
             return [...filtered, { timestamp, words, confidence }];
           });
 
+          console.log(`📝 [Content Classification] Type: ${contentClassification.type} (${Math.round(contentClassification.confidence * 100)}% confidence)`);
+
           return {
             session_id: sessionId,
             current_text: updatedText,
             current_verse: verse ?? prev.current_verse,
             current_song: song?.title ?? prev.current_song,
             current_line: song ? newLine : prev.current_line,
+            content_type: contentClassification.type,
             updated_at: new Date(timestamp).toISOString()
           };
         });
