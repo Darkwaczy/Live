@@ -21,7 +21,8 @@ export interface LiveState {
   current_line?: number;
   preview_text?: string;
   preview_verse?: BibleVerse | null;
-  is_live_dirty?: boolean;
+  is_live_dirty: boolean;
+  is_analyzing: boolean;
   history: LiveHistoryItem[];
   content_type?: 'scripture' | 'lyrics' | 'notes';
   updated_at: string;

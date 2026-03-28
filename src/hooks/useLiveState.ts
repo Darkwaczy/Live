@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LiveState, BibleVerse } from '../models/liveState';
-import { detectBibleVerse, classifyContent } from '../services/bibleParser';
+import { detectBibleVerse, detectBibleVerseAI, classifyContent } from '../services/bibleParser';
 import { findSongByWords, locateCurrentLine } from '../services/lyricsService';
 import { Song } from '../models/song';
 import { AudioService } from '../services/audioService';
@@ -26,6 +26,7 @@ export function useLiveState(
     preview_text: '',
     preview_verse: null,
     is_live_dirty: false,
+    is_analyzing: false,
     history: [],
     updated_at: new Date().toISOString()
   });
@@ -59,7 +60,7 @@ export function useLiveState(
         setInterimText('');
         setLiveState((prev) => {
           const updatedText = `${prev.preview_text} ${chunk}`.trim();
-          const rollingWindow = updatedText.split(' ').slice(-20).join(' ');
+          const rollingWindow = updatedText.split(' ').slice(-30).join(' ');
           const verse = detectBibleVerse(rollingWindow);
           const song = findSongByWords(chunk);
           const contentClassification = classifyContent(chunk);
@@ -67,17 +68,28 @@ export function useLiveState(
           const newLine = song ? locateCurrentLine(song, updatedText) : prev.current_line;
 
           const currentAi = aiConfigRef.current;
+          let nextState = {
+            ...prev,
+            preview_text: updatedText,
+            updated_at: new Date().toISOString()
+          };
+
           if (verse) {
              setCurrentVerse(verse);
-          } else if (currentAi.enabled && chunk.split(' ').length > 2) {
-             import('../services/bibleParser').then(m => {
-                m.detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
-                 .then(aiVerse => {
-                   if (aiVerse) {
-                      setLiveState(s => ({ ...s, preview_verse: aiVerse, is_live_dirty: true }));
-                   }
-                 });
-             });
+             nextState = { ...nextState, preview_verse: verse, is_live_dirty: true };
+          } else if (currentAi.enabled && rollingWindow.split(' ').length > 6 && !prev.is_analyzing) {
+             // AI trigger (async)
+             setTimeout(() => {
+               setLiveState(s => ({ ...s, is_analyzing: true }));
+               detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName).then((aiVerse: BibleVerse | null) => {
+                  if (aiVerse) {
+                     setCurrentVerse(aiVerse);
+                     setLiveState(s => ({ ...s, preview_verse: aiVerse, is_live_dirty: true, is_analyzing: false }));
+                  } else {
+                     setLiveState(s => ({ ...s, is_analyzing: false }));
+                  }
+               }).catch(() => setLiveState(s => ({ ...s, is_analyzing: false })));
+             }, 0);
           }
 
           if (song) {
@@ -93,11 +105,8 @@ export function useLiveState(
           });
 
           return {
-            ...prev,
+            ...nextState,
             session_id: sessionId,
-            preview_text: updatedText,
-            preview_verse: verse ?? prev.preview_verse,
-            is_live_dirty: true,
             content_type: contentClassification.type,
             updated_at: new Date(timestamp).toISOString()
           };

@@ -397,8 +397,8 @@ export default function App() {
            )}
            {(!displayVerseLive || !settings.showVerse) && settings.showTranscript && settings.enableTranscription && (
              <div className="w-full px-12 text-center z-0">
-                <p className={`${projectorTextClass1} text-white leading-relaxed font-medium tracking-tight whitespace-pre-wrap transition-all duration-700`}>
-                   {(liveState.current_text || '').split(' ').slice(-40).join(' ') || (isListening ? 'Listening...' : 'Screen is clear')}
+                <p className={`${projectorTextClass1} text-white leading-relaxed font-medium tracking-tight whitespace-pre-wrap transition-all duration-1000`}>
+                   {(liveState.current_text || '').split(' ').slice(-100).join(' ') || (isListening ? 'Listening...' : 'Screen is clear')}
                 </p>
              </div>
            )}
@@ -521,7 +521,13 @@ export default function App() {
                 {/* PREVIEW PANE */}
                 <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[#1a1a1e] rounded-3xl border border-white/5 relative overflow-hidden">
                   <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
-                    PREVIEW / STAGING
+                    {liveState.is_analyzing ? (
+                      <span className="flex items-center gap-1.5">
+                        <Activity size={10} className="animate-pulse" /> AI ANALYZING INTENT...
+                      </span>
+                    ) : (
+                      "PREVIEW / STAGING"
+                    )}
                   </div>
                   
                   <button 

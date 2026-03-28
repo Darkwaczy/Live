@@ -245,7 +245,13 @@ export async function detectBibleVerseAI(
   apiKey: string,
   model: string = 'mistral'
 ): Promise<BibleVerse | null> {
-  const prompt = `Analyze the following spoken text from a church sermon. Handle regional accents, phonetic variations, and common mishearings (e.g., "Georges" for "Judges", "Exitos" for "Exodus"). If the speaker is referencing or paraphrasing a specific Bible story, passage, or verse, determine the exact book, chapter, and verse starting point. Return YOUR ENTIRE RESPONSE as a valid JSON object matching this exact schema: {"book": "Genesis", "chapter": 1, "verse_start": 1}. If no biblical reference is present, return exactly {"book": null}. Do not include markdown, backticks, or conversational text. The spoken text is: "${text}"`;
+  const prompt = `Analyze the following spoken text from a sermon. 
+  1. Identify any explicit Bible references (e.g., "John 3:16").
+  2. Identify any paraphrased or quoted scripture even without a reference (e.g., "follow me and I will make you fishers of men" -> Matthew 4:19).
+  3. Map phonetic variations/accents (e.g., "Georges" -> "Judges").
+  Return ONLY a JSON object: {"book": "BookName", "chapter": X, "verse_start": Y}. 
+  If multiple verses are quoted, pick the most prominent one. If no scripture is found, return {"book": null}. 
+  Target: "${text}"`;
 
   try {
     const res = await fetch(endpoint, {
