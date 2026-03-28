@@ -23,6 +23,13 @@ export interface LiveState {
   preview_verse?: BibleVerse | null;
   is_live_dirty: boolean;
   is_analyzing: boolean;
+  detection_history: Array<{
+    id: string;
+    verse: BibleVerse;
+    timestamp: string;
+    confidence?: number;
+    is_paraphrase?: boolean;
+  }>;
   history: LiveHistoryItem[];
   content_type?: 'scripture' | 'lyrics' | 'notes';
   updated_at: string;

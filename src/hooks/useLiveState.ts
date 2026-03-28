@@ -27,6 +27,7 @@ export function useLiveState(
     preview_verse: null,
     is_live_dirty: false,
     is_analyzing: false,
+    detection_history: [],
     history: [],
     updated_at: new Date().toISOString()
   });
@@ -68,6 +69,20 @@ export function useLiveState(
           const newLine = song ? locateCurrentLine(song, updatedText) : prev.current_line;
 
           const currentAi = aiConfigRef.current;
+          let newDetections = prev.detection_history;
+
+          const addDetection = (v: BibleVerse, isPara = false) => {
+            const last = newDetections[0];
+            if (!last || last.verse.book !== v.book || last.verse.chapter !== v.chapter || last.verse.verse_start !== v.verse_start) {
+              newDetections = [{
+                id: `det-${Date.now()}`,
+                verse: v,
+                timestamp: new Date().toISOString(),
+                is_paraphrase: isPara
+              }, ...newDetections].slice(0, 15);
+            }
+          };
+
           let nextState = {
             ...prev,
             preview_text: updatedText,
@@ -76,7 +91,8 @@ export function useLiveState(
 
           if (verse) {
              setCurrentVerse(verse);
-             nextState = { ...nextState, preview_verse: verse, is_live_dirty: true };
+             addDetection(verse, false);
+             nextState = { ...nextState, preview_verse: verse, is_live_dirty: true, detection_history: newDetections };
           } else if (currentAi.enabled && rollingWindow.split(' ').length > 6 && !prev.is_analyzing) {
              // AI trigger (async)
              setTimeout(() => {
@@ -84,7 +100,15 @@ export function useLiveState(
                detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName).then((aiVerse: BibleVerse | null) => {
                   if (aiVerse) {
                      setCurrentVerse(aiVerse);
-                     setLiveState(s => ({ ...s, preview_verse: aiVerse, is_live_dirty: true, is_analyzing: false }));
+                     setLiveState(s => {
+                       const freshDets = [{
+                         id: `det-${Date.now()}`,
+                         verse: aiVerse,
+                         timestamp: new Date().toISOString(),
+                         is_paraphrase: true
+                       }, ...s.detection_history].slice(0, 15);
+                       return { ...s, preview_verse: aiVerse, is_live_dirty: true, is_analyzing: false, detection_history: freshDets };
+                     });
                   } else {
                      setLiveState(s => ({ ...s, is_analyzing: false }));
                   }
