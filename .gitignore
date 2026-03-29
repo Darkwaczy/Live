@@ -19,8 +19,9 @@ node_modules/
 
 # Logs and temp
 *.log
-<<<<<<< HEAD
 .DS_Store
-=======
-.DS_Store
->>>>>>> 1d421d8b32dda4748bbb1120594e66a46f4921c2
+
+# Environment Secrets
+.env
+.env.*
+!.env.example
