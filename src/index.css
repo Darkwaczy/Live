@@ -27,4 +27,16 @@
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 12px;
   }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .shadow-glow {
+     box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+  }
 }

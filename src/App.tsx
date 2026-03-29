@@ -148,16 +148,16 @@ export default function App() {
     { enabled: settings.aiVerseDetection, endpointUrl: settings.aiEndpoint, apiKey: settings.aiApiKey, modelName: settings.aiModel }
   );
 
-  // Helpers for transcription column
-  const sentences = useMemo(() => (liveState?.current_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.current_text]);
+  // Helpers for transcription column (Now using preview_text for permanence)
+  const sentences = useMemo(() => (liveState?.preview_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.preview_text]);
   const { connected } = useSync(session.id, liveState, applyLiveState);
 
   const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
   useEffect(() => {
      if (transcriptScrollRef.current) {
-        transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
+        transcriptScrollRef.current.scrollTo({ top: transcriptScrollRef.current.scrollHeight, behavior: 'smooth' });
      }
-  }, [liveState.current_text, interimText]);
+  }, [liveState.preview_text, interimText]);
 
   const [fetchedVerse, setFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
   const [secondaryFetchedVerse, setSecondaryFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
@@ -620,32 +620,35 @@ export default function App() {
                    {isListening && <span className="text-[8px] font-bold text-emerald-500/60 uppercase tracking-widest">Live</span>}
                 </div>
                 
-                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar bg-[#0f0f12]">
-                   {sentences.length === 0 ? (
-                     <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
-                        <FileText size={24} className="mb-2" />
-                        <p className="text-[8px] font-black uppercase tracking-widest">Feed Listening</p>
-                     </div>
-                   ) : (
-                     sentences.slice(-20).map((line, i) => (
-                       <div key={i} className="flex flex-col gap-1.5 group animate-in slide-in-from-bottom-2 duration-300">
-                          <div className="flex items-center justify-between opacity-30">
-                             <span className="text-[8px] font-black text-emerald-500 uppercase">Speaker</span>
-                             <span className="text-[8px] font-mono text-gray-500">[{new Date(Date.now() - (20 - i) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]</span>
-                          </div>
-                          <p className={`text-xs leading-relaxed font-medium transition-all ${line.toLowerCase().includes(selectedBook.toLowerCase()) ? 'text-emerald-400 font-bold' : 'text-gray-400 group-hover:text-gray-200'}`}>
-                             {line.trim()}.
-                          </p>
+                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar bg-[#0f0f12]">
+                {sentences.length === 0 && !interimText ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
+                     <FileText size={24} className="mb-2" />
+                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>
+                  </div>
+                ) : (
+                  sentences.map((line, i) => (
+                    <div key={i} className="flex flex-col gap-1.5 group animate-in slide-in-from-bottom-1 duration-300">
+                       <div className="flex items-center justify-between opacity-30">
+                          <span className="text-[8px] font-black text-emerald-500/60 uppercase">Final Output</span>
+                          <span className="text-[8px] font-mono text-gray-600">[{new Date(Date.now() - (sentences.length - i) * 2000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' })}]</span>
                        </div>
-                     ))
-                   )}
-                   {interimText && (
-                     <div className="flex flex-col gap-1 opacity-40 italic">
-                       <span className="text-[8px] font-bold text-gray-600 uppercase">Interim...</span>
-                       <p className="text-xs text-white/60 leading-relaxed">{interimText}</p>
-                     </div>
-                   )}
-                </div>
+                       <p className={`text-xs leading-relaxed font-medium transition-all ${line.toLowerCase().includes(selectedBook.toLowerCase()) ? 'text-emerald-400 font-bold border-l-2 border-emerald-500/40 pl-3 shadow-glow' : 'text-gray-400 group-hover:text-gray-200'}`}>
+                          {line.trim()}{line.endsWith('.') ? '' : '.'}
+                       </p>
+                    </div>
+                  ))
+                )}
+                {interimText && (
+                  <div className="flex flex-col gap-1 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between opacity-30">
+                       <span className="text-[8px] font-black text-blue-400 uppercase">Live Interim</span>
+                       <span className="text-[8px] font-mono text-gray-600">Now</span>
+                    </div>
+                    <p className="text-xs text-white/80 leading-relaxed font-medium underline decoration-blue-500/30 underline-offset-4">{interimText}...</p>
+                  </div>
+                )}
+             </div>
              </div>
 
              {/* BOTTOM: QUEUE */}
