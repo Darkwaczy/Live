@@ -91,7 +91,10 @@ export function detectBibleVerse(text: string): BibleVerse | null {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Hard fix for "John 316" or "John, 316" etc
+  // Hard fix for common phrases
+  if (/fishers\s*of\s*men/i.test(sanitizedText)) {
+    return { book: 'Matthew', chapter: 4, verse_start: 19, verse_end: 19 };
+  }
   if (/john\s*316\b/i.test(sanitizedText)) {
     return { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 };
   }

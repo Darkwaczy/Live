@@ -140,7 +140,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse
+    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse, removeDetection
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -657,17 +657,39 @@ export default function App() {
                    <LayoutGrid size={14} className="text-blue-400" />
                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Queue</h3>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
                    {liveState.detection_history.length === 0 ? (
-                      <p className="text-[9px] text-gray-700 italic text-center mt-4">Queue is empty</p>
+                      <p className="text-[9px] text-gray-700 italic text-center mt-4 uppercase tracking-widest opacity-30">Queue is empty</p>
                    ) : (
-                      liveState.detection_history.slice(-5).map((det) => (
-                        <div key={det.id} onClick={() => setPreviewVerse(det.verse)} className="p-3 bg-white/5 border border-white/5 rounded-xl hover:border-emerald-500/30 transition-all cursor-pointer group active:scale-95 shadow-sm">
+                      liveState.detection_history.map((det) => (
+                        <div 
+                           key={det.id} 
+                           className="relative flex flex-col p-3 bg-white/5 border border-white/5 rounded-xl hover:bg-white/8 hover:border-emerald-500/40 transition-all cursor-pointer group shadow-lg active:scale-[0.98]"
+                        >
                            <div className="flex items-center justify-between mb-2">
                               <span className="text-[8px] font-black text-emerald-500/40 uppercase group-hover:text-emerald-500 transition-colors">Detected</span>
-                              <span className="text-[8px] font-mono text-gray-600 tracking-tighter">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</span>
+                              <div className="flex items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                                 <button 
+                                    onClick={(e) => {
+                                       e.stopPropagation();
+                                       removeDetection(det.id);
+                                    }}
+                                    className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded transition-colors"
+                                 >
+                                    <X size={10} />
+                                 </button>
+                              </div>
                            </div>
-                           <p className="text-[11px] font-bold text-white/80 group-hover:text-white">{det.verse.book} {det.verse.chapter}:{det.verse.verse_start}</p>
+                           <div className="flex items-end justify-between" onClick={() => setPreviewVerse(det.verse)}>
+                              <div>
+                                 <p className="text-[11px] font-bold text-white mb-0.5">{det.verse.book} {det.verse.chapter}:{det.verse.verse_start}</p>
+                                 <p className="text-[8px] font-mono text-gray-600 tracking-tighter uppercase">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</p>
+                              </div>
+                              <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:bg-emerald-500 group-hover:text-black transition-all">
+                                 <Play size={10} fill="currentColor" />
+                              </div>
+                           </div>
                         </div>
                       ))
                    )}
@@ -990,12 +1012,12 @@ export default function App() {
             {settings.showVerse && settings.detectVerses && displayVerseLive && (!mainLyric || !settings.showLyrics) && (
               <div className="w-full absolute inset-0 flex flex-col justify-center px-24 space-y-12">
                 <div className="space-y-6">
-                   <h2 className={`${colorClass} text-5xl font-semibold tracking-wide uppercase`}>{displayVerseLive.reference} <span className="opacity-50 text-3xl font-normal ml-3">({settings.bibleVersion})</span></h2>
-                   <p className="text-white/90 text-[56px] leading-[1.2] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">{displayVerseLive.text}</p>
+                   <h2 className={`${colorClass} text-5xl font-semibold tracking-wide uppercase`}>{displayVerseLive?.reference} <span className="opacity-50 text-3xl font-normal ml-3">({settings.bibleVersion})</span></h2>
+                   <p className="text-white/90 text-[56px] leading-[1.2] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">{displayVerseLive?.text}</p>
                 </div>
                 {secondaryFetchedVerse && (
                    <div className="pt-8 border-t border-white/10 space-y-6">
-                      <h2 className="text-emerald-500 text-4xl font-semibold tracking-wide uppercase">{displayVerseLive.reference} <span className="opacity-50 text-2xl font-normal ml-3">({settings.secondaryBibleVersion})</span></h2>
+                      <h2 className="text-emerald-500 text-4xl font-semibold tracking-wide uppercase">{displayVerseLive?.reference} <span className="opacity-50 text-2xl font-normal ml-3">({settings.secondaryBibleVersion})</span></h2>
                       <p className="text-white/70 text-[48px] leading-[1.2] font-serif italic tracking-tight max-w-6xl mx-auto drop-shadow-xl line-clamp-2">{secondaryFetchedVerse.text}</p>
                    </div>
                 )}

@@ -269,6 +269,14 @@ export function useLiveState(
     setInterimText('');
   }, []);
 
+  const removeDetection = useCallback((id: string) => {
+    setLiveState(prev => ({
+      ...prev,
+      detection_history: prev.detection_history.filter(h => h.id !== id),
+      updated_at: new Date().toISOString()
+    }));
+  }, []);
+
   return {
     liveState,
     interimText,
@@ -284,6 +292,7 @@ export function useLiveState(
     goLive,
     setPreviewVerse,
     setSecondaryVerse,
+    removeDetection,
     speechStats,
     wordRate,
     error,
