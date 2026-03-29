@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
-  Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle
+  Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
+  Activity
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { useSync } from './hooks/useSync';
@@ -64,6 +65,7 @@ const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass 
 };
 
 export default function App() {
+
   const [session, setSession] = useState<Session>({
     id: SESSION_ID,
     name: 'Sunday Morning Service',
@@ -145,6 +147,9 @@ export default function App() {
     { apiKey: settings.whisperApiKey, endpoint: '', audioInput: settings.audioInput as 'live' | 'system' },
     { enabled: settings.aiVerseDetection, endpointUrl: settings.aiEndpoint, apiKey: settings.aiApiKey, modelName: settings.aiModel }
   );
+
+  // Helpers for transcription column
+  const sentences = useMemo(() => (liveState?.current_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.current_text]);
   const { connected } = useSync(session.id, liveState, applyLiveState);
 
   const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
@@ -600,74 +605,127 @@ export default function App() {
         </header>
 
         {/* Content Body */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden bg-black/20">
+          
+          {/* COLUMN 1: INTEGRATED FEED (LEFT) */}
+          <section className="w-[280px] flex flex-col bg-[#161616] border-r border-white/5 shrink-0 animate-in slide-in-from-left-8 duration-500 overflow-hidden">
+             
+             {/* TOP: LIVE TRANSCRIPTION */}
+             <div className="flex-[0.6] flex flex-col min-h-0 border-b border-white/5">
+                <div className="h-[56px] p-4 flex items-center justify-between bg-[#1a1a1e] border-b border-white/5">
+                   <div className="flex items-center gap-2">
+                      <Activity size={14} className="text-emerald-500 animate-pulse" />
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Transcript</h3>
+                   </div>
+                   {isListening && <span className="text-[8px] font-bold text-emerald-500/60 uppercase tracking-widest">Live</span>}
+                </div>
+                
+                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar bg-[#0f0f12]">
+                   {sentences.length === 0 ? (
+                     <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
+                        <FileText size={24} className="mb-2" />
+                        <p className="text-[8px] font-black uppercase tracking-widest">Feed Listening</p>
+                     </div>
+                   ) : (
+                     sentences.slice(-20).map((line, i) => (
+                       <div key={i} className="flex flex-col gap-1.5 group animate-in slide-in-from-bottom-2 duration-300">
+                          <div className="flex items-center justify-between opacity-30">
+                             <span className="text-[8px] font-black text-emerald-500 uppercase">Speaker</span>
+                             <span className="text-[8px] font-mono text-gray-500">[{new Date(Date.now() - (20 - i) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]</span>
+                          </div>
+                          <p className={`text-xs leading-relaxed font-medium transition-all ${line.toLowerCase().includes(selectedBook.toLowerCase()) ? 'text-emerald-400 font-bold' : 'text-gray-400 group-hover:text-gray-200'}`}>
+                             {line.trim()}.
+                          </p>
+                       </div>
+                     ))
+                   )}
+                   {interimText && (
+                     <div className="flex flex-col gap-1 opacity-40 italic">
+                       <span className="text-[8px] font-bold text-gray-600 uppercase">Interim...</span>
+                       <p className="text-xs text-white/60 leading-relaxed">{interimText}</p>
+                     </div>
+                   )}
+                </div>
+             </div>
+
+             {/* BOTTOM: QUEUE */}
+             <div className="flex-[0.4] flex flex-col min-h-0 bg-[#0a0a0c]">
+                <div className="h-[48px] p-4 flex items-center gap-2 bg-black/40 border-b border-white/5">
+                   <LayoutGrid size={14} className="text-blue-400" />
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Queue</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                   {liveState.detection_history.length === 0 ? (
+                      <p className="text-[9px] text-gray-700 italic text-center mt-4">Queue is empty</p>
+                   ) : (
+                      liveState.detection_history.slice(-5).map((det) => (
+                        <div key={det.id} onClick={() => setPreviewVerse(det.verse)} className="p-3 bg-white/5 border border-white/5 rounded-xl hover:border-emerald-500/30 transition-all cursor-pointer group active:scale-95 shadow-sm">
+                           <div className="flex items-center justify-between mb-2">
+                              <span className="text-[8px] font-black text-emerald-500/40 uppercase group-hover:text-emerald-500 transition-colors">Detected</span>
+                              <span className="text-[8px] font-mono text-gray-600 tracking-tighter">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</span>
+                           </div>
+                           <p className="text-[11px] font-bold text-white/80 group-hover:text-white">{det.verse.book} {det.verse.chapter}:{det.verse.verse_start}</p>
+                        </div>
+                      ))
+                   )}
+                </div>
+             </div>
+          </section>
           
           {/* Main Content Area based on ViewMode */}
           <div className="flex-1 flex flex-col relative px-10 py-8 overflow-hidden z-0">
             {activeView === 'live' ? (
               <>
-                {/* Dual Pane View */}
-                <div className="flex-1 flex gap-8 overflow-hidden">
-                  
-                  {/* PREVIEW PANE (Operator Stage) */}
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[#1a1a1e] rounded-3xl border border-white/5 relative overflow-hidden group">
-                    <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                      PREVIEW / STAGING
-                    </div>
-                    
-                    {displayVersePreview && settings.detectVerses ? (
-                      <div className="w-full space-y-6">
-                        <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
-                          <h4 className={`${colorClass} font-bold text-xl mb-2`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
-                          <p className="text-white text-xl leading-relaxed font-serif">{displayVersePreview.text}</p>
-                        </div>
-                        {secondaryFetchedVerse && (
-                          <div className="p-6 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-                            <h4 className="text-emerald-400 font-bold text-xl mb-2">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
-                            <p className="text-gray-200 text-xl leading-relaxed font-serif">{secondaryFetchedVerse.text}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-full text-center">
-                        <p className={`${transcriptTextClass} text-white/90 leading-relaxed font-medium transition-all`}>
-                          {liveState.preview_text.split(' ').slice(-20).join(' ') || (interimText ? interimText : (isListening ? 'Listening...' : 'Ready...'))}
-                          {interimText && <span className="text-gray-500 ml-2 italic">{interimText}</span>}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+                {/* Center Header: Same-Height Side-by-Side Preview and Live */}
+                <div className="flex items-start gap-4 h-[300px] p-1 shrink-0">
+                   
+                   {/* PREVIEW PANE (Top Left - Square) */}
+                   <div className="h-full aspect-square flex flex-col items-center justify-center p-6 bg-[#1a1a1e] rounded-3xl border border-white/5 relative overflow-hidden group shrink-0">
+                     <div className="absolute top-4 left-4 flex items-center gap-2 text-[9px] font-bold tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">
+                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                       PREVIEW
+                     </div>
+                     
+                     {displayVersePreview && settings.detectVerses ? (
+                       <div className="w-full space-y-4 text-center">
+                         <h4 className={`${colorClass} font-bold text-sm mb-1`}>{displayVersePreview.reference}</h4>
+                         <p className="text-white text-sm leading-relaxed font-serif line-clamp-6 italic">"{displayVersePreview.text}"</p>
+                       </div>
+                     ) : (
+                       <div className="w-full text-center opacity-30">
+                         <FileText size={48} className="mx-auto mb-3" />
+                         <p className="text-[9px] font-black uppercase tracking-widest text-gray-500">Staging Ready</p>
+                       </div>
+                     )}
+                   </div>
 
-                  {/* LIVE PANE (Audience View) */}
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 bg-black rounded-3xl border-2 border-red-500/20 shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-2 py-1 rounded">
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                      LIVE ON SCREEN
-                    </div>
+                   {/* LIVE ON SCREEN (Top Right - Landscape) */}
+                   <div className="h-full flex-1 flex flex-col items-center justify-center p-8 bg-black rounded-3xl border-2 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)] relative overflow-hidden">
+                     <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-3 py-1 rounded-full">
+                       <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                       LIVE ON SCREEN
+                     </div>
 
-                    {displayVerseLive && settings.detectVerses ? (
-                      <div className="w-full space-y-4 px-8 py-4 opacity-80 scale-95 origin-center">
-                         <div className="space-y-4">
-                            <div className="pb-2 border-b border-white/5">
-                               <h4 className={`${colorClass} font-bold text-lg`}>{displayVerseLive.reference} <span className="opacity-40 font-normal">({settings.bibleVersion})</span></h4>
-                               <p className="text-white/80 text-lg leading-snug font-serif line-clamp-3">{displayVerseLive.text}</p>
-                            </div>
-                            {secondaryFetchedVerse && liveState.secondary_verse && (
-                               <div>
-                                  <h4 className="text-emerald-500 font-bold text-lg">{displayVerseLive.reference} <span className="opacity-40 font-normal">({settings.secondaryBibleVersion})</span></h4>
-                                  <p className="text-white/60 text-lg leading-snug font-serif line-clamp-3 italic">{liveState.secondary_verse}</p>
-                               </div>
-                            )}
-                         </div>
-                      </div>
-                    ) : (
-                      <p className="text-white/40 text-lg font-medium max-w-md text-center">
-                        {liveState.current_text.split(' ').slice(-10).join(' ') || 'Screen is clear'}
-                      </p>
-                    )}
-                  </div>
+                     {displayVerseLive && settings.detectVerses ? (
+                       <div className="w-full text-center animate-in fade-in duration-500 px-4">
+                          <h4 className={`${colorClass} font-bold text-lg mb-2 tracking-wide uppercase drop-shadow-glow`}>{displayVerseLive.reference}</h4>
+                          <p className="text-white text-xl lg:text-2xl leading-tight font-serif italic line-clamp-4">"{displayVerseLive.text}"</p>
+                       </div>
+                     ) : (
+                       <p className="text-white/40 text-sm font-medium max-w-lg text-center leading-relaxed italic animate-pulse px-4">
+                         {liveState.current_text.split(' ').slice(-50).join(' ') || 'Screen is clear'}
+                       </p>
+                     )}
+                   </div>
                 </div>
+
+                {/* BOTTOM BLOCK: UNTOUCHED PLACEHOLDER */}
+                <div className="flex-1 bg-transparent border border-white/5 border-dashed rounded-3xl flex items-center justify-center relative group overflow-hidden">
+                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02),transparent)] opacity-20" />
+                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/10 select-none">Expansion Zone</p>
+                </div>
+              </div>
 
                 {/* Bottom Lyric Dock */}
                 {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
@@ -938,6 +996,14 @@ export default function App() {
                       <p className="text-white/70 text-[48px] leading-[1.2] font-serif italic tracking-tight max-w-6xl mx-auto drop-shadow-xl line-clamp-2">{secondaryFetchedVerse.text}</p>
                    </div>
                 )}
+              </div>
+            )}
+            {/* Fallback for Continuous Immersive Transcription */}
+            {!displayVerseLive && (!mainLyric || !settings.showLyrics) && settings.showTranscript && (
+              <div className="px-24 animate-in fade-in duration-1000">
+                <p className="text-white/80 text-[56px] leading-tight font-medium italic tracking-tight max-w-6xl mx-auto drop-shadow-2xl">
+                   {liveState.current_text.split(' ').slice(-100).join(' ') || (isListening ? 'Synchronizing Live Feed...' : '')}
+                </p>
               </div>
             )}
             {settings.autoShowTimer && (
