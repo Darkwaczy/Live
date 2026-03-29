@@ -91,12 +91,19 @@ export function detectBibleVerse(text: string): BibleVerse | null {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Hard fix for common phrases
-  if (/fishers\s*of\s*men/i.test(sanitizedText)) {
-    return { book: 'Matthew', chapter: 4, verse_start: 19, verse_end: 19 };
-  }
-  if (/john\s*316\b/i.test(sanitizedText)) {
-    return { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 };
+  // Hard fix for common phrases (Local Fast-Track Cache)
+  const SEMANTIC_HOTKEYS: Record<string, BibleVerse> = {
+    'fishers of men': { book: 'Matthew', chapter: 4, verse_start: 19, verse_end: 19 },
+    'john 3 16': { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 },
+    'for god so loved the world': { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 },
+    'great commission': { book: 'Matthew', chapter: 28, verse_start: 19, verse_end: 20 },
+    'our father who art in heaven': { book: 'Matthew', chapter: 6, verse_start: 9, verse_end: 13 },
+  };
+
+  for (const [phrase, verse] of Object.entries(SEMANTIC_HOTKEYS)) {
+    if (sanitizedText.toLowerCase().includes(phrase)) {
+      return verse;
+    }
   }
   
   console.log(`🔍 [detectBibleVerse] Input: "${text}" (Sanitized: "${sanitizedText}")`);
@@ -248,13 +255,20 @@ export async function detectBibleVerseAI(
   apiKey: string,
   model: string = 'mistral'
 ): Promise<BibleVerse | null> {
-  const prompt = `Analyze the following spoken text from a sermon. 
-  1. Identify any explicit Bible references (e.g., "John 3:16").
-  2. Identify any paraphrased or quoted scripture even without a reference (e.g., "follow me and I will make you fishers of men" -> Matthew 4:19).
-  3. Map phonetic variations/accents (e.g., "Georges" -> "Judges").
-  Return ONLY a JSON object: {"book": "BookName", "chapter": X, "verse_start": Y}. 
-  If multiple verses are quoted, pick the most prominent one. If no scripture is found, return {"book": null}. 
-  Target: "${text}"`;
+  const prompt = `Analyze the following spoken sermon transcript.
+  
+  TASK:
+  1. Identify any EXPLICIT references (e.g., "John 3:16").
+  2. Identify any SEMANTIC/PARAPHRASED quotes (e.g., "I will make you fishers of men" -> Matthew 4:19).
+  3. Resolve phonetic mishearings (e.g., "Genests" -> "Genesis").
+
+  REQUIREMENTS:
+  - Respond ONLY with a valid JSON object.
+  - If scripture is found, return: {"book": "BookName", "chapter": X, "verse_start": Y, "verse_end": Z}.
+  - If no scripture is found, return: {"book": null}.
+  - Search your internal database for the quote's source.
+
+  TEXT TO ANALYZE: "${text}"`;
 
   try {
     const res = await fetch(endpoint, {
