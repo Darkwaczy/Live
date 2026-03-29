@@ -627,17 +627,32 @@ export default function App() {
                      <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>
                   </div>
                 ) : (
-                  sentences.map((line, i) => (
-                    <div key={i} className="flex flex-col gap-1.5 group animate-in slide-in-from-bottom-1 duration-300">
-                       <div className="flex items-center justify-between opacity-30">
-                          <span className="text-[8px] font-black text-emerald-500/60 uppercase">Final Output</span>
-                          <span className="text-[8px] font-mono text-gray-600">[{new Date(Date.now() - (sentences.length - i) * 2000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' })}]</span>
-                       </div>
-                       <p className={`text-xs leading-relaxed font-medium transition-all ${line.toLowerCase().includes(selectedBook.toLowerCase()) ? 'text-emerald-400 font-bold border-l-2 border-emerald-500/40 pl-3 shadow-glow' : 'text-gray-400 group-hover:text-gray-200'}`}>
-                          {line.trim()}{line.endsWith('.') ? '' : '.'}
-                       </p>
-                    </div>
-                  ))
+                  sentences.map((line, i) => {
+                    const isTopic = /topic[:\-]/i.test(line);
+                    const isPoint = /^(?:point|number|no\.?)\s*\d+[:\-]?/i.test(line.trim());
+                    
+                    return (
+                      <div key={i} className={`flex flex-col gap-1.5 group animate-in slide-in-from-bottom-1 duration-300 ${isTopic ? 'mt-6 mb-2' : isPoint ? 'mt-4' : ''}`}>
+                         <div className="flex items-center justify-between opacity-30">
+                            <span className={`text-[8px] font-black uppercase tracking-widest ${isTopic ? 'text-blue-400' : isPoint ? 'text-amber-400' : 'text-emerald-500/60'}`}>
+                               {isTopic ? 'New Segment' : isPoint ? 'Structural Point' : 'Live Feed'}
+                            </span>
+                            <span className="text-[8px] font-mono text-gray-600">[{new Date(Date.now() - (sentences.length - i) * 2000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' })}]</span>
+                         </div>
+                         <p className={`leading-relaxed transition-all ${
+                            isTopic 
+                              ? 'text-lg font-black text-white py-2 border-b-2 border-blue-500/30 tracking-tight' 
+                              : isPoint 
+                                ? 'text-sm font-bold text-amber-200 border-l-2 border-amber-500/40 pl-3 italic'
+                                : line.toLowerCase().includes(selectedBook.toLowerCase()) 
+                                  ? 'text-xs text-emerald-400 font-bold border-l-2 border-emerald-500/40 pl-3 shadow-glow' 
+                                  : 'text-xs text-gray-400 group-hover:text-gray-200 font-medium'
+                         }`}>
+                            {line.trim()}{line.endsWith('.') ? '' : '.'}
+                         </p>
+                      </div>
+                    );
+                  })
                 )}
                 {interimText && (
                   <div className="flex flex-col gap-1 animate-in fade-in duration-200">
@@ -712,15 +727,28 @@ export default function App() {
                        PREVIEW
                      </div>
                      
-                     {displayVersePreview && settings.detectVerses ? (
-                       <div className="w-full space-y-4 text-center">
-                         <h4 className={`${colorClass} font-bold text-sm mb-1`}>{displayVersePreview.reference}</h4>
-                         <p className="text-white text-sm leading-relaxed font-serif line-clamp-6 italic">"{displayVersePreview.text}"</p>
+                    {displayVersePreview && settings.detectVerses ? (
+                       <div className="w-full h-full flex flex-col justify-between">
+                         <div className="text-center space-y-3">
+                            <h4 className={`${colorClass} font-bold text-sm tracking-wide uppercase`}>{displayVersePreview.reference}</h4>
+                            <p className="text-white text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
+                         </div>
+                         
+                         <button 
+                           onClick={goLive}
+                           className="w-full mt-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[11px] uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(220,38,38,0.3)] animate-pulse active:scale-95 transition-all flex items-center justify-center gap-2"
+                         >
+                           <SkipForward size={14} fill="currentColor" /> GO LIVE (AIR)
+                         </button>
                        </div>
                      ) : (
-                       <div className="w-full text-center opacity-30">
-                         <FileText size={48} className="mx-auto mb-3" />
-                         <p className="text-[9px] font-black uppercase tracking-widest text-gray-500">Staging Ready</p>
+                       <div className="w-full text-center opacity-30 group-hover:opacity-50 transition-opacity">
+                         <div className="relative inline-block mb-4">
+                            <FileText size={48} className="mx-auto text-gray-400" />
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-ping"></div>
+                         </div>
+                         <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-300">Ready to Stage</p>
+                         <p className="text-[8px] text-gray-500 mt-1 uppercase">Click Queue or Speak Verse</p>
                        </div>
                      )}
                    </div>
