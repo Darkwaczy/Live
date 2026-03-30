@@ -242,9 +242,9 @@ export class AudioService {
       const isFinal = data.is_final;
       
       if (transcript && this.config.onTranscript) {
-        // Deepgram sends empty transcripts sometimes, ignore those
-        if (transcript.trim().length > 0) {
-           this.config.onTranscript(transcript, isFinal, Date.now(), data.channel.alternatives[0].confidence);
+        const cleaned = this.deduplicateTranscript(transcript);
+        if (cleaned.trim().length > 0) {
+           this.config.onTranscript(cleaned, isFinal, Date.now(), data.channel.alternatives[0].confidence);
         }
       }
     };
@@ -534,7 +534,8 @@ export class AudioService {
       }
 
       if (transcriptText && this.config.onTranscript) {
-        this.config.onTranscript(transcriptText, true, Date.now(), 1.0);
+        const cleaned = this.deduplicateTranscript(transcriptText);
+        this.config.onTranscript(cleaned, true, Date.now(), 1.0);
       }
       console.log(`✅ Transcribed: ${transcriptText}`);
     } catch (err: any) {
@@ -643,5 +644,31 @@ export class AudioService {
     this.processor = undefined;
     this.context = undefined;
     this.audioChunks = []; // Clear buffered audio chunks
+  }
+
+  private deduplicateTranscript(text: string): string {
+    // 1. Kills immediate word stutters: "I I am" -> "I am"
+    const words = text.split(/\s+/);
+    const result: string[] = [];
+    for (let i = 0; i < words.length; i++) {
+      if (i > 0 && words[i].toLowerCase() === words[i-1].toLowerCase()) {
+        continue; // Skip consecutive identical words
+      }
+      result.push(words[i]);
+    }
+    
+    // 2. Kills short phrase stutters: "Praise the Lord Praise the Lord" -> "Praise the Lord"
+    // (Only if they are short and repeated exactly)
+    let finalString = result.join(' ');
+    const shortPhrases = ["praise the lord", "hallelujah", "amen amen", "in jesus name"];
+    for (const phrase of shortPhrases) {
+       const double = `${phrase} ${phrase}`;
+       const regex = new RegExp(double, 'gi');
+       if (finalString.toLowerCase().includes(double)) {
+          finalString = finalString.replace(regex, phrase);
+       }
+    }
+
+    return finalString;
   }
 }
