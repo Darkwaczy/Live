@@ -3,7 +3,7 @@ import {
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
-  Activity, Radio
+  Activity, Radio, Search
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
@@ -12,7 +12,11 @@ import { Session } from './models/session';
 import { Note } from './models/note';
 import { User } from './models/user';
 import { login, logout, getCurrentUser } from './services/authService';
-import { getNotes, saveNote, saveLiveState, getLiveState, saveSession, getSession } from './services/dbService';
+import { 
+   getNotes, saveNote, getSession, saveSession, getLiveState, saveLiveState 
+} from './services/dbService';
+import { loadEssentialLyrics, searchLyrics, addPastedSong } from './services/lyricsService';
+import { Song } from './models/song';
 import SettingsView from './components/SettingsView';
 
 const SESSION_ID = 'service-001';
@@ -189,6 +193,8 @@ export default function App() {
   const [selectedBook, setSelectedBook] = useState('Genesis');
   const [selectedChapter, setSelectedChapter] = useState(1);
   const [chapterText, setChapterText] = useState('Loading book...');
+  const [lyricSearchQuery, setLyricSearchQuery] = useState('');
+  const [lyricSearchResults, setLyricSearchResults] = useState<Song[]>([]);
 
   const bibleBooks = [
     'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther','Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon','Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi','Matthew','Mark','Luke','John','Acts','Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'
@@ -295,6 +301,10 @@ export default function App() {
       if (persistedLiveState) {
         applyLiveState(persistedLiveState);
       }
+
+      // Load 1k Essential Lyrics
+      const essentials = await loadEssentialLyrics();
+      setLyricSearchResults(essentials);
     })();
   }, [applyLiveState, session.id]);
 
@@ -1084,17 +1094,15 @@ export default function App() {
                            if (p) {
                              const lines = p.split('\n').filter(l => l.trim().length > 0);
                              const newId = `pasted-${Date.now()}`;
-                             const newSong = {
+                             const newSong: Song = {
                                id: newId,
                                title: 'Pasted Lyrics',
                                artist: 'Operator',
                                lyrics: lines.map((l, i) => ({ order: i, line: l.trim() }))
                              };
-                             // Temporary add to sampleSongs (Note: strictly for session persistence)
-                             import('./services/lyricsService').then(m => {
-                               m.sampleSongs.unshift(newSong as any);
-                               showToast("Lyrics pasted and ready!");
-                             });
+                             addPastedSong(newSong);
+                             setLyricSearchResults(prev => [newSong, ...prev]);
+                             showToast("Lyrics pasted and ready!");
                            }
                          }}
                          className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-2 py-1 rounded-md"
@@ -1102,26 +1110,78 @@ export default function App() {
                          Live Paste
                        </button>
                     </div>
+
+                    {/* SEARCH BAR */}
+                    <div className="relative group">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                      <input 
+                        type="text"
+                        placeholder="Search 10,000 songs..."
+                        value={lyricSearchQuery}
+                        onChange={async (e) => {
+                           const q = e.target.value;
+                           setLyricSearchQuery(q);
+                           const results = await searchLyrics(q);
+                           setLyricSearchResults(results);
+                        }}
+                        className="w-full bg-[#1c1c1f] border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
+                      />
+                    </div>
                     
                     {!currentSong || !settings.detectSongs ? (
-                      <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-white/5 rounded-2xl bg-white/2">
-                         <Music size={32} className="text-gray-600 mb-2 opacity-20" />
-                         <p className="text-gray-500 text-sm italic text-center">No worship song detected yet.<br/>Start singing or use "Live Paste".</p>
+                      <div className="space-y-3">
+                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 px-1">Discover / Selection</p>
+                         <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto no-scrollbar pb-10">
+                            {lyricSearchResults.map(song => (
+                               <button 
+                                 key={song.id}
+                                 onClick={() => {
+                                   setLiveState((s: any) => ({ ...s, current_song_id: song.id, is_live_dirty: true }));
+                                   showToast(`Loaded: ${song.title}`);
+                                 }}
+                                 className="flex flex-col items-start p-4 bg-white/3 hover:bg-white/8 border border-white/5 rounded-xl transition-all group relative overflow-hidden text-left"
+                               >
+                                  <div className="flex items-center justify-between w-full mb-1">
+                                     <span className="text-white font-bold text-sm group-hover:text-emerald-400 transition-colors">{song.title}</span>
+                                     <Music size={12} className="text-gray-600 opacity-20 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                  <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{song.artist || 'Unknown Artist'}</span>
+                                  <div className="absolute inset-x-0 bottom-0 h-0.5 bg-emerald-500 transform translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                               </button>
+                            ))}
+                            {lyricSearchResults.length === 0 && (
+                               <div className="text-center py-12 bg-white/1 rounded-2xl border border-dashed border-white/5">
+                                  <Search size={32} className="mx-auto text-gray-600 opacity-10 mb-2" />
+                                  <p className="text-gray-500 text-xs italic">No songs found. Try a different search term.</p>
+                               </div>
+                            )}
+                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1 pb-10">
-                        {currentSong?.lyrics?.map((lyricLine) => (
-                          <div 
-                             key={lyricLine.order} 
-                             onClick={() => setManualLineOffset(lyricLine.order - (currentLine ?? 0))}
-                             className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:${borderClass}/50 transition-all duration-300 ${lyricLine.order === actualLineIndex ? `bg-[#1e1e1e] ${borderClass} shadow-lg scale-[1.02] text-white` : 'bg-transparent border-white/5 opacity-60'}`}>
-                            <div className="flex items-center gap-3">
-                               <span className={`text-[10px] font-bold ${lyricLine.order === actualLineIndex ? colorClass : 'text-gray-600'}`}>{lyricLine.order + 1}</span>
-                               <span className="text-sm font-medium">{lyricLine.line}</span>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1 mb-2">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Now Active</p>
+                           <button 
+                             onClick={() => setLiveState((s: any) => ({ ...s, current_song_id: null }))}
+                             className="text-[10px] font-black uppercase text-red-500 hover:text-red-400"
+                           >
+                             Close Song
+                           </button>
+                        </div>
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1 pb-10">
+                          {currentSong?.lyrics?.map((lyricLine) => (
+                            <div 
+                               key={lyricLine.order} 
+                               onClick={() => setManualLineOffset(lyricLine.order - (currentLine ?? 0))}
+                               className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:${borderClass}/50 transition-all duration-300 ${lyricLine.order === actualLineIndex ? `bg-[#1e1e1e] ${borderClass} shadow-lg scale-[1.02] text-white` : 'bg-transparent border-white/5 opacity-60'}`}>
+                              <div className="flex items-center gap-3">
+                                 <span className={`text-[10px] font-bold ${lyricLine.order === actualLineIndex ? colorClass : 'text-gray-600'}`}>{lyricLine.order + 1}</span>
+                                 <span className="text-sm font-medium">{lyricLine.line}</span>
+                              </div>
+                              {lyricLine.order === actualLineIndex && <div className={`h-0.5 w-full mt-3 rounded-full ${bgClass} animate-pulse`}></div>}
                             </div>
-                            {lyricLine.order === actualLineIndex && <div className={`h-0.5 w-full mt-3 rounded-full ${bgClass} animate-pulse`}></div>}
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
