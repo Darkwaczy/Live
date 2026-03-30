@@ -214,7 +214,8 @@ export class AudioService {
     // No interim 'Listening...' text sent as transcript: keep user text stable and only update with real cloud results.
     // (UI already renders a listening placeholder when isListening=true.)
 
-    const mimeType = 'audio/webm';
+    // Detect supported mimeType for the specific browser: audio/webm (Chrome) or audio/ogg (Firefox)
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
     this.mediaRecorder = new MediaRecorder(stream, { mimeType });
 
     this.mediaRecorder.ondataavailable = async (e) => {
@@ -223,13 +224,13 @@ export class AudioService {
       }
     };
 
-    // Restart every 12s to preserve clean standalone chunks and avoid stale headers.
+    // Faster interval for a "Studio" feel: 4s instead of 12s
     this.mediaRecorder.onstop = () => {
       if (this.stream && this.stream.active) {
         setTimeout(() => {
           if (this.stream && this.stream.active && this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
             try {
-              this.mediaRecorder.start(12000);
+              this.mediaRecorder.start(4000);
             } catch (err) {
               console.warn('Could not restart media recorder after stop', err);
             }
@@ -238,14 +239,18 @@ export class AudioService {
       }
     };
 
-    this.mediaRecorder.start(12000);
+    this.mediaRecorder.start(4000);
     return true;
   }
 
   private async convertWebmToWavBlob(input: Blob): Promise<Blob> {
+    if (input.size === 0) throw new Error("Audio chunk is empty.");
     const arrayBuffer = await input.arrayBuffer();
     const audioCtx = new AudioContext();
-    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer).catch(err => {
+       console.error("🚨 WAV Conversion Failed: Audio data is corrupt or unsupported format", err);
+       throw new Error("Unable to decode audio data. Please refresh and try again.");
+    });
     const channelCount = decoded.numberOfChannels;
     const length = decoded.length * channelCount * 2 + 44;
     const buffer = new ArrayBuffer(length);
