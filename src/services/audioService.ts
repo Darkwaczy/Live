@@ -1,5 +1,6 @@
 import { TranscriptionCallback } from './speechService';
 import { RealSpeechProvider } from './speechProvider';
+import { NIGERIAN_VOCABULARY } from '../config/nigerianContext';
 
 // Injecting Web Speech API typings for the IDE
 declare global {
@@ -221,9 +222,10 @@ export class AudioService {
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     this.processor = processor;
 
-    // Build Deepgram URL with Nigerian Context Bias
-    const KEYWORDS = ["Wetin", "Abeg", "Oga", "Pikin", "Una", "Oyo"];
-    const keywordsParam = KEYWORDS.map(k => `keywords=${encodeURIComponent(k)}:2`).join('&');
+    // Build Deepgram URL with Nigerian Context Bias (Keywords boost common mishearings)
+    // We only take the most "at risk" items to avoid hitting URL length limits
+    const KEYWORDS_TO_BOOST = NIGERIAN_VOCABULARY.slice(0, 25);
+    const keywordsParam = KEYWORDS_TO_BOOST.map(k => `keywords=${encodeURIComponent(k)}:2`).join('&');
     const url = `wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&filler_words=true&${keywordsParam}`;
 
     this.socket = new WebSocket(url, ['token', this.config.apiKey]);
@@ -494,9 +496,10 @@ export class AudioService {
       formData.append("model", this.config.provider === 'groq' ? "whisper-large-v3" : "whisper-1");
       
       // MULTILINGUAL "PRIME" PROMPT
-      // This tells Whisper to expect Nigerian context, Pidgin, and local language names.
-      // We include "Wetin dey happen" to prevent it being mis-transcribed as "Wait in the afternoon".
-      const nigeriaPrime = "This is a Nigerian Christian sermon. Expect thick Nigerian accents, Nigerian Pidgin English (wetin, wetin dey happen, una, dia, sabi, pikin, abeg, ooo), and occasional Yoruba, Igbo, or Hausa phrases. Transcribe EXACTLY what is spoken in Pidgin/English. Do not translate to formal English.";
+      const nigeriaPrime = `This is a Nigerian Christian sermon. 
+      Expect thick Nigerian accents, Nigerian Pidgin English (wetin, una, sabi, pikin, abeg, ooo), 
+      and local church terms (${NIGERIAN_VOCABULARY.slice(20, 50).join(', ')}). 
+      Transcribe EXACTLY what is spoken in Pidgin/English. Do not translate to formal English.`;
       const contextualPrompt = `${nigeriaPrime} ${this.config.previousContext || ""}`;
       formData.append("prompt", contextualPrompt.slice(-2000));
 
