@@ -174,11 +174,15 @@ export function detectBibleVerse(text: string): BibleVerse | null {
     // Second try: Generic fallback for accents/mishearings
     match = genericBiblePattern.exec(normalizedText);
     if (match) {
-      const fuzzyBook = resolveBookName(match[1]);
-      if (fuzzyBook !== match[1]) {
-        console.log(`  ✅ Matched generic pattern with fuzzy resolve: ${match[1]} -> ${fuzzyBook}`);
+      const resolved = resolveBookName(match[1]);
+      if (resolved) {
+        console.log(`  ✅ Matched generic pattern: ${match[1]} -> ${resolved}`);
+        // Re-inject for standard processing
+        const chapter = match[2];
+        const verse = match[3];
+        const constructed = `${resolved} ${chapter}:${verse}`;
+        match = biblePattern.exec(constructed);
       } else {
-        // If it didn't resolve and it's some random word, ignore it to prevent false positives
         match = null;
       }
     }
@@ -221,8 +225,9 @@ export function detectBibleVerse(text: string): BibleVerse | null {
       console.log(`  🔧 Fixed no-colon format "${noColonMatch[0]}" → "${fixedRef}" (split: ch=${chapter}, v=${verse})`);
       match = biblePattern.exec(fixedRef);
       if (match) {
+        const resolved = resolveBookName(match[1]);
         return {
-          book: resolveBookName(match[1]),
+          book: resolved || match[1], // Fallback to raw if logic requires
           chapter: parseInt(match[2], 10),
           verse_start: parseInt(match[3], 10),
           verse_end: match[4] ? parseInt(match[4], 10) : parseInt(match[3], 10)
@@ -242,6 +247,7 @@ export function detectBibleVerse(text: string): BibleVerse | null {
   const verse_end = match[4] ? parseInt(match[4], 10) : verse_start;
 
   const normalizedBook = resolveBookName(rawBook);
+  if (!normalizedBook) return null; // Safety check
 
   console.log(`✅ Bible verse detected: ${normalizedBook} ${chapter}:${verse_start}${verse_end > verse_start ? `-${verse_end}` : ''}`);
 
@@ -253,7 +259,7 @@ export function detectBibleVerse(text: string): BibleVerse | null {
   };
 }
 
-function resolveBookName(rawBook: string): string {
+function resolveBookName(rawBook: string): string | null {
   const normalized = rawBook.trim().toLowerCase();
   
   // 1. Exact or Alias match
@@ -280,7 +286,7 @@ function resolveBookName(rawBook: string): string {
     }
   }
 
-  return bestMatch ?? rawBook;
+  return bestMatch;
 }
 
 function getLevenshteinDistance(a: string, b: string): number {
@@ -346,8 +352,9 @@ export async function detectBibleVerseAI(
        if (data.response) {
           // Fallback for native Ollama /api/generate endpoints which return { response: "" }
           const parsed = JSON.parse(data.response.match(/\{[\s\S]*\}/)?.[0] || '{}');
+          const resolved = resolveBookName(parsed.book);
           if (parsed.book) {
-             return { book: resolveBookName(parsed.book), chapter: Number(parsed.chapter), verse_start: Number(parsed.verse_start), verse_end: Number(parsed.verse_start) };
+             return { book: resolved || parsed.book, chapter: Number(parsed.chapter), verse_start: Number(parsed.verse_start), verse_end: Number(parsed.verse_start) };
           }
        }
        return null;
@@ -360,8 +367,9 @@ export async function detectBibleVerseAI(
     
     const parsed = JSON.parse(jsonMatch[0]);
     if (parsed && parsed.book && parsed.chapter && parsed.verse_start) {
+       const resolved = resolveBookName(parsed.book);
        return {
-          book: resolveBookName(parsed.book),
+          book: resolved || parsed.book,
           chapter: Number(parsed.chapter),
           verse_start: Number(parsed.verse_start),
           verse_end: parsed.verse_end ? Number(parsed.verse_end) : Number(parsed.verse_start)
