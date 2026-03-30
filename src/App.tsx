@@ -1104,7 +1104,7 @@ export default function App() {
                     </div>
                     
                     {!currentSong || !settings.detectSongs ? (
-                      <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-white/5 rounded-2xl bg-white/[0.02]">
+                      <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-white/5 rounded-2xl bg-white/2">
                          <Music size={32} className="text-gray-600 mb-2 opacity-20" />
                          <p className="text-gray-500 text-sm italic text-center">No worship song detected yet.<br/>Start singing or use "Live Paste".</p>
                       </div>

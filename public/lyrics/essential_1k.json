@@ -1,0 +1,76 @@
+[
+  {
+    "id": "amazing-grace",
+    "title": "Amazing Grace",
+    "artist": "John Newton",
+    "lyrics": [
+      { "order": 0, "line": "Amazing grace how sweet the sound" },
+      { "order": 1, "line": "That saved a wretch like me" },
+      { "order": 2, "line": "I once was lost but now am found" },
+      { "order": 3, "line": "Was blind but now I see" }
+    ]
+  },
+  {
+    "id": "10-000-reasons",
+    "title": "10,000 Reasons",
+    "artist": "Matt Redman",
+    "lyrics": [
+      { "order": 0, "line": "Bless the Lord O my soul" },
+      { "order": 1, "line": "O my soul worship His holy name" },
+      { "order": 2, "line": "Sing like never before" },
+      { "order": 3, "line": "O my soul" },
+      { "order": 4, "line": "I worship Your holy name" }
+    ]
+  },
+  {
+    "id": "imela",
+    "title": "Imela",
+    "artist": "Nathaniel Bassey",
+    "lyrics": [
+      { "order": 0, "line": "Imela Imela" },
+      { "order": 1, "line": "Okaka Onyekeruwa" },
+      { "order": 2, "line": "Imela Imela" },
+      { "order": 3, "line": "Eze m Onye oma" },
+      { "order": 4, "line": "When I think upon Your goodness" },
+      { "order": 5, "line": "And Your faithfulness each day" },
+      { "order": 6, "line": "My very soul will bless You" },
+      { "order": 7, "line": "And my lips shall sing Your praise" }
+    ]
+  },
+  {
+    "id": "way-maker",
+    "title": "Way Maker",
+    "artist": "Sinach",
+    "lyrics": [
+      { "order": 0, "line": "You are here moving in our midst" },
+      { "order": 1, "line": "I worship You I worship You" },
+      { "order": 2, "line": "You are here working in this place" },
+      { "order": 3, "line": "I worship You I worship You" },
+      { "order": 4, "line": "Way maker miracle worker promise keeper" },
+      { "order": 5, "line": "Light in the darkness my God that is who You are" }
+    ]
+  },
+  {
+    "id": "excess-love",
+    "title": "Excess Love",
+    "artist": "Mercy Chinwo",
+    "lyrics": [
+      { "order": 0, "line": "Your love is kind Your love is patient" },
+      { "order": 1, "line": "You fill my heart with so much peace and joy" },
+      { "order": 2, "line": "You're amazing You make my life feel brand new" },
+      { "order": 3, "line": "Jesus You love me too much oh" },
+      { "order": 4, "line": "Excess love oh" }
+    ]
+  },
+  {
+    "id": "you-are-great",
+    "title": "You Are Great",
+    "artist": "Steve Crown",
+    "lyrics": [
+      { "order": 0, "line": "You are Great everything written about You is Great" },
+      { "order": 1, "line": "You are Great" },
+      { "order": 2, "line": "You are Great You are Great" },
+      { "order": 3, "line": "Everything written about You is Great" }
+    ]
+  }
+]
