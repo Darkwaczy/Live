@@ -340,13 +340,15 @@ export class AudioService {
         return;
       }
 
-      // Convert raw WebM (or Ogg) to standard WAV for total reliability
-      const wavBlob = await this.convertWebmToWavBlob(audioBlob);
-      console.log(`📡 Converted to WAV, size: ${wavBlob.size} bytes`);
+      // Detect the actual extension based on the supported mimeType
+      const isWebm = MediaRecorder.isTypeSupported('audio/webm');
+      const filename = isWebm ? "audio.webm" : "audio.ogg";
+      
+      console.log(`📤 Sending raw ${filename}, size: ${audioBlob.size} bytes`);
 
       // For OpenAI Whisper and Groq (both use FormData)
       const formData = new FormData();
-      formData.append("file", wavBlob, "audio.wav");
+      formData.append("file", audioBlob, filename);
       formData.append("model", this.config.provider === 'groq' ? "whisper-large-v3" : "whisper-1");
       formData.append("language", "en");
 
