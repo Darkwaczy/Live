@@ -13,7 +13,13 @@ export function useSync(
   const isElectron = typeof window !== 'undefined' && (window as any).sermonSync?.db;
 
   useEffect(() => {
-    if (isElectron) return;
+    // Only subscribe to remote updates if NOT in Electron (prevent loops)
+    // Electron is the master source of truth.
+    if (isElectron) {
+      setConnected(true);
+      return;
+    }
+
     const sync = new SupabaseRealtimeSync();
     syncInstRef.current = sync;
 
@@ -33,20 +39,26 @@ export function useSync(
       sync.unsubscribe();
       setConnected(false);
     };
-  }, [sessionId, onRemoteUpdate]);
+  }, [sessionId, onRemoteUpdate, isElectron]);
 
   useEffect(() => {
-    if (isElectron || !connected) return;
+    // Allow publishing in Electron so big screens can "Cast" the state
+    if (!connected) return;
 
     const currentKey = JSON.stringify(state);
     if (currentKey === lastPublished.current) return;
 
     lastPublished.current = currentKey;
 
+    // Initialize sync instance for Electron if not already there
+    if (!syncInstRef.current) {
+      syncInstRef.current = new SupabaseRealtimeSync();
+    }
+
     syncInstRef.current?.publishLiveState(state).catch((err) => {
       console.warn('Failed to publish live state', err);
     });
-  }, [state, connected]);
+  }, [state, connected, isElectron]);
 
   return { connected };
 }

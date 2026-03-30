@@ -211,35 +211,46 @@ export class AudioService {
     const stream = await this.getAudioStream();
     this.stream = stream;
     
-    // No interim 'Listening...' text sent as transcript: keep user text stable and only update with real cloud results.
-    // (UI already renders a listening placeholder when isListening=true.)
-
-    // Detect supported mimeType for the specific browser: audio/webm (Chrome) or audio/ogg (Firefox)
+    // Detect supported mimeType
     const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
     this.mediaRecorder = new MediaRecorder(stream, { mimeType });
 
-    this.mediaRecorder.ondataavailable = async (e) => {
+    this.mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) {
-        await this.sendAudioToCloud(e.data);
+        this.audioChunks.push(e.data);
       }
     };
 
-    // Faster interval for a "Studio" feel: 4s instead of 12s
+    // Use manual stop/start cycle to ensure full headers in every chunk
     this.mediaRecorder.onstop = () => {
       if (this.stream && this.stream.active) {
+        if (this.audioChunks.length > 0) {
+          const fullBlob = new Blob(this.audioChunks, { type: mimeType });
+          this.sendAudioToCloud(fullBlob);
+          this.audioChunks = [];
+        }
+
+        // Restart immediately
         setTimeout(() => {
           if (this.stream && this.stream.active && this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
             try {
-              this.mediaRecorder.start(4000);
+              this.mediaRecorder.start();
             } catch (err) {
               console.warn('Could not restart media recorder after stop', err);
             }
           }
-        }, 50);
+        }, 100);
       }
     };
 
-    this.mediaRecorder.start(4000);
+    // Trigger manual stop every 4s to generate a fresh standalone file with headers
+    this.interimInterval = setInterval(() => {
+      if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+        this.mediaRecorder.stop();
+      }
+    }, 4000);
+
+    this.mediaRecorder.start();
     return true;
   }
 
