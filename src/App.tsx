@@ -1014,55 +1014,99 @@ export default function App() {
         </div>
       </main>
 
-      {/* Full Screen Projector Mode */}
+      {/* Full Screen Projector Mode (Redesigned for Premium Cinematic Experience) */}
       {isProjector && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center p-12">
+        <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-12 overflow-hidden animate-in fade-in duration-700">
+          
+          {/* ATMOSPHERIC BACKGROUND OVERLAY */}
+          <div 
+             className="absolute inset-0 bg-[url('/worship-bg.png')] bg-cover bg-center brightness-[0.25] saturate-[0.8] transition-all duration-1000 scale-105"
+             style={{ filter: 'blur(5px) contrast(1.1)' }} 
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black opacity-60" />
+
+          {/* ESCAPE BUTTON (Hidden unless cursor moves - TODO) */}
           <button 
             onClick={() => setProjector(false)}
-            className="absolute top-8 right-8 text-gray-500 hover:text-white p-2 transition-colors"
+            className="absolute top-8 right-8 text-white/5 hover:text-white/40 p-2 transition-all z-[110] border border-white/5 rounded-full"
           >
-            Esc
+            <X size={20} />
           </button>
           
-          <div className="w-full max-w-7xl relative mx-auto h-[70vh] flex flex-col items-center justify-center text-center">
+          <div className="w-full max-w-[85vw] relative mx-auto h-[80vh] flex flex-col items-center justify-center text-center z-10">
+            
+            {/* LYRICS OVERLAY (Karaoke Mode) */}
             {settings.showLyrics && settings.detectSongs && mainLyric && (
-              <div className="w-full absolute bottom-12 flex flex-col items-center">
+              <div className="w-full absolute bottom-12 flex flex-col items-center animate-in slide-in-from-bottom-8 duration-500">
                 <KaraokeLine 
                   lyric={mainLyric} 
                   spokenText={fullTranscript} 
                   colorClass={colorClass} 
                   animationClass={settings.highlightAnimation} 
-                  sizeClass="text-[72px]"
+                  sizeClass="text-[88px] font-black tracking-tight leading-tight"
                 />
-                {nextLyric && <p className="text-[40px] text-gray-500 italic mt-8">{nextLyric}</p>}
+                {nextLyric && <p className="text-[44px] text-gray-400/80 font-medium italic mt-10 tracking-wide font-serif">{nextLyric}</p>}
               </div>
             )}
+
+            {/* SCRIPTURE OVERLAY (Floating High-Contrast Card) */}
             {settings.showVerse && settings.detectVerses && displayVerseLive && (!mainLyric || !settings.showLyrics) && (
-              <div className="w-full absolute inset-0 flex flex-col justify-center px-24 space-y-12">
-                <div className="space-y-6">
-                   <h2 className={`${colorClass} text-5xl font-semibold tracking-wide uppercase`}>{displayVerseLive?.reference} <span className="opacity-50 text-3xl font-normal ml-3">({settings.bibleVersion})</span></h2>
-                   <p className="text-white/90 text-[56px] leading-[1.2] font-serif tracking-tight max-w-6xl mx-auto drop-shadow-xl">{displayVerseLive?.text}</p>
+              <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
+                
+                {/* PRIMARY BIBLE CARD */}
+                <div className="glass-panel w-full p-16 bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden group">
+                   <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent opacity-30" />
+                   
+                   <div className="relative space-y-12">
+                      <div className="flex flex-col items-center gap-4">
+                         <h2 className={`${colorClass} text-5xl font-black tracking-[0.2em] uppercase drop-shadow-glow`}>
+                            {displayVerseLive.reference} 
+                            <span className="opacity-40 text-2xl font-light ml-4 tracking-normal">({settings.bibleVersion})</span>
+                         </h2>
+                         <div className={`h-1 w-24 rounded-full ${bgClass} opacity-50`}></div>
+                      </div>
+
+                      <p className="text-white text-[72px] leading-[1.1] font-serif font-semibold tracking-tight max-w-5xl mx-auto drop-shadow-2xl selection:bg-emerald-500/30">
+                         "{displayVerseLive.text}"
+                      </p>
+
+                      {/* SECONDARY TRANSLATION (Subtle stack) */}
+                      {secondaryFetchedVerse && (
+                        <div className="pt-12 border-t border-white/10 space-y-4">
+                           <h3 className="text-emerald-500/70 text-2xl font-bold tracking-[0.15em] uppercase italic">
+                              {settings.secondaryBibleVersion}
+                           </h3>
+                           <p className="text-white/60 text-[38px] leading-[1.2] font-serif italic tracking-tight font-medium">
+                              {secondaryFetchedVerse.text}
+                           </p>
+                        </div>
+                      )}
+                   </div>
                 </div>
-                {secondaryFetchedVerse && (
-                   <div className="pt-8 border-t border-white/10 space-y-6">
-                      <h2 className="text-emerald-500 text-4xl font-semibold tracking-wide uppercase">{displayVerseLive?.reference} <span className="opacity-50 text-2xl font-normal ml-3">({settings.secondaryBibleVersion})</span></h2>
-                      <p className="text-white/70 text-[48px] leading-[1.2] font-serif italic tracking-tight max-w-6xl mx-auto drop-shadow-xl line-clamp-2">{secondaryFetchedVerse.text}</p>
+              </div>
+            )}
+
+            {/* FALLBACK: CONTINUOUS TRANSCRIPTION (Atmospheric) */}
+            {!displayVerseLive && (!mainLyric || !settings.showLyrics) && settings.showTranscript && (
+              <div className="px-12 animate-in fade-in duration-1000 max-w-7xl">
+                <blockquote className="text-white/90 text-[64px] leading-[1.15] font-medium italic tracking-tight drop-shadow-2xl font-serif">
+                   {liveState.current_text.split(' ').slice(-100).join(' ') || (isListening ? '...' : '')}
+                </blockquote>
+                {isListening && (
+                   <div className="mt-12 flex items-center justify-center gap-4 opacity-40">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <span className="text-sm font-black uppercase tracking-[0.5em] text-white/50 italic">Listening Live Session</span>
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse delay-150"></div>
                    </div>
                 )}
               </div>
             )}
-            {/* Fallback for Continuous Immersive Transcription */}
-            {!displayVerseLive && (!mainLyric || !settings.showLyrics) && settings.showTranscript && (
-              <div className="px-24 animate-in fade-in duration-1000">
-                <p className="text-white/80 text-[56px] leading-tight font-medium italic tracking-tight max-w-6xl mx-auto drop-shadow-2xl">
-                   {liveState.current_text.split(' ').slice(-100).join(' ') || (isListening ? 'Synchronizing Live Feed...' : '')}
-                </p>
-              </div>
-            )}
+
+            {/* STICKY STAGE TIMER */}
             {settings.autoShowTimer && (
-              <div className="absolute bottom-12 right-12 glass-panel px-8 py-4 bg-black/80 border border-white/10 rounded-2xl flex items-center gap-4 animate-in fade-in slide-in-from-right-4">
-                 <Activity size={24} className="text-emerald-400 animate-pulse" />
-                 <span className="text-white text-5xl font-mono font-bold tracking-tighter">
+              <div className="absolute bottom-16 right-0 glass-panel px-10 py-5 bg-black/60 border border-white/10 rounded-3xl flex items-center gap-6 animate-in fade-in slide-in-from-right-8 duration-700 shadow-2xl">
+                 <Activity size={32} className="text-emerald-400 animate-pulse" />
+                 <span className="text-white text-6xl font-mono font-black tracking-tighter tabular-nums drop-shadow-glow">
                     {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
                  </span>
               </div>
