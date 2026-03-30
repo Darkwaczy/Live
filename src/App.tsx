@@ -3,9 +3,10 @@ import {
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
-  Activity
+  Activity, Radio
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
+import { LiveState } from './models/liveState';
 import { useSync } from './hooks/useSync';
 import { Session } from './models/session';
 import { Note } from './models/note';
@@ -17,7 +18,7 @@ import SettingsView from './components/SettingsView';
 const SESSION_ID = 'service-001';
 
 type ViewMode = 'live' | 'history' | 'documents' | 'settings';
-type RightPanelTab = 'scriptures' | 'lyrics' | 'notes';
+type RightPanelTab = 'scriptures' | 'lyrics' | 'notes' | 'broadcast';
 const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass }: { lyric: string, spokenText: string, colorClass: string, animationClass: string, sizeClass: string }) => {
   const words = lyric.split(' ');
   const recentSpoken = spokenText.toLowerCase().replace(/[^a-z0-9 \']/g, '').split(' ').filter(w => w.length > 0).slice(-20);
@@ -141,7 +142,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse, removeDetection
+    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse, removeDetection, setLiveState
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -593,6 +594,12 @@ export default function App() {
                 <FileText size={16} /> Notes
                 {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
               </button>
+              <button 
+                onClick={() => { setRightPanelTab('broadcast'); setIsRightPanelOpen(true); }}
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'broadcast' ? colorClass : 'hover:text-white'}`}>
+                <Radio size={16} /> Broadcast
+                {rightPanelTab === 'broadcast' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
+              </button>
             </nav>
 
             <div className="w-px h-6 bg-gray-700/50 mx-2 hidden lg:block"></div>
@@ -849,6 +856,69 @@ export default function App() {
               
               <div className="flex-1 overflow-y-auto p-5 pb-8 flex flex-col bg-[#0d0d0d]">
                 
+                {/* Broadcast Hub (The News Ticker Editor) */}
+                {rightPanelTab === 'broadcast' && (
+                  <div className="space-y-6 animate-in slide-in-from-right-4">
+                     <div className="flex items-center justify-between">
+                       <div>
+                         <h3 className="text-white font-bold text-lg mb-0.5 flex items-center gap-2">
+                           <Radio size={18} className="text-red-500 animate-pulse" /> Live Broadcast
+                         </h3>
+                         <p className="text-gray-500 text-[9px] uppercase tracking-widest font-black leading-tight">Infinite News Ticker Control</p>
+                       </div>
+                       <input 
+                         type="checkbox" 
+                         checked={liveState.ticker_enabled ?? true} 
+                         onChange={(e) => setLiveState((s: LiveState) => ({ ...s, ticker_enabled: e.target.checked, updated_at: new Date().toISOString() }))}
+                         className="accent-emerald-500 h-5 w-5 bg-black cursor-pointer"
+                       />
+                     </div>
+
+                     <div className="bg-[#1e1e1e] p-5 rounded-2xl border border-white/5 space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Add Scrolling Headline</label>
+                        <input 
+                          type="text" 
+                          placeholder="Type breaking news..."
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
+                          onKeyDown={(e) => {
+                             if (e.key === 'Enter') {
+                                const msg = (e.target as HTMLInputElement).value;
+                                if (msg) {
+                                   setLiveState((s: LiveState) => ({ ...s, ticker_items: [...(s.ticker_items || []), msg], updated_at: new Date().toISOString() }));
+                                   (e.target as HTMLInputElement).value = '';
+                                }
+                             }
+                          }}
+                        />
+                     </div>
+
+                     <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Queue</span>
+                           <button 
+                             onClick={() => setLiveState((s: LiveState) => ({ ...s, ticker_items: [], updated_at: new Date().toISOString() }))}
+                             className="text-[10px] uppercase text-red-500 hover:text-red-400 font-black"
+                           >
+                             Clear All
+                           </button>
+                        </div>
+                        <div className="space-y-2 max-h-[350px] overflow-y-auto no-scrollbar pb-10">
+                           {liveState.ticker_items?.map((item, i) => (
+                             <div key={i} className="group relative bg-[#1c1c1f] hover:bg-[#252525] p-3 rounded-xl border border-white/5 transition-all">
+                                <p className="text-[13px] text-gray-200 pr-8">{item}</p>
+                                <button 
+                                  onClick={() => setLiveState((s: LiveState) => ({ ...s, ticker_items: s.ticker_items?.filter((_, idx: number) => idx !== i), updated_at: new Date().toISOString() }))}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-red-500 font-black text-[10px] opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  DELETE
+                                </button>
+                             </div>
+                           ))}
+                        </div>
+                     </div>
+                  </div>
+                )}
+
                 {rightPanelTab === 'notes' && (
                   <div className="space-y-4">
                     {notes.length === 0 && (
@@ -1109,11 +1179,42 @@ export default function App() {
 
             {/* STICKY STAGE TIMER */}
             {settings.autoShowTimer && (
-              <div className="absolute bottom-16 right-0 glass-panel px-10 py-5 bg-black/60 border border-white/10 rounded-3xl flex items-center gap-6 animate-in fade-in slide-in-from-right-8 duration-700 shadow-2xl">
+              <div className="absolute bottom-32 right-0 glass-panel px-10 py-5 bg-black/60 border border-white/10 rounded-l-3xl flex items-center gap-6 animate-in fade-in slide-in-from-right-8 duration-700 shadow-2xl z-120">
                  <Activity size={32} className="text-emerald-400 animate-pulse" />
                  <span className="text-white text-6xl font-mono font-black tracking-tighter tabular-nums drop-shadow-glow">
                     {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
                  </span>
+              </div>
+            )}
+
+            {/* LIVE NEWS TICKER (Infinite Scroll) */}
+            {liveState.ticker_enabled && (liveState.ticker_items || []).length > 0 && (
+              <div className="absolute bottom-0 left-0 right-0 h-24 bg-black/80 backdrop-blur-3xl border-t-4 border-emerald-500/50 flex items-center overflow-hidden z-130 group">
+                 {/* LABEL TAG */}
+                 <div className="h-full bg-emerald-500 px-10 flex items-center justify-center shadow-[20px_0_40px_rgba(0,0,0,0.4)] z-140 relative">
+                    <span className="text-black text-2xl font-black uppercase tracking-[0.2em] animate-pulse">Live</span>
+                 </div>
+                 
+                 {/* SCROLLING CONTENT */}
+                 <div className="flex-1 whitespace-nowrap flex items-center">
+                    <div className="animate-marquee inline-block">
+                       {liveState.ticker_items?.map((item, i) => (
+                         <span key={i} className="inline-flex items-center text-white text-4xl font-bold font-serif uppercase tracking-wider px-12 group-hover:text-emerald-300 transition-colors">
+                            {item}
+                            <span className="mx-12 text-emerald-500/30 text-5xl">•</span>
+                         </span>
+                       ))}
+                    </div>
+                    {/* Double it for infinite loop appearance */}
+                    <div className="animate-marquee inline-block">
+                       {liveState.ticker_items?.map((item, i) => (
+                         <span key={`dup-${i}`} className="inline-flex items-center text-white text-4xl font-bold font-serif uppercase tracking-wider px-12 group-hover:text-emerald-300 transition-colors">
+                            {item}
+                            <span className="mx-12 text-emerald-500/30 text-5xl">•</span>
+                         </span>
+                       ))}
+                    </div>
+                 </div>
               </div>
             )}
           </div>

@@ -32,5 +32,7 @@ export interface LiveState {
   }>;
   history: LiveHistoryItem[];
   content_type?: 'scripture' | 'lyrics' | 'notes';
+  ticker_items?: string[];
+  ticker_enabled?: boolean;
   updated_at: string;
 }

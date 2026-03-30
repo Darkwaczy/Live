@@ -322,6 +322,7 @@ export function useLiveState(
     setPreviewVerse,
     setSecondaryVerse,
     removeDetection,
+    setLiveState,
     speechStats,
     wordRate,
     error,
