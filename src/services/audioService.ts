@@ -244,9 +244,9 @@ export class AudioService {
     this.mediaRecorder.onstop = () => {
       if (this.stream && this.stream.active) {
         if (this.audioChunks.length > 0) {
-          // SILENCE FILTER: Only send if audio is not silence (Threshold: 0.05)
+          // SILENCE FILTER: Only send if audio is not silence (Threshold: 0.08 - stricter)
           console.log(`[AudioService] Chunk Peak Volume: ${peakVolume.toFixed(3)}`);
-          if (peakVolume > 0.05) {
+          if (peakVolume > 0.08) {
              const rawBlob = new Blob(this.audioChunks, { type: mimeType });
              this.convertWebmToWavBlob(rawBlob).then(wavBlob => {
                 this.sendAudioToCloud(wavBlob);
@@ -401,9 +401,10 @@ export class AudioService {
       
       // MULTILINGUAL "PRIME" PROMPT
       // This tells Whisper to expect Nigerian context, Pidgin, and local language names.
-      const nigeriaPrime = "This is a Nigerian Christian sermon. Expect thick Nigerian accents, Nigerian Pidgin English (wetin, una, dia, sabi, pikin), and occasional Yoruba, Igbo, or Hausa phrases. Transcribe exactly what is spoken.";
+      // We include "Wetin dey happen" to prevent it being mis-transcribed as "Wait in the afternoon".
+      const nigeriaPrime = "This is a Nigerian Christian sermon. Expect thick Nigerian accents, Nigerian Pidgin English (wetin, wetin dey happen, una, dia, sabi, pikin, abeg, ooo), and occasional Yoruba, Igbo, or Hausa phrases. Transcribe EXACTLY what is spoken in Pidgin/English. Do not translate to formal English.";
       const contextualPrompt = `${nigeriaPrime} ${this.config.previousContext || ""}`;
-      formData.append("prompt", contextualPrompt.slice(-2000)); // Whisper prompt limit is ~2000 chars
+      formData.append("prompt", contextualPrompt.slice(-2000));
 
       const res = await fetch(url, {
         method: "POST",
@@ -419,7 +420,22 @@ export class AudioService {
       }
 
       const data = await res.json();
-      const transcriptText = data.text || data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
+      const transcriptText = (data.text || data.results?.channels?.[0]?.alternatives?.[0]?.transcript || "").trim();
+
+      // BRUTAL HALLUCINATION FILTER (Kills ghost words at the source)
+      const ghostBlacklist = [
+        "thank you for watching", "thanks for watching", "subscribe to the channel", 
+        "please like and subscribe", "thank you for the gift", "okay, thank you", 
+        "okay! thank you", "unintelligible", "be sure to like and subscribe",
+        "i'll see you in the next video", "thanks for the support", "watching"
+      ];
+      
+      const lower = transcriptText.toLowerCase();
+      if (ghostBlacklist.some(g => lower === g || lower.startsWith(g) || lower.endsWith(g))) {
+         console.log(`[AudioService] System-level hallucination blocked: "${transcriptText}"`);
+         return;
+      }
+
       if (transcriptText && this.config.onTranscript) {
         this.config.onTranscript(transcriptText, true, Date.now(), 1.0);
       }
