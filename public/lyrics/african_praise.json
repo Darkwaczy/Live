@@ -1,0 +1,50 @@
+[
+  {
+    "id": "imela",
+    "title": "Imela",
+    "artist": "Nathaniel Bassey",
+    "lyrics": [
+      { "order": 0, "line": "Imela Imela" },
+      { "order": 1, "line": "Okaka Onyekeruwa" },
+      { "order": 2, "line": "Imela Imela" },
+      { "order": 3, "line": "Eze m Onye oma" },
+      { "order": 4, "line": "When I think upon Your goodness" },
+      { "order": 5, "line": "And Your faithfulness each day" },
+      { "order": 6, "line": "My very soul will bless You" },
+      { "order": 7, "line": "And my lips shall sing Your praise" }
+    ]
+  },
+  {
+    "id": "excess-love",
+    "title": "Excess Love",
+    "artist": "Mercy Chinwo",
+    "lyrics": [
+      { "order": 0, "line": "Your love is kind Your love is patient" },
+      { "order": 1, "line": "You fill my heart with so much peace and joy" },
+      { "order": 2, "line": "You're amazing You make my life feel brand new" },
+      { "order": 3, "line": "Jesus You love me too much oh" },
+      { "order": 4, "line": "Excess love oh" }
+    ]
+  },
+  {
+    "id": "you-are-great",
+    "title": "You Are Great",
+    "artist": "Steve Crown",
+    "lyrics": [
+      { "order": 0, "line": "You are Great everything written about You is Great" },
+      { "order": 1, "line": "You are Great" },
+      { "order": 2, "line": "You are Great You are Great" },
+      { "order": 3, "line": "Everything written about You is Great" }
+    ]
+  },
+  {
+    "id": "oniduro-mi",
+    "title": "Oniduro Mi",
+    "artist": "Yoruba Worship",
+    "lyrics": [
+      { "order": 0, "line": "Oniduro mi e seun" },
+      { "order": 1, "line": "Oniduro mi e seun" },
+      { "order": 2, "line": "E seun e seun e seun" }
+    ]
+  }
+]

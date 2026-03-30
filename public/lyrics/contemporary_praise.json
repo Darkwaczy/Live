@@ -1,0 +1,25 @@
+[
+  {
+    "id": "10-000-reasons",
+    "title": "10,000 Reasons",
+    "artist": "Matt Redman",
+    "lyrics": [
+      { "order": 0, "line": "Bless the Lord O my soul" },
+      { "order": 1, "line": "O my soul worship His holy name" },
+      { "order": 2, "line": "Sing like never before" },
+      { "order": 3, "line": "O my soul" },
+      { "order": 4, "line": "I worship Your holy name" }
+    ]
+  },
+  {
+    "id": "victory-belongs-to-jesus",
+    "title": "Victory Belongs to Jesus",
+    "artist": "Todd Dulaney",
+    "lyrics": [
+      { "order": 0, "line": "Victory belongs to Jesus" },
+      { "order": 1, "line": "Victory belongs to Him" },
+      { "order": 2, "line": "Who can stand against the Lord" },
+      { "order": 3, "line": "No one can no one will" }
+    ]
+  }
+]

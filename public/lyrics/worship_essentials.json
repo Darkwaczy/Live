@@ -1,0 +1,26 @@
+[
+  {
+    "id": "amazing-grace",
+    "title": "Amazing Grace",
+    "artist": "John Newton",
+    "lyrics": [
+      { "order": 0, "line": "Amazing grace how sweet the sound" },
+      { "order": 1, "line": "That saved a wretch like me" },
+      { "order": 2, "line": "I once was lost but now am found" },
+      { "order": 3, "line": "Was blind but now I see" }
+    ]
+  },
+  {
+    "id": "way-maker",
+    "title": "Way Maker",
+    "artist": "Sinach",
+    "lyrics": [
+      { "order": 0, "line": "You are here moving in our midst" },
+      { "order": 1, "line": "I worship You I worship You" },
+      { "order": 2, "line": "You are here working in this place" },
+      { "order": 3, "line": "I worship You I worship You" },
+      { "order": 4, "line": "Way maker miracle worker promise keeper" },
+      { "order": 5, "line": "Light in the darkness my God that is who You are" }
+    ]
+  }
+]

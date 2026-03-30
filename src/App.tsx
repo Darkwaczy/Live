@@ -13,9 +13,10 @@ import { Note } from './models/note';
 import { User } from './models/user';
 import { login, logout, getCurrentUser } from './services/authService';
 import { 
-   getNotes, saveNote, getSession, saveSession, getLiveState, saveLiveState 
+   getNotes, saveNote, getSession, saveSession, getLiveState, saveLiveState,
+   savePastedSong, getPastedSongs
 } from './services/dbService';
-import { loadEssentialLyrics, searchLyrics, addPastedSong } from './services/lyricsService';
+import { loadEssentialLyrics, searchLyrics, addPastedSong, setInitialPastedSongs } from './services/lyricsService';
 import { Song } from './models/song';
 import SettingsView from './components/SettingsView';
 
@@ -195,6 +196,7 @@ export default function App() {
   const [chapterText, setChapterText] = useState('Loading book...');
   const [lyricSearchQuery, setLyricSearchQuery] = useState('');
   const [lyricSearchResults, setLyricSearchResults] = useState<Song[]>([]);
+  const [selectedLyricCategory, setSelectedLyricCategory] = useState('All');
 
   const bibleBooks = [
     'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther','Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon','Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi','Matthew','Mark','Luke','John','Acts','Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'
@@ -304,7 +306,9 @@ export default function App() {
 
       // Load 1k Essential Lyrics
       const essentials = await loadEssentialLyrics();
-      setLyricSearchResults(essentials);
+      const persistedPasted = await getPastedSongs();
+      setInitialPastedSongs(persistedPasted);
+      setLyricSearchResults([...persistedPasted, ...essentials]);
     })();
   }, [applyLiveState, session.id]);
 
@@ -1101,8 +1105,9 @@ export default function App() {
                                lyrics: lines.map((l, i) => ({ order: i, line: l.trim() }))
                              };
                              addPastedSong(newSong);
+                             savePastedSong(newSong); // Persist to local store
                              setLyricSearchResults(prev => [newSong, ...prev]);
-                             showToast("Lyrics pasted and ready!");
+                             showToast("Lyrics pasted and saved!");
                            }
                          }}
                          className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-2 py-1 rounded-md"
@@ -1121,11 +1126,36 @@ export default function App() {
                         onChange={async (e) => {
                            const q = e.target.value;
                            setLyricSearchQuery(q);
-                           const results = await searchLyrics(q);
+                           const results = await searchLyrics(q, selectedLyricCategory);
                            setLyricSearchResults(results);
                         }}
                         className="w-full bg-[#1c1c1f] border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
                       />
+                    </div>
+
+                    {/* CATEGORY CHIPS */}
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                       {['All', 'African Praise', 'Contemporary Praise', 'Worship Essentials', 'Pasted'].map(cat => (
+                         <button
+                           key={cat}
+                           onClick={async () => {
+                             setSelectedLyricCategory(cat);
+                             const results = await searchLyrics(lyricSearchQuery, cat === 'Pasted' ? undefined : cat);
+                             // If Pasted, we need special handling in searchLyrics or just filter here
+                             if (cat === 'Pasted') {
+                               setLyricSearchResults(await searchLyrics(lyricSearchQuery, undefined));
+                             } else {
+                               setLyricSearchResults(results);
+                             }
+                           }}
+                           className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm
+                             ${selectedLyricCategory === cat 
+                               ? 'bg-emerald-500 text-black shadow-emerald-500/20' 
+                               : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white border border-white/5'}`}
+                         >
+                           {cat}
+                         </button>
+                       ))}
                     </div>
                     
                     {!currentSong || !settings.detectSongs ? (

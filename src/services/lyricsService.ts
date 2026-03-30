@@ -6,34 +6,51 @@ let pastedSongs: Song[] = [];
 export const loadEssentialLyrics = async (): Promise<Song[]> => {
   if (cachedSongs.length > 0) return cachedSongs;
   try {
-    const res = await fetch('/lyrics/essential_1k.json');
-    if (!res.ok) throw new Error('Essential lyrics not found');
-    cachedSongs = await res.json();
+    const shards = [
+      '/lyrics/african_praise.json',
+      '/lyrics/contemporary_praise.json',
+      '/lyrics/worship_essentials.json'
+    ];
+    
+    const results = await Promise.all(shards.map(url => fetch(url).then(res => res.json())));
+    // Tag songs with their category based on the file they came from
+    const categories = ['African Praise', 'Contemporary Praise', 'Worship Essentials'];
+    
+    const taggedSongs = results.flatMap((songs, i) => 
+      songs.map((s: Song) => ({ ...s, tags: [...(s.tags || []), categories[i]] }))
+    );
+
+    cachedSongs = taggedSongs;
     return cachedSongs;
   } catch (err) {
-    console.warn('Failed to load essential lyrics', err);
+    console.warn('Failed to load lyrics shards', err);
     return [];
   }
 };
 
-export const addPastedSong = (song: Song) => {
-  pastedSongs.unshift(song);
+export const setInitialPastedSongs = (songs: Song[]) => {
+  pastedSongs = songs.map(s => ({ ...s, tags: [...(s.tags || []), 'Pasted'] }));
 };
 
-export const searchLyrics = async (query: string): Promise<Song[]> => {
+export const addPastedSong = (song: Song) => {
+  const tagged = { ...song, tags: [...(song.tags || []), 'Pasted'] };
+  pastedSongs.unshift(tagged);
+};
+
+export const searchLyrics = async (query: string, category?: string): Promise<Song[]> => {
   const allLocal = [...pastedSongs, ...cachedSongs];
-  if (!query) return allLocal;
+  let filtered = allLocal;
 
-  const normalized = query.toLowerCase();
-  const filtered = allLocal.filter(s => 
-    s.title.toLowerCase().includes(normalized) || 
-    (s.artist && s.artist.toLowerCase().includes(normalized))
-  );
+  if (category && category !== 'All') {
+    filtered = filtered.filter(s => s.tags?.includes(category));
+  }
 
-  // If local results are low, simulate a Global Search for the "other 9,000"
-  if (filtered.length < 3) {
-    // Placeholder for API call to Musixmatch/etc.
-    console.log('Searching global database for:', query);
+  if (query) {
+    const normalized = query.toLowerCase();
+    filtered = filtered.filter(s => 
+      s.title.toLowerCase().includes(normalized) || 
+      (s.artist && s.artist.toLowerCase().includes(normalized))
+    );
   }
 
   return filtered;

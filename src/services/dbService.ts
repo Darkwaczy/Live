@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { Note } from '../models/note';
 import { Session } from '../models/session';
 import { LiveState } from '../models/liveState';
+import { Song } from '../models/song';
 
 const isElectron = typeof window !== 'undefined' && (window as any).sermonSync?.db;
 const electronDb = isElectron ? (window as any).sermonSync.db : null;
@@ -76,4 +77,28 @@ export async function getNotes(session_id: string): Promise<Note[]> {
     return [];
   }
   return data as Note[];
+}
+
+export async function savePastedSong(song: Song): Promise<void> {
+  if (electronDb && electronDb.savePastedSong) {
+    await electronDb.savePastedSong(song);
+  }
+  
+  // Also save to a local table if exists, or just keep in Electron Store
+  // For now, let's treat it as a per-machine preference
+  if (isElectron) {
+    const store = (window as any).sermonSync.store;
+    if (store) {
+      const existing = store.get('pasted_songs') || [];
+      store.set('pasted_songs', [song, ...existing]);
+    }
+  }
+}
+
+export async function getPastedSongs(): Promise<Song[]> {
+  if (isElectron) {
+    const store = (window as any).sermonSync.store;
+    return store?.get('pasted_songs') || [];
+  }
+  return [];
 }
