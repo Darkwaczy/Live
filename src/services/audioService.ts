@@ -103,13 +103,7 @@ export class AudioService {
         confidence = Math.min(confidence, event.results[i][0].confidence ?? 1);
       }
 
-      if (this.config.provider === 'whisper' && this.whisperClient && finalTranscript) {
-        const chunkAudio = new Float32Array(finalTranscript.split(' ').map(() => Math.random()));
-        const remoteText = await this.whisperClient.transcribeChunk(chunkAudio);
-        if (this.config.onTranscript) {
-          this.config.onTranscript((remoteText || finalTranscript).trim(), true, Date.now(), confidence);
-        }
-      } else if (this.config.onTranscript) {
+      if (this.config.onTranscript) {
         if (finalTranscript) {
           this.config.onTranscript(finalTranscript.trim(), true, Date.now(), confidence);
         }
@@ -341,9 +335,13 @@ export class AudioService {
         return;
       }
 
+      // Convert raw WebM (or Ogg) to standard WAV for total reliability
+      const wavBlob = await this.convertWebmToWavBlob(audioBlob);
+      console.log(`📡 Converted to WAV, size: ${wavBlob.size} bytes`);
+
       // For OpenAI Whisper and Groq (both use FormData)
       const formData = new FormData();
-      formData.append("file", audioBlob, "audio.webm");
+      formData.append("file", wavBlob, "audio.wav");
       formData.append("model", this.config.provider === 'groq' ? "whisper-large-v3" : "whisper-1");
       formData.append("language", "en");
 
