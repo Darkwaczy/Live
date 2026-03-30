@@ -100,12 +100,19 @@ export function useLiveState(
               d.verse.book === v.book && 
               d.verse.chapter === v.chapter && 
               d.verse.verse_start === v.verse_start &&
-              (Date.now() - new Date(d.timestamp).getTime() < 30000)
+              (Date.now() - new Date(d.timestamp).getTime() < 180000) // 3-minute lockout for exact same verse
             );
           };
 
+          const isCurrentlyShowing = (v: BibleVerse) => {
+            return prev.preview_verse && 
+                   prev.preview_verse.book === v.book && 
+                   prev.preview_verse.chapter === v.chapter && 
+                   prev.preview_verse.verse_start === v.verse_start;
+          };
+
           const addDetection = (v: BibleVerse, isPara = false) => {
-            if (!isDuplicate(v)) {
+            if (!isDuplicate(v) && !isCurrentlyShowing(v)) {
               newDetections = [{
                 id: `det-${Date.now()}`,
                 verse: v,
@@ -137,14 +144,20 @@ export function useLiveState(
                detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName).then((aiVerse: BibleVerse | null) => {
                   if (aiVerse) {
                      setLiveState(s => {
-                        // Re-check duplicate inside the async callback
+                        // Re-check duplicate inside the async callback (3-minute lockout)
                         const alreadyExists = s.detection_history.some(d => 
                           d.verse.book === aiVerse.book && 
                           d.verse.chapter === aiVerse.chapter && 
-                          d.verse.verse_start === aiVerse.verse_start
+                          d.verse.verse_start === aiVerse.verse_start && 
+                          ((Date.now() - new Date(d.timestamp).getTime()) < 180000)
                         );
                         
-                        if (alreadyExists) return { ...s, is_analyzing: false };
+                        const isCurrent = s.preview_verse && 
+                                         s.preview_verse.book === aiVerse.book && 
+                                         s.preview_verse.chapter === aiVerse.chapter && 
+                                         s.preview_verse.verse_start === aiVerse.verse_start;
+
+                        if (alreadyExists || isCurrent) return { ...s, is_analyzing: false };
 
                         const freshDets = [{
                           id: `det-${Date.now()}`,
