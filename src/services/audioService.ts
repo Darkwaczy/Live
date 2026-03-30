@@ -223,8 +223,8 @@ export class AudioService {
     this.processor = processor;
 
     // Build Deepgram URL with Nigerian Context Bias (Keywords boost common mishearings)
-    // We only take the most "at risk" items to avoid hitting URL length limits
-    const KEYWORDS_TO_BOOST = NIGERIAN_VOCABULARY.slice(0, 25);
+    // We only take the top 15 most CRITICAL terms to maintain high speed
+    const KEYWORDS_TO_BOOST = NIGERIAN_VOCABULARY.slice(0, 15);
     const keywordsParam = KEYWORDS_TO_BOOST.map(k => `keywords=${encodeURIComponent(k)}:2`).join('&');
     const url = `wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&filler_words=true&${keywordsParam}`;
 
@@ -650,9 +650,13 @@ export class AudioService {
     // 1. Kills immediate word stutters: "I I am" -> "I am"
     const words = text.split(/\s+/);
     const result: string[] = [];
+    const numberWords = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
     for (let i = 0; i < words.length; i++) {
-      if (i > 0 && words[i].toLowerCase() === words[i-1].toLowerCase()) {
-        continue; // Skip consecutive identical words
+      const current = words[i].toLowerCase();
+      const isNum = !isNaN(parseInt(current)) || numberWords.includes(current);
+      
+      if (i > 0 && !isNum && current === words[i-1].toLowerCase()) {
+        continue; // Skip consecutive identical words ONLY if they aren't numbers (for Bible refs)
       }
       result.push(words[i]);
     }
