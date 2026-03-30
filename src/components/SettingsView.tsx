@@ -346,7 +346,7 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm text-gray-300 mb-2">Accent Color</label>
-                      <select value={settings.highlightColor} onChange={e => onUpdate('highlightColor', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white">
+                      <select value={settings.highlightColor} onChange={e => onUpdate('highlightColor', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
                         <option value="emerald">Emerald Green</option>
                         <option value="gold">Soft Gold</option>
                         <option value="blue">Electric Blue</option>
@@ -354,7 +354,7 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                     </div>
                     <div>
                       <label className="block text-sm text-gray-300 mb-2">Animation Style</label>
-                      <select value={settings.highlightAnimation} onChange={e => onUpdate('highlightAnimation', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white">
+                      <select value={settings.highlightAnimation} onChange={e => onUpdate('highlightAnimation', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
                         <option value="glow">Subtle Glow</option>
                         <option value="fade">Quick Fade</option>
                         <option value="slide">Typing Slide</option>
@@ -367,7 +367,37 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <span className="text-gray-300">UI Glass Transparency / Blur Level</span>
                       <span className="text-emerald-400">{settings.transparency}%</span>
                     </div>
-                    <input type="range" min="0" max="100" value={settings.transparency} onChange={e => onUpdate('transparency', Number(e.target.value))} className="w-full accent-emerald-500" />
+                    <input type="range" min="0" max="100" value={settings.transparency} onChange={e => onUpdate('transparency', Number(e.target.value))} className="w-full accent-emerald-500 cursor-pointer" />
+                  </div>
+                </div>
+
+                <hr className="border-white/5" />
+
+                {/* PROJECTOR BACKGROUND SELECTOR */}
+                <div>
+                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Projector Theme & Background</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <button 
+                      onClick={() => onUpdate('projectorBg', '/worship-bg.png')}
+                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg.png' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-[#1e1e1e] border-white/5 hover:border-white/20'}`}
+                    >
+                      <div className="aspect-video bg-[url('/worship-bg.png')] bg-cover bg-center rounded-lg border border-white/10" />
+                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg.png' ? 'text-emerald-400' : 'text-gray-500'}`}>Obsidian Emerald</span>
+                    </button>
+                    <button 
+                      onClick={() => onUpdate('projectorBg', '/worship-bg-blue.png')}
+                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg-blue.png' ? 'bg-blue-500/10 border-blue-500/50' : 'bg-[#1e1e1e] border-white/5 hover:border-white/20'}`}
+                    >
+                      <div className="aspect-video bg-[url('/worship-bg-blue.png')] bg-cover bg-center rounded-lg border border-white/10" />
+                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg-blue.png' ? 'text-blue-400' : 'text-gray-500'}`}>Sapphire Night</span>
+                    </button>
+                    <button 
+                      onClick={() => onUpdate('projectorBg', '/worship-bg-amber.png')}
+                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg-amber.png' ? 'bg-amber-500/10 border-amber-500/50' : 'bg-[#1e1e1e] border-white/5 hover:border-white/20'}`}
+                    >
+                      <div className="aspect-video bg-[url('/worship-bg-amber.png')] bg-cover bg-center rounded-lg border border-white/10" />
+                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg-amber.png' ? 'text-amber-400' : 'text-gray-500'}`}>Sunrise Amber</span>
+                    </button>
                   </div>
                 </div>
 

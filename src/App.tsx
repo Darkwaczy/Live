@@ -125,6 +125,7 @@ export default function App() {
     secondaryBibleVersion: '',
     timerDuration: 45,
     autoShowTimer: false,
+    projectorBg: '/worship-bg.png', // obsidian/emerald
   });
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
@@ -1016,19 +1017,22 @@ export default function App() {
 
       {/* Full Screen Projector Mode (Redesigned for Premium Cinematic Experience) */}
       {isProjector && (
-        <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center p-12 overflow-hidden animate-in fade-in duration-700">
+        <div className="fixed inset-0 bg-black z-100 flex flex-col items-center justify-center p-12 overflow-hidden animate-in fade-in duration-700">
           
           {/* ATMOSPHERIC BACKGROUND OVERLAY */}
           <div 
-             className="absolute inset-0 bg-[url('/worship-bg.png')] bg-cover bg-center brightness-[0.25] saturate-[0.8] transition-all duration-1000 scale-105"
-             style={{ filter: 'blur(5px) contrast(1.1)' }} 
+             className="absolute inset-0 bg-cover bg-center brightness-[0.25] saturate-[0.8] transition-all duration-1000 scale-105"
+             style={{ 
+               backgroundImage: `url('${settings.projectorBg}')`,
+               filter: 'blur(5px) contrast(1.1)' 
+             }} 
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black opacity-60" />
+          <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-black opacity-60" />
 
           {/* ESCAPE BUTTON (Hidden unless cursor moves - TODO) */}
           <button 
             onClick={() => setProjector(false)}
-            className="absolute top-8 right-8 text-white/5 hover:text-white/40 p-2 transition-all z-[110] border border-white/5 rounded-full"
+            className="absolute top-8 right-8 text-white/5 hover:text-white/40 p-2 transition-all z-110 border border-white/5 rounded-full"
           >
             <X size={20} />
           </button>
@@ -1054,8 +1058,8 @@ export default function App() {
               <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
                 
                 {/* PRIMARY BIBLE CARD */}
-                <div className="glass-panel w-full p-16 bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden group">
-                   <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent opacity-30" />
+                <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden group">
+                   <div className="absolute inset-0 bg-linear-to-br from-white/5 via-transparent to-transparent opacity-30" />
                    
                    <div className="relative space-y-12">
                       <div className="flex flex-col items-center gap-4">
@@ -1090,7 +1094,8 @@ export default function App() {
             {!displayVerseLive && (!mainLyric || !settings.showLyrics) && settings.showTranscript && (
               <div className="px-12 animate-in fade-in duration-1000 max-w-7xl">
                 <blockquote className="text-white/90 text-[64px] leading-[1.15] font-medium italic tracking-tight drop-shadow-2xl font-serif">
-                   {liveState.current_text.split(' ').slice(-100).join(' ') || (isListening ? '...' : '')}
+                   {/* Ghost word fix: Show only stable final words in the big feed */}
+                   {liveState.current_text.split(' ').slice(-60).join(' ') || (isListening ? '...' : '')}
                 </blockquote>
                 {isListening && (
                    <div className="mt-12 flex items-center justify-center gap-4 opacity-40">

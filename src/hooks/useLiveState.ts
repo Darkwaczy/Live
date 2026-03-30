@@ -60,54 +60,83 @@ export function useLiveState(
 
         setInterimText('');
         setLiveState((prev) => {
-          const updatedText = `${prev.preview_text} ${chunk}`.trim();
-          const rollingWindow = updatedText.split(' ').slice(-30).join(' ');
+          const cleanChunk = chunk.trim();
+          if (!cleanChunk) return prev;
+
+          // Append with proper punctuation spacing
+          const updatedText = prev.preview_text ? `${prev.preview_text.trim()} ${cleanChunk}` : cleanChunk;
+          
+          // Use a larger window for semantic context
+          const rollingWindow = updatedText.split(' ').slice(-60).join(' ');
           const verse = detectBibleVerse(rollingWindow);
-          const song = findSongByWords(chunk);
-          const contentClassification = classifyContent(chunk);
+          const song = findSongByWords(cleanChunk);
+          const contentClassification = classifyContent(cleanChunk);
 
           const newLine = song ? locateCurrentLine(song, updatedText) : prev.current_line;
-
           const currentAi = aiConfigRef.current;
-          let newDetections = prev.detection_history;
+          let newDetections = [...prev.detection_history];
+
+          // Utility to prevent duplicates in history (within last 30 seconds or matching verse)
+          const isDuplicate = (v: BibleVerse) => {
+            return newDetections.some(d => 
+              d.verse.book === v.book && 
+              d.verse.chapter === v.chapter && 
+              d.verse.verse_start === v.verse_start &&
+              (Date.now() - new Date(d.timestamp).getTime() < 30000)
+            );
+          };
 
           const addDetection = (v: BibleVerse, isPara = false) => {
-            const last = newDetections[0];
-            if (!last || last.verse.book !== v.book || last.verse.chapter !== v.chapter || last.verse.verse_start !== v.verse_start) {
+            if (!isDuplicate(v)) {
               newDetections = [{
                 id: `det-${Date.now()}`,
                 verse: v,
                 timestamp: new Date().toISOString(),
                 is_paraphrase: isPara
               }, ...newDetections].slice(0, 15);
+              return true;
             }
+            return false;
           };
 
           let nextState = {
             ...prev,
             preview_text: updatedText,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            detection_history: newDetections
           };
 
           if (verse) {
-             setCurrentVerse(verse);
-             addDetection(verse, false);
-             nextState = { ...nextState, preview_verse: verse, is_live_dirty: true, detection_history: newDetections };
-          } else if (currentAi.enabled && rollingWindow.split(' ').length > 6 && !prev.is_analyzing) {
+             const added = addDetection(verse, false);
+             if (added) {
+                setCurrentVerse(verse);
+                nextState = { ...nextState, preview_verse: verse, is_live_dirty: true, detection_history: newDetections };
+             }
+          } else if (currentAi.enabled && rollingWindow.split(' ').length > 8 && !prev.is_analyzing) {
              // AI trigger (async)
              setTimeout(() => {
                setLiveState(s => ({ ...s, is_analyzing: true }));
                detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName).then((aiVerse: BibleVerse | null) => {
                   if (aiVerse) {
-                     setCurrentVerse(aiVerse);
                      setLiveState(s => {
-                       const freshDets = [{
-                         id: `det-${Date.now()}`,
-                         verse: aiVerse,
-                         timestamp: new Date().toISOString(),
-                         is_paraphrase: true
-                       }, ...s.detection_history].slice(0, 15);
-                       return { ...s, preview_verse: aiVerse, is_live_dirty: true, is_analyzing: false, detection_history: freshDets };
+                        // Re-check duplicate inside the async callback
+                        const alreadyExists = s.detection_history.some(d => 
+                          d.verse.book === aiVerse.book && 
+                          d.verse.chapter === aiVerse.chapter && 
+                          d.verse.verse_start === aiVerse.verse_start
+                        );
+                        
+                        if (alreadyExists) return { ...s, is_analyzing: false };
+
+                        const freshDets = [{
+                          id: `det-${Date.now()}`,
+                          verse: aiVerse,
+                          timestamp: new Date().toISOString(),
+                          is_paraphrase: true
+                        }, ...s.detection_history].slice(0, 15);
+                        
+                        setCurrentVerse(aiVerse);
+                        return { ...s, preview_verse: aiVerse, is_live_dirty: true, is_analyzing: false, detection_history: freshDets };
                      });
                   } else {
                      setLiveState(s => ({ ...s, is_analyzing: false }));
