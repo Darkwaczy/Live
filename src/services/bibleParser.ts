@@ -255,18 +255,21 @@ export async function detectBibleVerseAI(
   apiKey: string,
   model: string = 'mistral'
 ): Promise<BibleVerse | null> {
-  const prompt = `Analyze the following spoken sermon transcript.
+  const prompt = `Analyze the following spoken sermon transcript from a Nigerian church.
+  
+  CONTEXT:
+  - The speaker may use Standard English, Nigerian Pidgin (e.g., "wetin", "una", "dia"), or local languages (Yoruba, Igbo, Hausa).
   
   TASK:
-  1. Identify any EXPLICIT references (e.g., "John 3:16").
-  2. Identify any SEMANTIC/PARAPHRASED quotes (e.g., "I will make you fishers of men" -> Matthew 4:19).
-  3. Resolve phonetic mishearings (e.g., "Genests" -> "Genesis").
+  1. Identify any EXPLICIT Bible references (e.g., "John 3:16").
+  2. Identify any SEMANTIC/PARAPHRASED quotes or stories.
+  3. IMPORTANT: If the user is speaking Pidgin or a local language, TRANSLATE it into Standard English in your mind first to find the matching verse in your database.
+  4. Resolve phonetic mishearings (e.g., "Genests" -> "Genesis").
 
   REQUIREMENTS:
   - Respond ONLY with a valid JSON object.
   - If scripture is found, return: {"book": "BookName", "chapter": X, "verse_start": Y, "verse_end": Z}.
   - If no scripture is found, return: {"book": null}.
-  - Search your internal database for the quote's source.
 
   TEXT TO ANALYZE: "${text}"`;
 

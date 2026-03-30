@@ -211,6 +211,15 @@ export function useLiveState(
     };
   }, [sessionId, provider, whisperConfig.audioInput, whisperConfig.apiKey, whisperConfig.endpoint]);
 
+  // Feed context back to AudioService for Whisper "Memory"
+  useEffect(() => {
+    if (audioServiceRef.current && liveState.preview_text) {
+      // Send the last 500 characters as context to prime the next chunk
+      const context = liveState.preview_text.slice(-500);
+      audioServiceRef.current.setConfig({ previousContext: context });
+    }
+  }, [liveState.preview_text]);
+
   const start = async () => {
     setError(null);
     if (audioServiceRef.current) {

@@ -28,6 +28,7 @@ export type AudioServiceConfig = {
   locale?: string;
   apiKey?: string;
   endpoint?: string;
+  previousContext?: string; // Whisper memory
   onTranscript?: (text: string, isFinal: boolean, timestamp: number, confidence?: number) => void;
   onError?: (error: Error) => void;
 };
@@ -246,8 +247,10 @@ export class AudioService {
           // SILENCE FILTER: Only send if audio is not silence (Threshold: 0.05)
           console.log(`[AudioService] Chunk Peak Volume: ${peakVolume.toFixed(3)}`);
           if (peakVolume > 0.05) {
-             const fullBlob = new Blob(this.audioChunks, { type: mimeType });
-             this.sendAudioToCloud(fullBlob);
+             const rawBlob = new Blob(this.audioChunks, { type: mimeType });
+             this.convertWebmToWavBlob(rawBlob).then(wavBlob => {
+                this.sendAudioToCloud(wavBlob);
+             });
           } else {
              console.log(`[AudioService] Discarding silent chunk to prevent hallucination.`);
           }
@@ -298,9 +301,19 @@ export class AudioService {
        console.error("🚨 WAV Conversion Failed: Audio data is corrupt or unsupported format", err);
        throw new Error("Unable to decode audio data. Please refresh and try again.");
     });
-    const channelCount = decoded.numberOfChannels;
-    const length = decoded.length * channelCount * 2 + 44;
-    const buffer = new ArrayBuffer(length);
+
+    // DOWN-SAMPLING TO 16kHz MONO (Optimized for AI)
+    const TARGET_SAMPLE_RATE = 16000;
+    const offlineCtx = new OfflineAudioContext(1, (decoded.duration * TARGET_SAMPLE_RATE), TARGET_SAMPLE_RATE);
+    const source = offlineCtx.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offlineCtx.destination);
+    source.start();
+    
+    const resampled = await offlineCtx.startRendering();
+    const channelData = resampled.getChannelData(0);
+    
+    const buffer = new ArrayBuffer(44 + channelData.length * 2);
     const view = new DataView(buffer);
 
     function writeString(view: DataView, offset: number, str: string) {
@@ -317,32 +330,20 @@ export class AudioService {
     }
 
     writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + decoded.length * channelCount * 2, true);
+    view.setUint32(4, 36 + channelData.length * 2, true);
     writeString(view, 8, 'WAVE');
     writeString(view, 12, 'fmt ');
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
-    view.setUint16(22, channelCount, true);
-    view.setUint32(24, decoded.sampleRate, true);
-    view.setUint32(28, decoded.sampleRate * channelCount * 2, true);
-    view.setUint16(32, channelCount * 2, true);
+    view.setUint16(22, 1, true); // Mono
+    view.setUint32(24, TARGET_SAMPLE_RATE, true);
+    view.setUint32(28, TARGET_SAMPLE_RATE * 2, true);
+    view.setUint16(32, 2, true);
     view.setUint16(34, 16, true);
     writeString(view, 36, 'data');
-    view.setUint32(40, decoded.length * channelCount * 2, true);
+    view.setUint32(40, channelData.length * 2, true);
 
-    let offset = 44;
-    if (channelCount === 1) {
-      floatTo16BitPCM(view, offset, decoded.getChannelData(0));
-    } else {
-      const interleaved = new Float32Array(decoded.length * channelCount);
-      let index = 0;
-      for (let i = 0; i < decoded.length; i++) {
-        for (let ch = 0; ch < channelCount; ch++) {
-          interleaved[index++] = decoded.getChannelData(ch)[i];
-        }
-      }
-      floatTo16BitPCM(view, offset, interleaved);
-    }
+    floatTo16BitPCM(view, 44, channelData);
 
     await audioCtx.close();
     return new Blob([buffer], { type: 'audio/wav' });
@@ -395,9 +396,14 @@ export class AudioService {
 
       // For OpenAI Whisper and Groq (both use FormData)
       const formData = new FormData();
-      formData.append("file", audioBlob, filename);
+      formData.append("file", audioBlob, "audio.wav"); // Use .wav for filtered content
       formData.append("model", this.config.provider === 'groq' ? "whisper-large-v3" : "whisper-1");
-      formData.append("language", "en");
+      
+      // MULTILINGUAL "PRIME" PROMPT
+      // This tells Whisper to expect Nigerian context, Pidgin, and local language names.
+      const nigeriaPrime = "This is a Nigerian Christian sermon. Expect thick Nigerian accents, Nigerian Pidgin English (wetin, una, dia, sabi, pikin), and occasional Yoruba, Igbo, or Hausa phrases. Transcribe exactly what is spoken.";
+      const contextualPrompt = `${nigeriaPrime} ${this.config.previousContext || ""}`;
+      formData.append("prompt", contextualPrompt.slice(-2000)); // Whisper prompt limit is ~2000 chars
 
       const res = await fetch(url, {
         method: "POST",
