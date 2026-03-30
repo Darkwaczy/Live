@@ -88,13 +88,19 @@ export const sampleSongs: Song[] = [
 ];
 
 export const findSongByWords = (text: string): Song | null => {
-  const normalized = text.toLowerCase();
+  const normalized = text.toLowerCase().replace(/[.,!?;:]/g, '');
+  const words = normalized.split(/\s+/).slice(-30); // Look at last 30 words
+  
   for (const song of sampleSongs) {
     if (normalized.includes(song.title.toLowerCase())) {
       return song;
     }
-    for (const line of song.lyrics) {
-      if (normalized.includes(line.line.toLowerCase().slice(0, 10))) {
+    
+    // Check if any line has significant overlap with the recent transcript
+    for (const lyricLine of song.lyrics) {
+      const lineWords = lyricLine.line.toLowerCase().replace(/[.,!?;:]/g, '').split(/\s+/);
+      const overlap = lineWords.filter(w => words.includes(w)).length;
+      if (overlap >= Math.min(4, lineWords.length)) {
         return song;
       }
     }
@@ -103,7 +109,32 @@ export const findSongByWords = (text: string): Song | null => {
 };
 
 export const locateCurrentLine = (song: Song, transcriptText: string): number => {
-  const normalized = transcriptText.toLowerCase();
-  const byIndex = song.lyrics.findIndex((l) => normalized.includes(l.line.toLowerCase().slice(0, 12)));
-  return byIndex >= 0 ? byIndex : 0;
+  const normalized = transcriptText.toLowerCase().replace(/[.,!?;:]/g, '');
+  const transcriptWords = normalized.split(/\s+/).slice(-25); // Sliding window
+  
+  let bestLineIndex = -1;
+  let highestScore = 0;
+
+  song.lyrics.forEach((lyricLine, index) => {
+    const lineWords = lyricLine.line.toLowerCase().replace(/[.,!?;:]/g, '').split(/\s+/);
+    if (lineWords.length === 0) return;
+
+    // Calculate overlap score
+    let matchCount = 0;
+    lineWords.forEach(w => {
+      if (transcriptWords.includes(w)) matchCount++;
+    });
+
+    const score = matchCount / lineWords.length;
+    
+    // Bias towards lines that share at least 3 unique words or 50% of the line
+    if (matchCount >= 3 || score > 0.5) {
+      if (score > highestScore) {
+        highestScore = score;
+        bestLineIndex = index;
+      }
+    }
+  });
+
+  return bestLineIndex;
 };

@@ -793,6 +793,11 @@ export default function App() {
                            <h4 className={`${colorClass} font-bold text-lg mb-2 tracking-wide uppercase drop-shadow-glow`}>{displayVerseLive.reference}</h4>
                            <p className="text-white text-xl lg:text-2xl leading-tight font-serif italic line-clamp-4">"{displayVerseLive.text}"</p>
                         </div>
+                      ) : currentSong && settings.detectSongs && mainLyric ? (
+                        <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
+                           <p className={`text-2xl lg:text-3xl font-black ${colorClass} tracking-tight leading-none drop-shadow-glow mb-2`}>{mainLyric}</p>
+                           {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
+                        </div>
                       ) : (
                         <p className="text-white/40 text-sm font-medium max-w-lg text-center leading-relaxed italic animate-pulse px-4 z-10">
                           {liveState.current_text.split(' ').slice(-50).join(' ') || 'Screen is clear'}
@@ -1071,19 +1076,53 @@ export default function App() {
 
                 {rightPanelTab === 'lyrics' && (
                   <div className="space-y-4">
-                    <h3 className="text-white font-medium mb-1">Upcoming Verses</h3>
+                    <div className="flex items-center justify-between">
+                       <h3 className="text-white font-bold text-lg">Worship Lyrics</h3>
+                       <button 
+                         onClick={() => {
+                           const p = prompt("Paste lyrics here (each line will be a slide):");
+                           if (p) {
+                             const lines = p.split('\n').filter(l => l.trim().length > 0);
+                             const newId = `pasted-${Date.now()}`;
+                             const newSong = {
+                               id: newId,
+                               title: 'Pasted Lyrics',
+                               artist: 'Operator',
+                               lyrics: lines.map((l, i) => ({ order: i, line: l.trim() }))
+                             };
+                             // Temporary add to sampleSongs (Note: strictly for session persistence)
+                             import('./services/lyricsService').then(m => {
+                               m.sampleSongs.unshift(newSong as any);
+                               showToast("Lyrics pasted and ready!");
+                             });
+                           }
+                         }}
+                         className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-2 py-1 rounded-md"
+                       >
+                         Live Paste
+                       </button>
+                    </div>
+                    
                     {!currentSong || !settings.detectSongs ? (
-                      <p className="text-gray-500 text-sm italic">No worship song detected.</p>
+                      <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-white/5 rounded-2xl bg-white/[0.02]">
+                         <Music size={32} className="text-gray-600 mb-2 opacity-20" />
+                         <p className="text-gray-500 text-sm italic text-center">No worship song detected yet.<br/>Start singing or use "Live Paste".</p>
+                      </div>
                     ) : (
-                      currentSong?.lyrics?.map((lyricLine) => (
-                        <div 
-                           key={lyricLine.order} 
-                           onClick={() => setManualLineOffset(lyricLine.order - (currentLine ?? 0))}
-                           className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:${borderClass}/50 transition-colors ${lyricLine.order === actualLineIndex ? `bg-[#1e1e1e] ${borderClass}/30` : 'bg-transparent border-white/5'}`}>
-                          {lyricLine.line}
-                          {lyricLine.order === actualLineIndex && <div className={`opacity-50 text-sm italic mt-2 ${colorClass}`}>Current Line</div>}
-                        </div>
-                      ))
+                      <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1 pb-10">
+                        {currentSong?.lyrics?.map((lyricLine) => (
+                          <div 
+                             key={lyricLine.order} 
+                             onClick={() => setManualLineOffset(lyricLine.order - (currentLine ?? 0))}
+                             className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:${borderClass}/50 transition-all duration-300 ${lyricLine.order === actualLineIndex ? `bg-[#1e1e1e] ${borderClass} shadow-lg scale-[1.02] text-white` : 'bg-transparent border-white/5 opacity-60'}`}>
+                            <div className="flex items-center gap-3">
+                               <span className={`text-[10px] font-bold ${lyricLine.order === actualLineIndex ? colorClass : 'text-gray-600'}`}>{lyricLine.order + 1}</span>
+                               <span className="text-sm font-medium">{lyricLine.line}</span>
+                            </div>
+                            {lyricLine.order === actualLineIndex && <div className={`h-0.5 w-full mt-3 rounded-full ${bgClass} animate-pulse`}></div>}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
