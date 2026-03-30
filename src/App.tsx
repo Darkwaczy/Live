@@ -660,7 +660,17 @@ export default function App() {
                                   ? 'text-xs text-emerald-400 font-bold border-l-2 border-emerald-500/40 pl-3 shadow-glow' 
                                   : 'text-xs text-gray-400 group-hover:text-gray-200 font-medium'
                          }`}>
-                            {line.trim()}{line.endsWith('.') ? '' : '.'}
+                            {displayVerseLive && line.split(' ').some(w => displayVerseLive.text.toLowerCase().includes(w.toLowerCase())) ? (
+                                <KaraokeLine 
+                                   lyric={line.trim() + (line.endsWith('.') ? '' : '.')}
+                                   spokenText={displayVerseLive.text}
+                                   colorClass={colorClass}
+                                   animationClass="glow"
+                                   sizeClass="text-xs"
+                                />
+                             ) : (
+                                <span>{line.trim()}{line.endsWith('.') ? '' : '.'}</span>
+                             )}
                          </p>
                       </div>
                     );
@@ -766,22 +776,37 @@ export default function App() {
                    </div>
 
                    {/* LIVE ON SCREEN (Top Right - Landscape) */}
-                   <div className="h-full flex-1 flex flex-col items-center justify-center p-8 bg-black rounded-3xl border-2 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)] relative overflow-hidden">
-                     <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-3 py-1 rounded-full">
-                       <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                       LIVE ON SCREEN
-                     </div>
+                   <div className="h-full flex-1 flex flex-col items-center justify-center p-8 bg-black rounded-3xl border-2 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)] relative overflow-hidden group">
+                      {/* MIRROR BACKGROUND */}
+                      <div 
+                         className="absolute inset-0 bg-cover bg-center brightness-[0.35] saturate-[0.8] opacity-60 group-hover:opacity-100 transition-opacity duration-1000"
+                         style={{ backgroundImage: `url('${settings.projectorBg}')` }}
+                      />
+                      
+                      <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-3 py-1 rounded-full z-10">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                        LIVE ON SCREEN
+                      </div>
 
-                     {displayVerseLive && settings.detectVerses ? (
-                       <div className="w-full text-center animate-in fade-in duration-500 px-4">
-                          <h4 className={`${colorClass} font-bold text-lg mb-2 tracking-wide uppercase drop-shadow-glow`}>{displayVerseLive.reference}</h4>
-                          <p className="text-white text-xl lg:text-2xl leading-tight font-serif italic line-clamp-4">"{displayVerseLive.text}"</p>
-                       </div>
-                     ) : (
-                       <p className="text-white/40 text-sm font-medium max-w-lg text-center leading-relaxed italic animate-pulse px-4">
-                         {liveState.current_text.split(' ').slice(-50).join(' ') || 'Screen is clear'}
-                       </p>
-                     )}
+                      {displayVerseLive && settings.detectVerses ? (
+                        <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
+                           <h4 className={`${colorClass} font-bold text-lg mb-2 tracking-wide uppercase drop-shadow-glow`}>{displayVerseLive.reference}</h4>
+                           <p className="text-white text-xl lg:text-2xl leading-tight font-serif italic line-clamp-4">"{displayVerseLive.text}"</p>
+                        </div>
+                      ) : (
+                        <p className="text-white/40 text-sm font-medium max-w-lg text-center leading-relaxed italic animate-pulse px-4 z-10">
+                          {liveState.current_text.split(' ').slice(-50).join(' ') || 'Screen is clear'}
+                        </p>
+                      )}
+
+                      {/* MIRROR TICKER */}
+                      {liveState.ticker_enabled && liveState.ticker_items && liveState.ticker_items.length > 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 h-6 bg-red-600/20 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-10">
+                           <div className="flex whitespace-nowrap animate-marquee-fast py-1 px-4 text-[9px] font-bold text-white/80 uppercase tracking-widest">
+                              {liveState.ticker_items.join(' • ')} • {liveState.ticker_items.join(' • ')}
+                           </div>
+                        </div>
+                      )}
                    </div>
                 </div>
 
@@ -923,18 +948,6 @@ export default function App() {
                   </div>
                 )}
 
-                {rightPanelTab === 'notes' && (
-                  <div className="space-y-4">
-                    {notes.length === 0 && (
-                       <p className="text-gray-500 text-sm text-center mt-4">No notes for this session yet.</p>
-                    )}
-                    {notes.map(n => (
-                      <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 shadow-sm text-[14px] text-gray-300 leading-relaxed hover:border-emerald-500/30 transition-colors cursor-default">
-                        {n.content}
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 {/* Scriptures Tab */}
                 {rightPanelTab === 'scriptures' && (
@@ -1038,6 +1051,24 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Notes Tab (Consolidated) */}
+                {rightPanelTab === 'notes' && (
+                  <div className="space-y-4 pb-20">
+                    <h3 className="text-white font-bold text-lg mb-2">Session Notes</h3>
+                    {notes.length === 0 ? (
+                       <p className="text-gray-500 text-sm italic">No notes captured yet. Save snippets from the transcript or type below.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {notes.map(n => (
+                          <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 shadow-sm text-[13px] text-gray-300 leading-relaxed animate-in fade-in slide-in-from-bottom-2">
+                             {n.content}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {rightPanelTab === 'lyrics' && (
                   <div className="space-y-4">
                     <h3 className="text-white font-medium mb-1">Upcoming Verses</h3>
@@ -1057,18 +1088,6 @@ export default function App() {
                   </div>
                 )}
 
-                {rightPanelTab === 'notes' && (
-                  <div className="space-y-4">
-                    {notes.length === 0 && (
-                       <p className="text-gray-500 text-sm text-center mt-4">No notes for this session yet.</p>
-                    )}
-                    {notes.map(n => (
-                      <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 shadow-sm text-[14px] text-gray-300 leading-relaxed hover:border-emerald-500/30 transition-colors cursor-default">
-                        {n.content}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {rightPanelTab === 'notes' && (

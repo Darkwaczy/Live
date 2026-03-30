@@ -82,6 +82,27 @@ const biblePatternNoColon = new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{2,5})\\b
 // Generic fallback for misheard books (e.g. "Genests 1:1")
 const genericBiblePattern = /\b([a-z1-3\s]{3,15})\s+(\d{1,3}):(\d{1,3})(?:-(\d{1,3}))?\b/i;
 
+const numberWords: Record<string, string> = {
+  'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9',
+  'ten': '10', 'eleven': '11', 'twelve': '12', 'thirteen': '13', 'fourteen': '14', 'fifteen': '15', 'sixteen': '16', 'seventeen': '17', 'eighteen': '18', 'nineteen': '19',
+  'twenty': '20', 'thirty': '30', 'forty': '40', 'fifty': '50', 'sixty': '60', 'seventy': '70', 'eighty': '80', 'ninety': '90'
+};
+
+function normalizePhoneticNumbers(text: string): string {
+  let result = text.toLowerCase();
+  
+  // Handle compound numbers like "twenty one" -> "20 1" -> then joined
+  Object.keys(numberWords).sort((a, b) => b.length - a.length).forEach(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'g');
+    result = result.replace(regex, numberWords[word]);
+  });
+
+  // Join disconnected digits that were converted from words (e.g., "three sixteen" -> "3 16" -> "3:16")
+  // Or "one one" -> "1 1" -> "11" (if no chapter/verse separator)
+  // We'll let the existing normalization handle "1 1" -> "1:1" if preceded by "chapter"/"verse"
+  return result;
+}
+
 export function detectBibleVerse(text: string): BibleVerse | null {
   // Clean transcription artifacts like #, /, \, |, _, , 
   const sanitizedText = text
@@ -109,11 +130,18 @@ export function detectBibleVerse(text: string): BibleVerse | null {
   console.log(`🔍 [detectBibleVerse] Input: "${text}" (Sanitized: "${sanitizedText}")`);
   
   // Normalize spoken structures from speech-to-text engines
-  let normalizedText = sanitizedText
+  let normalizedText = normalizePhoneticNumbers(sanitizedText)
     .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
     .replace(/\b(\d+)\s+verses?\s+(\d+)/gi, '$1:$2') 
+    .replace(/\b(\d+)\s+and\s+(\d+)\b/gi, '$1:$2') // "one and one" -> "1 and 1" -> "1:1"
     .replace(/\b(\d+)\s*(?::|\s+)\s*(\d+)\s*(?:to|through|until|-|–|—)\s*(\d+)\b/gi, '$1:$2-$3') // "15:1 to 5", "15 1 to 5"
     .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') 
+    // Join isolated single digits that are likely chapter/verse (e.g., "3 16" -> "316" or "3:16")
+    // We'll join them with a colon to be safe
+    .replace(/\b(\d{1,2})\s+(\d{1,3})\b/g, (match, ch, v) => {
+       // Only if they are preceded by a Bible book or "Chapter"
+       return `${ch}:${v}`;
+    })
     .replace(/verses?\s+(\d+)/gi, ':$1')
     .replace(/\s+/g, ' '); 
 
