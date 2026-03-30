@@ -27,6 +27,8 @@ export function useLiveState(
     preview_verse: null,
     is_live_dirty: false,
     is_analyzing: false,
+    ticker_enabled: true,
+    ticker_items: [],
     detection_history: [],
     history: [],
     updated_at: new Date().toISOString()
@@ -40,6 +42,7 @@ export function useLiveState(
   const [error, setError] = useState<string | null>(null);
   const [speechStats, setSpeechStats] = useState<SpeechStats[]>([]);
   const audioServiceRef = useRef<AudioService | null>(null);
+  const lastPhraseRef = useRef<string>('');
 
   const aiConfigRef = useRef(aiConfig);
   useEffect(() => {
@@ -62,6 +65,13 @@ export function useLiveState(
         setLiveState((prev) => {
           const cleanChunk = chunk.trim();
           if (!cleanChunk) return prev;
+
+          // REPETITION FILTER (Prevents duplicate phrases)
+          if (cleanChunk === lastPhraseRef.current) {
+             console.log("[useLiveState] Skipping duplicate phrase:", cleanChunk);
+             return prev;
+          }
+          lastPhraseRef.current = cleanChunk;
 
           // WHISPER HALLUCINATION FILTER (Kills ghost words during silence)
           const lowerChunk = cleanChunk.toLowerCase();

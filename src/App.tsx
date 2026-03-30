@@ -1099,15 +1099,15 @@ export default function App() {
           />
           <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-black opacity-60" />
 
-          {/* ESCAPE BUTTON (Hidden unless cursor moves - TODO) */}
+          {/* ESCAPE BUTTON */}
           <button 
             onClick={() => setProjector(false)}
-            className="absolute top-8 right-8 text-white/5 hover:text-white/40 p-2 transition-all z-110 border border-white/5 rounded-full"
+            className="absolute top-8 right-8 text-white/5 hover:text-white/40 p-2 transition-all z-150 border border-white/5 rounded-full"
           >
             <X size={20} />
           </button>
           
-          <div className="w-full max-w-[85vw] relative mx-auto h-[80vh] flex flex-col items-center justify-center text-center z-10">
+          <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[70vh] mb-24' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 transition-all duration-700`}>
             
             {/* LYRICS OVERLAY (Karaoke Mode) */}
             {settings.showLyrics && settings.detectSongs && mainLyric && (

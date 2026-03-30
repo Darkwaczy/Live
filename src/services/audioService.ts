@@ -271,12 +271,39 @@ export class AudioService {
       }
     };
 
+    let startTime = Date.now();
+    let lastSilenceTime = 0;
+
     // Trigger manual stop every 4s to generate a fresh standalone file with headers
     this.interimInterval = setInterval(() => {
-      if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-        this.mediaRecorder.stop();
+      if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+
+      const now = Date.now();
+      const elapsed = now - startTime;
+      
+      // Calculate current instantaneous volume from the active volCheck (using the shared 'buffer')
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i++) sum += Math.abs(buffer[i] - 128);
+      const instantVol = sum / buffer.length;
+
+      if (instantVol < 2) { // Very quiet
+        if (lastSilenceTime === 0) lastSilenceTime = now;
+      } else {
+        lastSilenceTime = 0;
       }
-    }, 4000);
+
+      const silenceGap = lastSilenceTime > 0 ? (now - lastSilenceTime) : 0;
+
+      // ADAPTIVE STOP:
+      // - If at least 3s elapsed AND 600ms of silence
+      // - OR if we hit 10s max (fail-safe)
+      if ((elapsed > 3000 && silenceGap > 600) || elapsed > 10000) {
+        console.log(`[AudioService] Adaptive Stop: ${elapsed}ms (Silence: ${silenceGap}ms)`);
+        this.mediaRecorder.stop();
+        startTime = now;
+        lastSilenceTime = 0;
+      }
+    }, 200);
 
     // Initial Start
     this.mediaRecorder.start();

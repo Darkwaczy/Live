@@ -262,9 +262,10 @@ export async function detectBibleVerseAI(
   
   TASK:
   1. Identify any EXPLICIT Bible references (e.g., "John 3:16").
-  2. Identify any SEMANTIC/PARAPHRASED quotes or stories.
-  3. IMPORTANT: If the user is speaking Pidgin or a local language, TRANSLATE it into Standard English in your mind first to find the matching verse in your database.
-  4. Resolve phonetic mishearings (e.g., "Genests" -> "Genesis").
+  2. Identify any SEMANTIC/PARAPHRASED quotes, STORIES, PARABLES, or MIRACLES.
+  3. If the speaker is describing a story (e.g., "Man that had two sons", "Jesus walking on water"), IDENTIFY the most likely Bible location.
+  4. IMPORTANT: If the user is speaking Pidgin or a local language, TRANSLATE it into Standard English in your mind first to find the matching verse in your database.
+  5. Resolve phonetic mishearings (e.g., "Genests" -> "Genesis").
 
   REQUIREMENTS:
   - Respond ONLY with a valid JSON object.
