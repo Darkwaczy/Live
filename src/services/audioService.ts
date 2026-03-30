@@ -210,6 +210,24 @@ export class AudioService {
     
     const stream = await this.getAudioStream();
     this.stream = stream;
+
+    // NOISE GATE: Monitor volume to avoid hallucination during silence
+    const audioCtx = new AudioContext();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    const buffer = new Uint8Array(analyser.frequencyBinCount);
+    let peakVolume = 0;
+
+    // Background loop to track peak volume
+    const volCheckInterval = setInterval(() => {
+      analyser.getByteTimeDomainData(buffer);
+      for (let i = 0; i < buffer.length; i++) {
+        const volume = Math.abs(buffer[i] - 128) / 128; // 0.0 to 1.0
+        if (volume > peakVolume) peakVolume = volume;
+      }
+    }, 100);
     
     // Detect supported mimeType
     const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
@@ -225,9 +243,16 @@ export class AudioService {
     this.mediaRecorder.onstop = () => {
       if (this.stream && this.stream.active) {
         if (this.audioChunks.length > 0) {
-          const fullBlob = new Blob(this.audioChunks, { type: mimeType });
-          this.sendAudioToCloud(fullBlob);
+          // SILENCE FILTER: Only send if audio is not silence (Threshold: 0.05)
+          console.log(`[AudioService] Chunk Peak Volume: ${peakVolume.toFixed(3)}`);
+          if (peakVolume > 0.05) {
+             const fullBlob = new Blob(this.audioChunks, { type: mimeType });
+             this.sendAudioToCloud(fullBlob);
+          } else {
+             console.log(`[AudioService] Discarding silent chunk to prevent hallucination.`);
+          }
           this.audioChunks = [];
+          peakVolume = 0; // Reset for next chunk
         }
 
         // Restart immediately
@@ -250,7 +275,18 @@ export class AudioService {
       }
     }, 4000);
 
+    // Initial Start
     this.mediaRecorder.start();
+
+    // Cleanup interval on stop
+    const originalStop = this.stop.bind(this);
+    this.stop = () => {
+       clearInterval(volCheckInterval);
+       clearInterval(this.interimInterval);
+       audioCtx.close();
+       originalStop();
+    };
+
     return true;
   }
 

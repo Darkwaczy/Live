@@ -63,6 +63,24 @@ export function useLiveState(
           const cleanChunk = chunk.trim();
           if (!cleanChunk) return prev;
 
+          // WHISPER HALLUCINATION FILTER (Kills ghost words during silence)
+          const lowerChunk = cleanChunk.toLowerCase();
+          const hallucinations = [
+            'thank you for watching',
+            'thanks for watching',
+            'okay, thank you',
+            'subscribe to the channel',
+            'please like and subscribe',
+            'thank you for the gift',
+            'unintelligible',
+            'okay! thank you'
+          ];
+          
+          if (hallucinations.some(h => lowerChunk === h || lowerChunk.startsWith(h))) {
+            console.log(`[useLiveState] Hallucination detected: "${cleanChunk}". Filtered.`);
+            return prev;
+          }
+
           // Append with proper punctuation spacing
           const updatedText = prev.preview_text ? `${prev.preview_text.trim()} ${cleanChunk}` : cleanChunk;
           
