@@ -11,7 +11,10 @@
       { "order": 4, "line": "When I think upon Your goodness" },
       { "order": 5, "line": "And Your faithfulness each day" },
       { "order": 6, "line": "My very soul will bless You" },
-      { "order": 7, "line": "And my lips shall sing Your praise" }
+      { "order": 7, "line": "And my lips shall sing Your praise" },
+      { "order": 8, "line": "Onye oma Onye oma" },
+      { "order": 9, "line": "Agidigba Onye oma" },
+      { "order": 10, "line": "You are good and Your mercy is forever" }
     ]
   },
   {
@@ -23,7 +26,76 @@
       { "order": 1, "line": "You fill my heart with so much peace and joy" },
       { "order": 2, "line": "You're amazing You make my life feel brand new" },
       { "order": 3, "line": "Jesus You love me too much oh" },
-      { "order": 4, "line": "Excess love oh" }
+      { "order": 4, "line": "Excess love oh" },
+      { "order": 5, "line": "Your love is kind Your love is patient" },
+      { "order": 6, "line": "You fill my heart with so much peace and joy" },
+      { "order": 7, "line": "You're amazing You make my life feel brand new" },
+      { "order": 8, "line": "All my life I've seen Your goodness" },
+      { "order": 9, "line": "All my life I've seen Your faithfulness" }
+    ]
+  },
+  {
+    "id": "oghene-doh",
+    "title": "Oghene Doh",
+    "artist": "Nathaniel Bassey",
+    "lyrics": [
+      { "order": 0, "line": "Oghene Doh" },
+      { "order": 1, "line": "Oghene Doh" },
+      { "order": 2, "line": "Thank You for everything You've done" },
+      { "order": 3, "line": "For the things You're doing now" },
+      { "order": 4, "line": "And for the things You're yet to do" },
+      { "order": 5, "line": "Oghene Doh" }
+    ]
+  },
+  {
+    "id": "na-gode",
+    "title": "Na Gode",
+    "artist": "Hausa Worship",
+    "lyrics": [
+      { "order": 0, "line": "Na gode na gode" },
+      { "order": 1, "line": "Na gode ya Allah" },
+      { "order": 2, "line": "Saboda alherin Ka" },
+      { "order": 3, "line": "Saboda rahamar Ka" }
+    ]
+  },
+  {
+    "id": "mighty-chorus",
+    "title": "Mighty God",
+    "artist": "Joe Praize",
+    "lyrics": [
+      { "order": 0, "line": "Mighty God I give You praise" },
+      { "order": 1, "line": "For You are the King of Kings" },
+      { "order": 2, "line": "You are the Lord of Lords" },
+      { "order": 3, "line": "And I worship You today" },
+      { "order": 4, "line": "Hallelujah Hallelujah" }
+    ]
+  },
+  {
+    "id": "e-se-o",
+    "title": "E se O",
+    "artist": "Yoruba Praise",
+    "lyrics": [
+      { "order": 0, "line": "E se o Baba" },
+      { "order": 1, "line": "E se o o" },
+      { "order": 2, "line": "Alubarika po ninu aye mi" },
+      { "order": 3, "line": "E se o o" }
+    ]
+  },
+  {
+    "id": "nara",
+    "title": "Nara",
+    "artist": "Tim Godfrey ft Travis Greene",
+    "lyrics": [
+      { "order": 0, "line": "What shall I render" },
+      { "order": 1, "line": "To Jehovah" },
+      { "order": 2, "line": "For He has done so very much for me" },
+      { "order": 3, "line": "What shall I render" },
+      { "order": 4, "line": "To Jehovah" },
+      { "order": 5, "line": "For He has done so very much for me" },
+      { "order": 6, "line": "Nara nara ekele" },
+      { "order": 7, "line": "Nara ekele" },
+      { "order": 8, "line": "Nara nara ekele" },
+      { "order": 9, "line": "Nara ekele" }
     ]
   },
   {
@@ -34,17 +106,10 @@
       { "order": 0, "line": "You are Great everything written about You is Great" },
       { "order": 1, "line": "You are Great" },
       { "order": 2, "line": "You are Great You are Great" },
-      { "order": 3, "line": "Everything written about You is Great" }
-    ]
-  },
-  {
-    "id": "oniduro-mi",
-    "title": "Oniduro Mi",
-    "artist": "Yoruba Worship",
-    "lyrics": [
-      { "order": 0, "line": "Oniduro mi e seun" },
-      { "order": 1, "line": "Oniduro mi e seun" },
-      { "order": 2, "line": "E seun e seun e seun" }
+      { "order": 3, "line": "Everything written about You is Great" },
+      { "order": 4, "line": "Demons tremble at Your presence" },
+      { "order": 5, "line": "What a mighty God we serve" },
+      { "order": 6, "line": "What a mighty God we serve" }
     ]
   }
 ]
