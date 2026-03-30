@@ -57,10 +57,12 @@ export function useLiveState(
       apiKey: whisperConfig.apiKey,
       onTranscript: (chunk, isFinal, timestamp, confidence) => {
         if (!isFinal) {
+          // INTERIM: Update immediate UI
           setInterimText(chunk);
           return;
         }
 
+        // FINAL: Process stable sentence
         setInterimText('');
         setLiveState((prev) => {
           const cleanChunk = chunk.trim();
@@ -142,48 +144,53 @@ export function useLiveState(
           };
 
           if (verse) {
-             const added = addDetection(verse, false);
-             if (added) {
-                setCurrentVerse(verse);
-                nextState = { ...nextState, preview_verse: verse, is_live_dirty: true, detection_history: newDetections };
+            const added = addDetection(verse, false);
+            if (added) {
+              setCurrentVerse(verse);
+              nextState = { ...nextState, preview_verse: verse, is_live_dirty: true, detection_history: newDetections };
+            }
+          } else {
+             const isBibleStoryCandidate = (text: string) => {
+                const keywords = ['jesus', 'god', 'lord', 'spirit', 'bible', 'scripture', 'verse', 'man', 'son', 'father', 'king'];
+                const low = text.toLowerCase();
+                return keywords.some(k => low.includes(k)) && text.split(' ').length > 6;
+             };
+
+             if (currentAi.enabled && isBibleStoryCandidate(cleanChunk) && !prev.is_analyzing) {
+                // AI trigger (async)
+                setTimeout(() => {
+                   setLiveState(s => ({ ...s, is_analyzing: true }));
+                   detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName).then((aiVerse: BibleVerse | null) => {
+                      if (aiVerse) {
+                         setLiveState(s => {
+                            const alreadyExists = s.detection_history.some(d => 
+                               d.verse.book === aiVerse.book && 
+                               d.verse.chapter === aiVerse.chapter && 
+                               d.verse.verse_start === aiVerse.verse_start && 
+                               ((Date.now() - new Date(d.timestamp).getTime()) < 180000)
+                            );
+                            if (alreadyExists) return { ...s, is_analyzing: false };
+
+                            setCurrentVerse(aiVerse);
+                            return { 
+                               ...s, 
+                               preview_verse: aiVerse, 
+                               is_live_dirty: true, 
+                               is_analyzing: false,
+                               detection_history: [{
+                                  id: `det-${Date.now()}`,
+                                  verse: aiVerse,
+                                  timestamp: new Date().toISOString(),
+                                  is_paraphrase: true
+                               }, ...s.detection_history].slice(0, 15)
+                            };
+                         });
+                      } else {
+                         setLiveState(s => ({ ...s, is_analyzing: false }));
+                      }
+                   }).catch(() => setLiveState(s => ({ ...s, is_analyzing: false })));
+                }, 0);
              }
-          } else if (currentAi.enabled && rollingWindow.split(' ').length > 8 && !prev.is_analyzing) {
-             // AI trigger (async)
-             setTimeout(() => {
-               setLiveState(s => ({ ...s, is_analyzing: true }));
-               detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName).then((aiVerse: BibleVerse | null) => {
-                  if (aiVerse) {
-                     setLiveState(s => {
-                        // Re-check duplicate inside the async callback (3-minute lockout)
-                        const alreadyExists = s.detection_history.some(d => 
-                          d.verse.book === aiVerse.book && 
-                          d.verse.chapter === aiVerse.chapter && 
-                          d.verse.verse_start === aiVerse.verse_start && 
-                          ((Date.now() - new Date(d.timestamp).getTime()) < 180000)
-                        );
-                        
-                        const isCurrent = s.preview_verse && 
-                                         s.preview_verse.book === aiVerse.book && 
-                                         s.preview_verse.chapter === aiVerse.chapter && 
-                                         s.preview_verse.verse_start === aiVerse.verse_start;
-
-                        if (alreadyExists || isCurrent) return { ...s, is_analyzing: false };
-
-                        const freshDets = [{
-                          id: `det-${Date.now()}`,
-                          verse: aiVerse,
-                          timestamp: new Date().toISOString(),
-                          is_paraphrase: true
-                        }, ...s.detection_history].slice(0, 15);
-                        
-                        setCurrentVerse(aiVerse);
-                        return { ...s, preview_verse: aiVerse, is_live_dirty: true, is_analyzing: false, detection_history: freshDets };
-                     });
-                  } else {
-                     setLiveState(s => ({ ...s, is_analyzing: false }));
-                  }
-               }).catch(() => setLiveState(s => ({ ...s, is_analyzing: false })));
-             }, 0);
           }
 
           if (song) {

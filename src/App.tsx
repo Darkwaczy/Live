@@ -96,8 +96,8 @@ export default function App() {
     noiseSuppression: true,
     gain: 75,
     enableTranscription: true,
-    speechEngine: 'whisper',
-    whisperApiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
+    speechEngine: 'deepgram',
+    whisperApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY || import.meta.env.VITE_OPENAI_API_KEY || '',
     accuracyLevel: 95,
     languageModel: 'whisper-1',
     detectVerses: true,
@@ -146,7 +146,11 @@ export default function App() {
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
-    { apiKey: settings.whisperApiKey, endpoint: '', audioInput: settings.audioInput as 'live' | 'system' },
+    { 
+      apiKey: (settings.speechEngine === 'deepgram') ? (import.meta.env.VITE_DEEPGRAM_API_KEY || settings.whisperApiKey) : settings.whisperApiKey, 
+      endpoint: '', 
+      audioInput: settings.audioInput as 'live' | 'system' 
+    },
     { enabled: settings.aiVerseDetection, endpointUrl: settings.aiEndpoint, apiKey: settings.aiApiKey, modelName: settings.aiModel }
   );
 

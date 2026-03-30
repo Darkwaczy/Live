@@ -40,10 +40,12 @@ export class AudioService {
   private worker?: Worker;
   private recognition?: SpeechRecognition;
   private mediaRecorder?: MediaRecorder;
+  private socket?: WebSocket;
   private whisperClient?: RealSpeechProvider;
   private config: AudioServiceConfig;
   private interimInterval?: any;
   private audioChunks: Blob[] = [];  // Buffer audio chunks before sending
+  private isRecording: boolean = false;
 
   constructor(config?: AudioServiceConfig) {
     this.config = { provider: 'web', locale: 'en-NG', ...config };
@@ -200,7 +202,72 @@ export class AudioService {
          throw new Error("System Audio capture failed: " + (err.message || "Please try again and enable audio sharing."));
        }
     }
-    return navigator.mediaDevices.getUserMedia({ audio: true });
+    return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+  }
+
+  private async startDeepgramStreaming() {
+    if (!this.config.apiKey) {
+      this.config.onError?.(new Error("Deepgram API Key is required for streaming."));
+      return;
+    }
+
+    const stream = await this.getAudioStream();
+    this.stream = stream;
+    this.isRecording = true;
+
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    this.context = audioContext;
+    const source = audioContext.createMediaStreamSource(stream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    this.processor = processor;
+
+    // Build Deepgram URL with Nigerian Context Bias
+    const KEYWORDS = ["Wetin", "Abeg", "Oga", "Pikin", "Una", "Oyo"];
+    const keywordsParam = KEYWORDS.map(k => `keywords=${encodeURIComponent(k)}:2`).join('&');
+    const url = `wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&filler_words=true&${keywordsParam}`;
+
+    this.socket = new WebSocket(url, ['token', this.config.apiKey]);
+
+    this.socket.onopen = () => {
+      console.log('[AudioService] Deepgram WebSocket Stream Open');
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+    };
+
+    this.socket.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      const transcript = data.channel?.alternatives?.[0]?.transcript;
+      const isFinal = data.is_final;
+      
+      if (transcript && this.config.onTranscript) {
+        // Deepgram sends empty transcripts sometimes, ignore those
+        if (transcript.trim().length > 0) {
+           this.config.onTranscript(transcript, isFinal, Date.now(), data.channel.alternatives[0].confidence);
+        }
+      }
+    };
+
+    this.socket.onerror = (err) => {
+      console.error('[AudioService] Deepgram WebSocket Error:', err);
+      this.config.onError?.(new Error("Deepgram Stream Connection Failed"));
+    };
+
+    this.socket.onclose = () => {
+      console.log('[AudioService] Deepgram WebSocket Stream Closed');
+    };
+
+    processor.onaudioprocess = (e) => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Convert Float32 to Int16 PCM
+        const pcmData = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        this.socket.send(pcmData.buffer);
+      }
+    };
   }
 
   private async startCloudTranscription() {
@@ -525,7 +592,9 @@ export class AudioService {
     try {
       if (this.config.provider === 'worker') {
         await this.startVoskTranscription();
-      } else if (['whisper', 'groq', 'deepgram'].includes(this.config.provider || '')) {
+      } else if (this.config.provider === 'deepgram') {
+        await this.startDeepgramStreaming();
+      } else if (['whisper', 'groq'].includes(this.config.provider || '')) {
         await this.startCloudTranscription();
       } else {
         const hasSpeech = this.startWebSpeechRecognition();
@@ -546,6 +615,10 @@ export class AudioService {
     }
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
+    }
+    if (this.socket) {
+      this.socket.close();
+      this.socket = undefined;
     }
     if (this.voskSimInterval) {
       clearInterval(this.voskSimInterval);
