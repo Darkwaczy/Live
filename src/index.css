@@ -2,10 +2,63 @@
 
 @layer base {
   :root {
-    --background: #121212;
-    --surface: #1E1E1E;
+    --bg-primary: #121212;
+    --bg-secondary: #161616;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
+    --accent-color: #10b981;
+    --border-color: rgba(255, 255, 255, 0.05);
+    --glass-bg: rgba(30, 30, 30, 0.4);
+  }
+  
+  .theme-obsidian {
+    --bg-primary: #121212;
+    --bg-secondary: #161616;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-color: var(--highlight-override, #10b981);
+    --border-color: rgba(255, 255, 255, 0.05);
+    --glass-bg: rgba(30, 30, 30, 0.4);
+  }
+
+  .theme-midnight-royal {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --accent-color: var(--highlight-override, #fbbf24);
+    --border-color: rgba(251, 191, 36, 0.1);
+    --glass-bg: rgba(22, 33, 62, 0.6);
+  }
+
+  .theme-classic-hymnal {
+    --bg-primary: #fdf6e3;
+    --bg-secondary: #eee8d5;
+    --text-primary: #002b36;
+    --text-secondary: #586e75;
+    --accent-color: var(--highlight-override, #b91c1c);
+    --border-color: rgba(0, 43, 54, 0.1);
+    --glass-bg: rgba(238, 232, 213, 0.7);
+  }
+
+  .theme-deep-sea {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-color: var(--highlight-override, #06b6d4);
+    --border-color: rgba(6, 182, 212, 0.1);
+    --glass-bg: rgba(15, 23, 42, 0.6);
+  }
+
+  .theme-modern-clean {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --accent-color: var(--highlight-override, #3b82f6);
+    --border-color: rgba(30, 41, 59, 0.05);
+    --glass-bg: rgba(255, 255, 255, 0.7);
   }
   
   html, body, #root {
@@ -13,18 +66,19 @@
     width: 100%;
     margin: 0;
     padding: 0;
-    background-color: var(--background);
+    background-color: var(--bg-primary);
     color: var(--text-primary);
     font-family: 'Inter', 'SF Pro Display', system-ui, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
 @layer utilities {
   .glass-panel {
-    background: rgba(30, 30, 30, 0.4);
+    background: var(--glass-bg);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
   }
 

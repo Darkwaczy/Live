@@ -3,7 +3,8 @@ import {
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
-  Activity, Radio, Search
+  Activity, Radio, Search,
+  ChevronLeft
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
@@ -60,7 +61,7 @@ const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass 
          
          let className = "text-white/40 font-bold transition-all duration-300 transform";
          if (isSung) {
-            className = `${colorClass.replace('text-', 'text-')} font-black ${animationClass === 'glow' ? 'drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]' : ''} transition-all duration-200`;
+            className = `text-(--accent-color) font-black ${animationClass === 'glow' ? 'drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]' : ''} transition-all duration-200`;
          } else if (isNext) {
             className = "text-white/90 font-bold scale-105 transition-all duration-200 drop-shadow-md";
          }
@@ -132,6 +133,7 @@ export default function App() {
     timerDuration: 45,
     autoShowTimer: false,
     projectorBg: '/worship-bg.png', // obsidian/emerald
+    theme: 'obsidian',
   });
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
@@ -409,11 +411,13 @@ export default function App() {
   const handlePrev = () => setManualLineOffset(prev => prev - 1);
 
   // Dynamic Tailwind Classes based on settings
-  const colorClass = settings.highlightColor === 'gold' ? 'text-amber-400' : settings.highlightColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
-  const bgClass = settings.highlightColor === 'gold' ? 'bg-amber-500' : settings.highlightColor === 'blue' ? 'bg-blue-500' : 'bg-emerald-500';
-  const borderClass = settings.highlightColor === 'gold' ? 'border-amber-500' : settings.highlightColor === 'blue' ? 'border-blue-500' : 'border-emerald-500';
   const animationClass = settings.highlightAnimation === 'glow' ? `drop-shadow-[0_0_12px_rgba(currentColor,0.4)]` : settings.highlightAnimation === 'fade' ? 'animate-pulse' : '';
-  const blurStyle = { backdropFilter: `blur(${settings.transparency/10 + 2}px)`, filter: `opacity(${settings.transparency}%)` };
+  const highlightHex = settings.highlightColor === 'gold' ? '#fbbf24' : settings.highlightColor === 'blue' ? '#3b82f6' : '#10b981';
+  const blurStyle = { 
+    backdropFilter: `blur(${settings.transparency/10 + 2}px)`, 
+    filter: `opacity(${settings.transparency}%)`,
+    '--highlight-override': highlightHex
+  } as React.CSSProperties;
 
   const transcriptTextClass = settings.transcriptSize === 'small' ? 'text-xl' : settings.transcriptSize === 'medium' ? 'text-2xl' : 'text-3xl';
   const projectorTextClass1 = settings.transcriptSize === 'small' ? 'text-4xl' : settings.transcriptSize === 'medium' ? 'text-5xl' : 'text-6xl';
@@ -425,10 +429,19 @@ export default function App() {
     const seconds = timerSession.remaining % 60;
     
     return (
-      <div className="flex h-screen w-full bg-[#000000] text-white font-sans overflow-hidden select-none relative px-12 py-12">
+      <div className="flex h-screen w-full bg-black text-white font-sans overflow-hidden select-none relative px-12 py-12">
         <button onClick={() => setProjector(false)} className="absolute top-6 right-6 p-4 text-white/20 hover:text-white/80 transition-opacity z-50">
            <X size={32} />
         </button>
+
+        {/* Theme-Aware Background Filter */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center brightness-[0.2] saturate-[0.8] opacity-60 z-0 transition-opacity duration-1000"
+          style={{ backgroundImage: `url('${settings.projectorBg}')` }}
+        />
+        
+        {/* Color overlay based on theme */}
+        <div className="absolute inset-0 bg-(--bg-primary)/40 z-1 transition-colors" />
 
         {/* Countdown Timer */}
         {settings.autoShowTimer && (
@@ -439,18 +452,18 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 flex flex-col justify-center items-center w-full max-w-6xl mx-auto space-y-12">
+        <div className="flex-1 flex flex-col justify-center items-center w-full max-w-6xl mx-auto space-y-12 z-10">
            {settings.showVerse && displayVerseLive && settings.detectVerses && (
-              <div className="z-10 w-full max-w-4xl glass-panel p-10 shadow-2xl bg-[#1a1a1a]/90 border-t border-white/10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
+              <div className="w-full max-w-4xl glass-panel p-10 shadow-2xl bg-(--bg-secondary)/90 border-(--border-color)" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
                 <div className="flex gap-10">
                    <div className="flex-1">
-                     <h4 className={`${colorClass} font-medium pb-4 border-b border-white/10 mb-4 text-xl`}>{displayVerseLive.reference} <span className="text-gray-500 font-normal">({settings.bibleVersion})</span></h4>
-                     <p className="text-gray-200 text-3xl leading-relaxed font-serif">{displayVerseLive.text}</p>
+                     <h4 className="text-(--accent-color) font-medium pb-4 border-b border-(--border-color) mb-4 text-xl">{displayVerseLive.reference} <span className="text-(--text-secondary) font-normal">({settings.bibleVersion})</span></h4>
+                     <p className="text-(--text-primary) text-3xl leading-relaxed font-serif">{displayVerseLive.text}</p>
                    </div>
                    {secondaryFetchedVerse && (
-                     <div className="flex-1 border-l border-white/10 pl-10">
-                       <h4 className="text-emerald-400 font-medium pb-4 border-b border-white/10 mb-4 text-xl">{secondaryFetchedVerse.reference} <span className="text-gray-500 font-normal">({settings.secondaryBibleVersion})</span></h4>
-                       <p className="text-gray-300 text-3xl leading-relaxed font-serif italic">{secondaryFetchedVerse.text}</p>
+                     <div className="flex-1 border-l border-(--border-color) pl-10">
+                       <h4 className="text-(--accent-color) font-medium pb-4 border-b border-(--border-color) mb-4 text-xl">{secondaryFetchedVerse.reference} <span className="text-(--text-secondary) font-normal">({settings.secondaryBibleVersion})</span></h4>
+                       <p className="text-(--text-primary) text-3xl leading-relaxed font-serif italic">{secondaryFetchedVerse.text}</p>
                      </div>
                    )}
                 </div>
@@ -465,11 +478,11 @@ export default function App() {
            )}
         </div>
         {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
-           <div className="absolute bottom-12 left-12 right-12 glass-panel p-8 bg-[#111111]/90 border border-white/10 text-center" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
-              <p className={`text-5xl font-bold ${colorClass} tracking-wide mb-4 ${animationClass}`}>
+           <div className="absolute bottom-12 left-12 right-12 glass-panel p-8 bg-(--bg-secondary)/90 border-(--border-color) text-center z-10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
+              <p className="text-5xl font-bold text-(--accent-color) tracking-wide mb-4">
                 {mainLyric || '...'}
               </p>
-              {nextLyric && <p className="text-3xl text-gray-500 italic mt-4">{nextLyric}</p>}
+              {nextLyric && <p className="text-3xl text-(--text-secondary) italic mt-4">{nextLyric}</p>}
            </div>
         )}
       </div>
@@ -477,7 +490,10 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#121212] text-white font-sans overflow-hidden select-none">
+    <div 
+      className={`flex h-screen w-full font-sans overflow-hidden select-none theme-${settings.theme} bg-(--bg-primary) text-(--text-primary) transition-colors duration-300`}
+      style={{ '--highlight-override': highlightHex } as React.CSSProperties}
+    >
       
       {/* Toast Notification */}
       {toastMessage && (
@@ -488,7 +504,7 @@ export default function App() {
       )}
 
       {/* Sidebar */}
-      <aside className="w-[72px] flex flex-col items-center py-6 bg-[#161616] border-r border-white/5 z-20 shrink-0">
+      <aside className="w-[72px] flex flex-col items-center py-6 bg-(--bg-secondary) border-r border-(--border-color) z-20 shrink-0 transition-colors">
         <button onClick={() => showToast('Menu opened')} className="p-3 hover:bg-white/5 rounded-xl mb-8 transition-colors">
           <Menu size={24} className={activeView === 'settings' ? 'text-white' : 'text-gray-400'} />
         </button>
@@ -526,7 +542,7 @@ export default function App() {
       </aside>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-[#1a2332]/40 via-[#121212] to-[#121212]">
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-(--bg-secondary) via-(--bg-primary) to-(--bg-primary) transition-colors">
         
         {/* API Error Toast */}
         {error && (
@@ -541,9 +557,9 @@ export default function App() {
         )}
 
         {/* Top Navbar */}
-        <header className="h-[72px] flex items-center justify-between px-6 border-b border-white/5 bg-transparent z-10 shrink-0">
+        <header className="h-[72px] flex items-center justify-between px-6 border-b border-(--border-color) bg-transparent z-10 shrink-0 transition-colors">
           <div className="flex items-center gap-6">
-            <button onClick={() => showToast('Burger menu clicked')} className="text-gray-400 hover:text-white transition-colors">
+            <button onClick={() => showToast('Burger menu clicked')} className="text-(--text-secondary) hover:text-(--text-primary) transition-colors">
               <Menu size={24} />
             </button>
             <div className="flex items-center gap-2 bg-red-500 rounded-md px-2.5 py-1" title="Session is live">
@@ -551,7 +567,7 @@ export default function App() {
               <span className="text-[11px] font-bold text-white tracking-widest uppercase">LIVE</span>
             </div>
             
-            <div className="flex items-center gap-1 bg-[#1e1e24]/80 p-0.5 rounded-lg border border-white/5">
+            <div className="flex items-center gap-1 bg-(--bg-secondary)/80 p-0.5 rounded-lg border border-(--border-color)">
               <button 
                 onClick={() => setTimerSession(prev => ({ ...prev, isRunning: !prev.isRunning }))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${timerSession.isRunning ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'}`}
@@ -572,7 +588,7 @@ export default function App() {
                 <Save size={14} /> Save & Clear
               </button>
               <div className="w-px h-5 bg-white/10 mx-1"></div>
-              <button onClick={isListening ? stop : start} className={`p-2 hover:bg-white/10 rounded-md transition-colors ${colorClass}`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
+              <button onClick={isListening ? stop : start} className={`p-2 hover:bg-white/10 rounded-md transition-colors text-(--accent-color)`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
                 {isListening ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
               <button 
@@ -596,27 +612,27 @@ export default function App() {
             <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-gray-400 h-full">
               <button 
                 onClick={() => { setRightPanelTab('scriptures'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? colorClass : 'hover:text-white'}`}>
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
                 <BookOpen size={16} /> Scriptures
-                {rightPanelTab === 'scriptures' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
+                {rightPanelTab === 'scriptures' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('lyrics'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'lyrics' ? colorClass : 'hover:text-white'}`}>
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'lyrics' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
                 <Music size={16} /> Lyrics
-                {rightPanelTab === 'lyrics' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
+                {rightPanelTab === 'lyrics' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('notes'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'notes' ? colorClass : 'hover:text-white'}`}>
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'notes' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
                 <FileText size={16} /> Notes
-                {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
+                {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('broadcast'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'broadcast' ? colorClass : 'hover:text-white'}`}>
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'broadcast' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
                 <Radio size={16} /> Broadcast
-                {rightPanelTab === 'broadcast' && <div className={`absolute bottom-0 left-0 right-0 h-1 ${bgClass} rounded-t-full`}></div>}
+                {rightPanelTab === 'broadcast' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
             </nav>
 
@@ -634,19 +650,19 @@ export default function App() {
         <div className="flex-1 flex overflow-hidden bg-black/20">
           
           {/* COLUMN 1: INTEGRATED FEED (LEFT) */}
-          <section className="w-[280px] flex flex-col bg-[#161616] border-r border-white/5 shrink-0 animate-in slide-in-from-left-8 duration-500 overflow-hidden">
+          <section className="w-[280px] flex flex-col bg-(--bg-secondary) border-r border-(--border-color) shrink-0 animate-in slide-in-from-left-8 duration-500 overflow-hidden transition-colors">
              
              {/* TOP: LIVE TRANSCRIPTION */}
-             <div className="flex-[0.6] flex flex-col min-h-0 border-b border-white/5">
-                <div className="h-[56px] p-4 flex items-center justify-between bg-[#1a1a1e] border-b border-white/5">
+             <div className="flex-[0.6] flex flex-col min-h-0 border-b border-(--border-color)">
+                <div className="h-[56px] p-4 flex items-center justify-between bg-(--bg-primary) border-b border-(--border-color)">
                    <div className="flex items-center gap-2">
-                      <Activity size={14} className="text-emerald-500 animate-pulse" />
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Transcript</h3>
+                      <Activity size={14} className="text-(--accent-color) animate-pulse" />
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-(--text-primary)">Transcript</h3>
                    </div>
-                   {isListening && <span className="text-[8px] font-bold text-emerald-500/60 uppercase tracking-widest">Live</span>}
+                   {isListening && <span className="text-[8px] font-bold text-(--accent-color)/60 uppercase tracking-widest">Live</span>}
                 </div>
                 
-                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar bg-[#0f0f12]">
+                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar bg-(--bg-primary)/50">
                 {sentences.length === 0 && !interimText ? (
                   <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
                      <FileText size={24} className="mb-2" />
@@ -678,7 +694,7 @@ export default function App() {
                                 <KaraokeLine 
                                    lyric={line.trim() + (line.endsWith('.') ? '' : '.')}
                                    spokenText={displayVerseLive.text}
-                                   colorClass={colorClass}
+                                   colorClass="text-(--accent-color)"
                                    animationClass="glow"
                                    sizeClass="text-xs"
                                 />
@@ -703,10 +719,10 @@ export default function App() {
              </div>
 
              {/* BOTTOM: QUEUE */}
-             <div className="flex-[0.4] flex flex-col min-h-0 bg-[#0a0a0c]">
-                <div className="h-[48px] p-4 flex items-center gap-2 bg-black/40 border-b border-white/5">
+             <div className="flex-[0.4] flex flex-col min-h-0 bg-(--bg-primary)/80">
+                <div className="h-[48px] p-4 flex items-center gap-2 bg-black/10 border-b border-(--border-color)">
                    <LayoutGrid size={14} className="text-blue-400" />
-                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Queue</h3>
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-(--text-primary)/60">Queue</h3>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
@@ -714,34 +730,34 @@ export default function App() {
                       <p className="text-[9px] text-gray-700 italic text-center mt-4 uppercase tracking-widest opacity-30">Queue is empty</p>
                    ) : (
                       liveState.detection_history.map((det) => (
-                        <div 
-                           key={det.id} 
-                           className="relative flex flex-col p-3 bg-white/5 border border-white/5 rounded-xl hover:bg-white/8 hover:border-emerald-500/40 transition-all cursor-pointer group shadow-lg active:scale-[0.98]"
-                        >
-                           <div className="flex items-center justify-between mb-2">
-                              <span className="text-[8px] font-black text-emerald-500/40 uppercase group-hover:text-emerald-500 transition-colors">Detected</span>
-                              <div className="flex items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
-                                 <button 
-                                    onClick={(e) => {
-                                       e.stopPropagation();
-                                       removeDetection(det.id);
-                                    }}
-                                    className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded transition-colors"
-                                 >
-                                    <X size={10} />
-                                 </button>
-                              </div>
-                           </div>
-                           <div className="flex items-end justify-between" onClick={() => setPreviewVerse(det.verse)}>
-                              <div>
-                                 <p className="text-[11px] font-bold text-white mb-0.5">{det.verse.book} {det.verse.chapter}:{det.verse.verse_start}</p>
-                                 <p className="text-[8px] font-mono text-gray-600 tracking-tighter uppercase">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</p>
-                              </div>
-                              <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:bg-emerald-500 group-hover:text-black transition-all">
-                                 <Play size={10} fill="currentColor" />
-                              </div>
-                           </div>
-                        </div>
+                         <div 
+                            key={det.id} 
+                            className="relative flex flex-col p-3 bg-(--text-primary)/5 border border-(--border-color) rounded-xl hover:bg-(--text-primary)/10 hover:border-(--accent-color)/40 transition-all cursor-pointer group shadow-lg active:scale-[0.98]"
+                         >
+                            <div className="flex items-center justify-between mb-2">
+                               <span className="text-[8px] font-black text-(--accent-color)/40 uppercase group-hover:text-(--accent-color) transition-colors">Detected</span>
+                               <div className="flex items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                     onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeDetection(det.id);
+                                     }}
+                                     className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded transition-colors"
+                                  >
+                                     <X size={10} />
+                                  </button>
+                               </div>
+                            </div>
+                            <div className="flex items-end justify-between" onClick={() => setPreviewVerse(det.verse)}>
+                               <div>
+                                  <p className="text-[11px] font-bold text-(--text-primary) mb-0.5">{det.verse.book} {det.verse.chapter}:{det.verse.verse_start}</p>
+                                  <p className="text-[8px] font-mono text-(--text-secondary) tracking-tighter uppercase">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</p>
+                               </div>
+                               <div className="p-1.5 bg-(--accent-color)/10 rounded-lg text-(--accent-color) group-hover:bg-(--accent-color) group-hover:text-black transition-all">
+                                  <Play size={10} fill="currentColor" />
+                               </div>
+                            </div>
+                         </div>
                       ))
                    )}
                 </div>
@@ -757,17 +773,17 @@ export default function App() {
                 <div className="flex items-start gap-4 h-[300px] p-1 shrink-0">
                    
                    {/* PREVIEW PANE (Top Left - Square) */}
-                   <div className="h-full aspect-square flex flex-col items-center justify-center p-6 bg-[#1a1a1e] rounded-3xl border border-white/5 relative overflow-hidden group shrink-0">
-                     <div className="absolute top-4 left-4 flex items-center gap-2 text-[9px] font-bold tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">
-                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                   <div className="h-full aspect-square flex flex-col items-center justify-center p-6 bg-(--bg-secondary) rounded-3xl border border-(--border-color) relative overflow-hidden group shrink-0 transition-colors">
+                     <div className="absolute top-4 left-4 flex items-center gap-2 text-[9px] font-bold tracking-widest text-(--accent-color) bg-(--accent-color)/10 px-2 py-1 rounded-full">
+                       <div className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse"></div>
                        PREVIEW
                      </div>
                      
                     {displayVersePreview && settings.detectVerses ? (
                        <div className="w-full h-full flex flex-col justify-between">
                          <div className="text-center space-y-3">
-                            <h4 className={`${colorClass} font-bold text-sm tracking-wide uppercase`}>{displayVersePreview.reference}</h4>
-                            <p className="text-white text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
+                            <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
+                            <p className="text-(--text-primary) text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
                          </div>
                          
                          <button 
@@ -804,12 +820,21 @@ export default function App() {
 
                       {displayVerseLive && settings.detectVerses ? (
                         <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
-                           <h4 className={`${colorClass} font-bold text-lg mb-2 tracking-wide uppercase drop-shadow-glow`}>{displayVerseLive.reference}</h4>
-                           <p className="text-white text-xl lg:text-2xl leading-tight font-serif italic line-clamp-4">"{displayVerseLive.text}"</p>
+                           <div className="text-center space-y-4">
+                              <h4 className="text-(--accent-color) font-bold text-lg mb-2 tracking-wide uppercase drop-shadow-glow">{displayVerseLive.reference}</h4>
+                              <div className="flex items-center gap-6 justify-center">
+                                 <button onClick={handlePrev} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-white"><ChevronLeft size={24} /></button>
+                                 <div className="flex flex-col items-center">
+                                    <p className={`text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2 transition-all duration-300`}>{mainLyric}</p>
+                                    <p className="text-sm font-medium text-white/40 italic">{nextLyric || '...'}</p>
+                                 </div>
+                                 <button onClick={handleNext} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-white"><ChevronRight size={24} /></button>
+                              </div>
+                           </div>
                         </div>
                       ) : currentSong && settings.detectSongs && mainLyric ? (
                         <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
-                           <p className={`text-2xl lg:text-3xl font-black ${colorClass} tracking-tight leading-none drop-shadow-glow mb-2`}>{mainLyric}</p>
+                           <p className={`text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2`}>{mainLyric}</p>
                            {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
                         </div>
                       ) : (
@@ -845,17 +870,17 @@ export default function App() {
                         {currentSong.title}
                       </span>
                       <div className="flex-1 h-0.5 bg-white/10 mx-4 rounded-full overflow-hidden">
-                        <div className={`h-full w-2/5 rounded-full ${bgClass}`} />
+                        <div className={`h-full w-2/5 rounded-full bg-(--accent-color)`} />
                       </div>
                     </div>
                     
                     <div className="flex flex-col gap-2 pl-8">
                       <div className="relative">
-                        <div className={`absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-[2px] rounded-r-md ${bgClass}`}></div>
+                        <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-[2px] rounded-r-md bg-(--accent-color)"></div>
                         <KaraokeLine 
                           lyric={mainLyric || '...'} 
                           spokenText={fullTranscript} 
-                          colorClass={colorClass} 
+                          colorClass="text-(--accent-color)" 
                           animationClass={settings.highlightAnimation} 
                           sizeClass="text-[26px]"
                         />
@@ -1026,14 +1051,14 @@ export default function App() {
                     </div>
 
                     <div className="space-y-3 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 shadow-sm">
-                      <h3 className={`${colorClass} font-semibold text-base`}>{selectedBook} {selectedChapter} <span className="text-gray-400 text-xs">({settings.bibleVersion})</span></h3>
+                      <h3 className="text-(--accent-color) font-semibold text-base">{selectedBook} {selectedChapter} <span className="text-gray-400 text-xs">({settings.bibleVersion})</span></h3>
                       <div className="mt-2 max-h-[250px] overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-gray-200 font-serif">
                         {chapterText}
                       </div>
                     </div>
                     {displayVersePreview && settings.detectVerses ? (
-                      <div className={`bg-[#1e1e1e] p-5 rounded-xl border shadow-sm animate-in fade-in ${borderClass}/50`}>
-                        <h3 className={`${colorClass} font-semibold text-lg mb-3 tracking-tight`}>{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
+                      <div className="bg-(--bg-secondary) p-5 rounded-xl border border-(--accent-color)/30 shadow-sm animate-in fade-in transition-colors">
+                        <h3 className="text-(--accent-color) font-semibold text-lg mb-3 tracking-tight">{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
                         <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVersePreview.text}</p>
                       </div>
                     ) : (
@@ -1210,12 +1235,12 @@ export default function App() {
                             <div 
                                key={lyricLine.order} 
                                onClick={() => setManualLineOffset(lyricLine.order - (currentLine ?? 0))}
-                               className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:${borderClass}/50 transition-all duration-300 ${lyricLine.order === actualLineIndex ? `bg-[#1e1e1e] ${borderClass} shadow-lg scale-[1.02] text-white` : 'bg-transparent border-white/5 opacity-60'}`}>
+                               className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:border-(--accent-color)/50 transition-all duration-300 ${lyricLine.order === actualLineIndex ? `bg-(--bg-secondary) border-(--accent-color) shadow-lg scale-[1.02] text-white` : 'bg-transparent border-(--border-color) opacity-60'}`}>
                               <div className="flex items-center gap-3">
-                                 <span className={`text-[10px] font-bold ${lyricLine.order === actualLineIndex ? colorClass : 'text-gray-600'}`}>{lyricLine.order + 1}</span>
+                                 <span className={`text-[10px] font-bold ${lyricLine.order === actualLineIndex ? 'text-(--accent-color)' : 'text-gray-600'}`}>{lyricLine.order + 1}</span>
                                  <span className="text-sm font-medium">{lyricLine.line}</span>
                               </div>
-                              {lyricLine.order === actualLineIndex && <div className={`h-0.5 w-full mt-3 rounded-full ${bgClass} animate-pulse`}></div>}
+                              {lyricLine.order === actualLineIndex && <div className="h-0.5 w-full mt-3 rounded-full bg-(--accent-color) animate-pulse"></div>}
                             </div>
                           ))}
                         </div>
@@ -1274,7 +1299,7 @@ export default function App() {
                 <KaraokeLine 
                   lyric={mainLyric} 
                   spokenText={fullTranscript} 
-                  colorClass={colorClass} 
+                  colorClass="text-(--accent-color)" 
                   animationClass={settings.highlightAnimation} 
                   sizeClass="text-[88px] font-black tracking-tight leading-tight"
                 />
@@ -1292,11 +1317,11 @@ export default function App() {
                    
                    <div className="relative space-y-12">
                       <div className="flex flex-col items-center gap-4">
-                         <h2 className={`${colorClass} text-5xl font-black tracking-[0.2em] uppercase drop-shadow-glow`}>
+                         <h2 className="text-(--accent-color) text-5xl font-black tracking-[0.2em] uppercase drop-shadow-glow">
                             {displayVerseLive.reference} 
                             <span className="opacity-40 text-2xl font-light ml-4 tracking-normal">({settings.bibleVersion})</span>
                          </h2>
-                         <div className={`h-1 w-24 rounded-full ${bgClass} opacity-50`}></div>
+                         <div className="h-1 w-24 rounded-full bg-(--accent-color) opacity-50"></div>
                       </div>
 
                       <p className="text-white text-[72px] leading-[1.1] font-serif font-semibold tracking-tight max-w-5xl mx-auto drop-shadow-2xl selection:bg-emerald-500/30">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Mic, Cpu, Monitor, Activity, Volume2, Save, Database, Bell, Download, Trash2, Cloud } from 'lucide-react';
+import { Mic, Cpu, Monitor, Activity, Volume2, Save, Database, Bell, Download, Trash2, Cloud, Palette } from 'lucide-react';
+import { THEMES } from '../config/themes';
 
 export default function SettingsView({ settings, onUpdate, onSave }: any) {
   const [activeTab, setActiveTab] = useState<'audio' | 'ai' | 'display' | 'data' | 'notifications'>('audio');
@@ -15,9 +16,9 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
   );
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0d0d0d] rounded-tl-2xl border-t border-l border-white/5">
+    <div className="flex-1 flex overflow-hidden bg-(--bg-primary) rounded-tl-2xl border-t border-l border-(--border-color) transition-colors">
       {/* Sidebar */}
-      <div className="w-72 bg-[#161616] border-r border-white/5 p-6 flex flex-col shrink-0">
+      <div className="w-72 bg-(--bg-secondary) border-r border-(--border-color) p-6 flex flex-col shrink-0 transition-colors">
         <h2 className="text-xl font-semibold mb-8 text-white px-2">System Settings</h2>
         <nav className="space-y-2 flex-1">
           <button 
@@ -375,28 +376,59 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
 
                 {/* PROJECTOR BACKGROUND SELECTOR */}
                 <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Projector Theme & Background</h4>
+                  <h4 className="text-(--text-secondary) text-sm font-medium uppercase tracking-wider mb-4">Application Theme</h4>
+                  <div className="grid grid-cols-5 gap-3">
+                    {[
+                      { id: 'obsidian', name: 'Obsidian', color: '#121212', accent: '#10b981' },
+                      { id: 'midnight-royal', name: 'Royal', color: '#1a1a2e', accent: '#fbbf24' },
+                      { id: 'classic-hymnal', name: 'Hymnal', color: '#fdf6e3', accent: '#b91c1c' },
+                      { id: 'deep-sea', name: 'Sea', color: '#0f172a', accent: '#06b6d4' },
+                      { id: 'modern-clean', name: 'Clean', color: '#f8fafc', accent: '#3b82f6' }
+                    ].map(t => (
+                      <button 
+                        key={t.id}
+                        onClick={() => {
+                          onUpdate('theme', t.id);
+                          const matchingTheme = THEMES[t.id];
+                          if (matchingTheme) {
+                            onUpdate('projectorBg', matchingTheme.projectorBg);
+                          }
+                        }}
+                        className={`flex flex-col gap-2 p-2 rounded-xl border transition-all ${settings.theme === t.id ? 'border-(--accent-color) bg-(--accent-color)/10' : 'border-(--border-color) bg-(--bg-secondary)'}`}
+                      >
+                        <div className="aspect-square rounded-lg border border-white/10" style={{ backgroundColor: t.color, borderLeft: `4px solid ${t.accent}` }} />
+                        <span className={`text-[9px] font-black uppercase text-center ${settings.theme === t.id ? 'text-(--accent-color)' : 'text-(--text-secondary)'}`}>{t.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <hr className="border-(--border-color)" />
+
+                {/* PROJECTOR BACKGROUND SELECTOR */}
+                <div>
+                  <h4 className="text-(--text-secondary) text-sm font-medium uppercase tracking-wider mb-4">Projector Background</h4>
                   <div className="grid grid-cols-3 gap-4">
                     <button 
                       onClick={() => onUpdate('projectorBg', '/worship-bg.png')}
-                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg.png' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-[#1e1e1e] border-white/5 hover:border-white/20'}`}
+                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg.png' ? 'bg-(--accent-color)/10 border-(--accent-color)' : 'bg-(--bg-secondary) border-(--border-color) hover:border-white/20'}`}
                     >
                       <div className="aspect-video bg-[url('/worship-bg.png')] bg-cover bg-center rounded-lg border border-white/10" />
-                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg.png' ? 'text-emerald-400' : 'text-gray-500'}`}>Obsidian Emerald</span>
+                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg.png' ? 'text-(--accent-color)' : 'text-(--text-secondary)'}`}>Obsidian Emerald</span>
                     </button>
                     <button 
                       onClick={() => onUpdate('projectorBg', '/worship-bg-blue.png')}
-                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg-blue.png' ? 'bg-blue-500/10 border-blue-500/50' : 'bg-[#1e1e1e] border-white/5 hover:border-white/20'}`}
+                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg-blue.png' ? 'bg-(--accent-color)/10 border-(--accent-color)' : 'bg-(--bg-secondary) border-(--border-color) hover:border-white/20'}`}
                     >
                       <div className="aspect-video bg-[url('/worship-bg-blue.png')] bg-cover bg-center rounded-lg border border-white/10" />
-                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg-blue.png' ? 'text-blue-400' : 'text-gray-500'}`}>Sapphire Night</span>
+                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg-blue.png' ? 'text-(--accent-color)' : 'text-(--text-secondary)'}`}>Sapphire Night</span>
                     </button>
                     <button 
                       onClick={() => onUpdate('projectorBg', '/worship-bg-amber.png')}
-                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg-amber.png' ? 'bg-amber-500/10 border-amber-500/50' : 'bg-[#1e1e1e] border-white/5 hover:border-white/20'}`}
+                      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all ${settings.projectorBg === '/worship-bg-amber.png' ? 'bg-(--accent-color)/10 border-(--accent-color)' : 'bg-(--bg-secondary) border-(--border-color) hover:border-white/20'}`}
                     >
                       <div className="aspect-video bg-[url('/worship-bg-amber.png')] bg-cover bg-center rounded-lg border border-white/10" />
-                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg-amber.png' ? 'text-amber-400' : 'text-gray-500'}`}>Sunrise Amber</span>
+                      <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg-amber.png' ? 'text-(--accent-color)' : 'text-(--text-secondary)'}`}>Sunrise Amber</span>
                     </button>
                   </div>
                 </div>
