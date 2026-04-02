@@ -1305,7 +1305,15 @@ export default function App() {
                     </div>
                     {displayVersePreview && settings.detectVerses ? (
                       <div className="shrink-0 bg-(--bg-secondary) p-5 rounded-xl border border-(--accent-color)/30 shadow-sm animate-in fade-in transition-colors mb-2">
-                        <h3 className="text-(--accent-color) font-semibold text-lg mb-3 tracking-tight">{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
+                        <div className="flex items-start justify-between mb-3">
+                            <h3 className="text-(--accent-color) font-semibold text-lg tracking-tight">{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
+                            <button 
+                              onClick={goLive}
+                              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_rgba(16,185,129,0.6)] active:scale-95"
+                            >
+                              AIR
+                            </button>
+                        </div>
                         <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVersePreview.text}</p>
                       </div>
                     ) : (
