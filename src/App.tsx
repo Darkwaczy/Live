@@ -137,6 +137,19 @@ export default function App() {
   });
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
 
   const updateDraftSetting = (key: string, value: any) => {
     setDraftSettings(prev => ({ ...prev, [key as keyof typeof settings]: value }));
@@ -149,7 +162,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText, applyLiveState, error, setError, goLive, setPreviewVerse, setSecondaryVerse, removeDetection, setLiveState
+    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, setPreviewVerse, setSecondaryVerse, removeDetection, setLiveState
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -160,6 +173,27 @@ export default function App() {
     },
     { enabled: settings.aiVerseDetection, endpointUrl: settings.aiEndpoint, apiKey: settings.aiApiKey, modelName: settings.aiModel }
   );
+
+  const [airedVerse, setAiredVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
+  const [airedLyric, setAiredLyric] = useState<string | null>(null);
+
+  const goLive = () => {
+    // Snapshot the current preview content for the dashboard mirror
+    if (displayVersePreview) setAiredVerse(displayVersePreview);
+    else setAiredVerse(null);
+
+    const mainLyric = currentSong?.lyrics?.find(l => l.order === actualLineIndex)?.line || '';
+    if (mainLyric) setAiredLyric(mainLyric);
+    else setAiredLyric(null);
+
+    originalGoLive();
+  };
+
+  const clearText = () => {
+    setAiredVerse(null);
+    setAiredLyric(null);
+    originalClearText();
+  };
 
   // Helpers for transcription column (Now using preview_text for permanence)
   const sentences = useMemo(() => (liveState?.preview_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.preview_text]);
@@ -211,11 +245,24 @@ export default function App() {
   const [lyricSearchQuery, setLyricSearchQuery] = useState('');
   const [lyricSearchResults, setLyricSearchResults] = useState<Song[]>([]);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [apiBibleCache, setApiBibleCache] = useState<Record<string, { verse: number; text: string }[]>>({});
+  const [isBibleLoading, setIsBibleLoading] = useState(false);
   const [selectedLyricCategory, setSelectedLyricCategory] = useState('All');
 
   const bibleBooks = [
     'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther','Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon','Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi','Matthew','Mark','Luke','John','Acts','Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'
   ];
+
+  const BIBLE_CHAPTER_COUNTS: Record<string, number> = {
+    'Genesis': 50, 'Exodus': 40, 'Leviticus': 27, 'Numbers': 36, 'Deuteronomy': 34, 'Joshua': 24, 'Judges': 21, 'Ruth': 4,
+    '1 Samuel': 31, '2 Samuel': 24, '1 Kings': 22, '2 Kings': 25, '1 Chronicles': 29, '2 Chronicles': 36, 'Ezra': 10, 'Nehemiah': 13,
+    'Esther': 10, 'Job': 42, 'Psalms': 150, 'Proverbs': 31, 'Ecclesiastes': 12, 'Song of Solomon': 8, 'Isaiah': 66, 'Jeremiah': 52,
+    'Lamentations': 5, 'Ezekiel': 48, 'Daniel': 12, 'Hosea': 14, 'Joel': 3, 'Amos': 9, 'Obadiah': 1, 'Jonah': 4, 'Micah': 7,
+    'Nahum': 3, 'Habakkuk': 3, 'Zephaniah': 3, 'Haggai': 2, 'Zechariah': 14, 'Malachi': 4, 'Matthew': 28, 'Mark': 16, 'Luke': 24,
+    'John': 21, 'Acts': 28, 'Romans': 16, '1 Corinthians': 16, '2 Corinthians': 13, 'Galatians': 6, 'Ephesians': 6, 'Philippians': 4,
+    'Colossians': 4, '1 Thessalonians': 5, '2 Thessalonians': 3, '1 Timothy': 6, '2 Timothy': 4, 'Titus': 3, 'Philemon': 1,
+    'Hebrews': 13, 'James': 5, '1 Peter': 5, '2 Peter': 3, '1 John': 5, '2 John': 1, '3 John': 1, 'Jude': 1, 'Revelation': 22
+  };
 
   useEffect(() => {
     const loadBibleData = async () => {
@@ -244,23 +291,63 @@ export default function App() {
 
   // Update chapter verses when book or chapter changes
   useEffect(() => {
-    if (bibleData.length > 0) {
-      const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
-      if (book && book.chapters && book.chapters[selectedChapter - 1]) {
-        const verses = book.chapters[selectedChapter - 1].map((text: string, i: number) => ({
-          verse: i + 1,
-          text: text.replace(/\n/g, ' ').trim()
-        }));
-        setChapterVerses(verses);
-      } else {
-        setChapterVerses([]);
+    const fetchChapter = async () => {
+      setIsBibleLoading(true);
+      const version = settings.bibleVersion;
+      const cacheKey = `${version}-${selectedBook}-${selectedChapter}`;
+
+      // 1. Try local data first
+      if (bibleData.length > 0) {
+        const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+        if (book && book.chapters && book.chapters[selectedChapter - 1]) {
+          const verses = book.chapters[selectedChapter - 1].map((text: string, i: number) => ({
+            verse: i + 1,
+            text: text.replace(/\n/g, ' ').trim()
+          }));
+          if (verses.length > 0) {
+             setChapterVerses(verses);
+             setIsBibleLoading(false);
+             return;
+          }
+        }
       }
-    }
-  }, [selectedBook, selectedChapter, bibleData]);
+
+      // 2. Try Cache next
+      if (apiBibleCache[cacheKey]) {
+        setChapterVerses(apiBibleCache[cacheKey]);
+        setIsBibleLoading(false);
+        return;
+      }
+
+      // 3. Fallback to API
+      try {
+        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(selectedBook)}+${selectedChapter}?translation=${version.toLowerCase()}`);
+        if (!apiRes.ok) throw new Error("API Retrieval Failed");
+        const apiData = await apiRes.json();
+        if (apiData.verses && Array.isArray(apiData.verses)) {
+           const verses = apiData.verses.map((v: any) => ({
+             verse: v.verse,
+             text: v.text.replace(/\n/g, ' ').trim()
+           }));
+           setChapterVerses(verses);
+           setApiBibleCache(prev => ({ ...prev, [cacheKey]: verses }));
+        } else {
+           setChapterVerses([]);
+        }
+      } catch (err) {
+        console.warn('Bible API fallback failed:', err);
+        setChapterVerses([]);
+      } finally {
+        setIsBibleLoading(false);
+      }
+    };
+
+    fetchChapter();
+  }, [selectedBook, selectedChapter, bibleData, settings.bibleVersion]);
 
   const handleNextChapter = () => {
-    const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
-    if (book && selectedChapter < book.chapters.length) {
+    const maxChapters = BIBLE_CHAPTER_COUNTS[selectedBook] || 1;
+    if (selectedChapter < maxChapters) {
       setSelectedChapter(prev => prev + 1);
     } else {
       const bookIdx = bibleBooks.findIndex(b => b.toLowerCase() === selectedBook.toLowerCase());
@@ -279,12 +366,7 @@ export default function App() {
       if (bookIdx > 0) {
         const prevBookName = bibleBooks[bookIdx - 1];
         setSelectedBook(prevBookName);
-        const prevBook = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === prevBookName.toLowerCase());
-        if (prevBook) {
-          setSelectedChapter(prevBook.chapters.length);
-        } else {
-          setSelectedChapter(1);
-        }
+        setSelectedChapter(BIBLE_CHAPTER_COUNTS[prevBookName] || 1);
       }
     }
   };
@@ -473,9 +555,7 @@ export default function App() {
     : null;
 
   const displayVerseLive = liveState.current_verse
-    ? fetchedVerse && fetchedVerse.reference.includes(liveState.current_verse.book)
-      ? fetchedVerse
-      : { reference: `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}${liveState.current_verse.verse_end && liveState.current_verse.verse_end > liveState.current_verse.verse_start ? `-${liveState.current_verse.verse_end}` : ''}`, text: 'Live on Screen', translation: settings.bibleVersion }
+    ? airedVerse || { reference: `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}${liveState.current_verse.verse_end && liveState.current_verse.verse_end > liveState.current_verse.verse_start ? `-${liveState.current_verse.verse_end}` : ''}`, text: 'Live on Screen', translation: settings.bibleVersion }
     : null;
 
   const fullTranscript = (liveState.current_text + ' ' + (interimText || '')).trim();
@@ -641,9 +721,9 @@ export default function App() {
             <button onClick={() => showToast('Burger menu clicked')} className="text-(--text-secondary) hover:text-(--text-primary) transition-colors">
               <Menu size={24} />
             </button>
-            <div className="flex items-center gap-2 bg-red-500 rounded-md px-2.5 py-1" title="Session is live">
-              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-              <span className="text-[11px] font-bold text-white tracking-widest uppercase">LIVE</span>
+            <div className={`flex items-center gap-2 rounded-md px-2.5 py-1 transition-colors ${isOnline ? 'bg-emerald-500' : 'bg-gray-600'}`} title={isOnline ? "Connected to the Internet" : "Offline / Local Mode"}>
+              <div className={`w-1.5 h-1.5 rounded-full bg-white ${isOnline ? 'animate-pulse' : ''}`}></div>
+              <span className="text-[11px] font-bold text-white tracking-widest uppercase">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </div>
             
             <div className="flex items-center gap-1 bg-(--bg-secondary)/80 p-0.5 rounded-lg border border-(--border-color)">
@@ -662,11 +742,7 @@ export default function App() {
               >
                 <X size={12} />
               </button>
-              <div className="w-px h-5 bg-white/10 mx-1"></div>
-              <button onClick={handleSnapshotToNotes} className="px-3 py-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 rounded-md transition-all mr-1" title="Save current text to Notes and clear screen">
-                <Save size={14} /> Save & Clear
-              </button>
-              <div className="w-px h-5 bg-white/10 mx-1"></div>
+
               <button onClick={isListening ? stop : start} className={`p-2 hover:bg-white/10 rounded-md transition-colors text-(--accent-color)`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
                 {isListening ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
@@ -677,13 +753,23 @@ export default function App() {
               >
                 <SkipBack size={18} fill="currentColor" />
               </button>
-              <button 
-                onClick={goLive}
-                className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${liveState.is_live_dirty ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-gray-700 text-gray-400 opacity-50 cursor-not-allowed'}`}
-                disabled={!liveState.is_live_dirty}
-              >
-                <SkipForward size={18} fill="currentColor" /> GO LIVE (AIR)
-              </button>
+              
+              {(() => {
+                 const isLive = (liveState.current_verse && liveState.preview_verse && liveState.current_verse.book === liveState.preview_verse.book && liveState.current_verse.chapter === liveState.preview_verse.chapter && liveState.current_verse.verse_start === liveState.preview_verse.verse_start) || 
+                                (mainLyric && airedLyric && mainLyric === airedLyric);
+                 
+                 return (
+                   <button 
+                     onClick={isLive ? clearText : goLive}
+                     className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-xs tracking-wider uppercase transition-all ml-2
+                       ${isLive ? 'bg-white/10 text-gray-400 hover:bg-white/20' : 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)] animate-pulse'}`}
+                     title={isLive ? "Clear Currently Airing Text" : "Send Screen to Air!"}
+                   >
+                     {isLive ? <X size={14} /> : <SkipForward size={14} fill="currentColor" />}
+                     {isLive ? 'Clear Text' : 'Go Live (Air)'}
+                   </button>
+                 );
+              })()}
             </div>
           </div>
 
@@ -859,18 +945,13 @@ export default function App() {
                      </div>
                      
                     {displayVersePreview && settings.detectVerses ? (
-                       <div className="w-full h-full flex flex-col justify-between">
+                       <div className="w-full h-full flex flex-col justify-center">
                          <div className="text-center space-y-3">
                             <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
                             <p className="text-(--text-primary) text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
                          </div>
                          
-                         <button 
-                           onClick={goLive}
-                           className="w-full mt-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-[11px] uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(220,38,38,0.3)] animate-pulse active:scale-95 transition-all flex items-center justify-center gap-2"
-                         >
-                           <SkipForward size={14} fill="currentColor" /> GO LIVE (AIR)
-                         </button>
+
                        </div>
                      ) : (
                        <div className="w-full text-center opacity-30 group-hover:opacity-50 transition-opacity">
@@ -884,55 +965,63 @@ export default function App() {
                      )}
                    </div>
 
-                   {/* LIVE ON SCREEN (Top Right - Landscape) */}
-                   <div className="h-full flex-1 flex flex-col items-center justify-center p-8 bg-black rounded-3xl border-2 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)] relative overflow-hidden group">
-                      {/* MIRROR BACKGROUND */}
-                      <div 
-                         className="absolute inset-0 bg-cover bg-center brightness-[0.35] saturate-[0.8] opacity-60 group-hover:opacity-100 transition-opacity duration-1000"
-                         style={{ backgroundImage: `url('${settings.projectorBg}')` }}
-                      />
-                      
-                      <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-3 py-1 rounded-full z-10">
-                        <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                        LIVE ON SCREEN
-                      </div>
+                   {/* LIVE ON SCREEN & CLEAR BUTTON CONTAINER */}
+                   <div className="flex-1 flex flex-col gap-3 min-w-0 h-full">
+                      {/* LIVE ON SCREEN (Top Right - Landscape) */}
+                      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black rounded-3xl border-2 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)] relative overflow-hidden group">
+                         {/* MIRROR BACKGROUND */}
+                         <div 
+                            className="absolute inset-0 bg-cover bg-center brightness-[0.35] saturate-[0.8] opacity-60 group-hover:opacity-100 transition-opacity duration-1000"
+                            style={{ backgroundImage: `url('${settings.projectorBg}')` }}
+                         />
+                         
+                         <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-3 py-1 rounded-full z-10">
+                           <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                           LIVE ON SCREEN
+                         </div>
 
-                      {displayVerseLive && settings.detectVerses ? (
-                        <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
-                           <div className="text-center space-y-4">
-                              <h4 className="text-(--accent-color) font-bold text-lg mb-2 tracking-wide uppercase drop-shadow-glow">{displayVerseLive.reference}</h4>
-                              <div className="flex items-center gap-6 justify-center">
-                                 <button onClick={handlePrev} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-white"><ChevronLeft size={24} /></button>
-                                 <div className="flex flex-col items-center">
-                                    <p className={`text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2 transition-all duration-300`}>{mainLyric}</p>
-                                    <p className="text-sm font-medium text-white/40 italic">{nextLyric || '...'}</p>
-                                 </div>
-                                 <button onClick={handleNext} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-white"><ChevronRight size={24} /></button>
+                          {liveState.current_verse && displayVerseLive ? (
+                            <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
+                               <div className="text-center space-y-4">
+                                  <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase drop-shadow-glow">{displayVerseLive.reference}</h4>
+                                  <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
+                               </div>
+                            </div>
+                          ) : airedLyric ? (
+                            <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
+                               <p className={`text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2`}>{airedLyric}</p>
+                               {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full opacity-30 z-10">
+                               <Monitor size={48} className="text-gray-500 mb-3" />
+                               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Screen is Clear</p>
+                            </div>
+                          )}
+
+                         {/* MIRROR TICKER */}
+                         {liveState.ticker_enabled && liveState.ticker_items && liveState.ticker_items.length > 0 && (
+                           <div className="absolute bottom-0 left-0 right-0 h-6 bg-red-600/20 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-10">
+                              <div className="flex whitespace-nowrap animate-marquee-fast py-1 px-4 text-[9px] font-bold text-white/80 uppercase tracking-widest">
+                                 {liveState.ticker_items.join(' • ')} • {liveState.ticker_items.join(' • ')}
                               </div>
                            </div>
-                        </div>
-                      ) : currentSong && settings.detectSongs && mainLyric ? (
-                        <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
-                           <p className={`text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2`}>{mainLyric}</p>
-                           {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
-                        </div>
-                      ) : (
-                        <p className="text-white/40 text-sm font-medium max-w-lg text-center leading-relaxed italic animate-pulse px-4 z-10">
-                          {liveState.current_text.split(' ').slice(-50).join(' ') || 'Screen is clear'}
-                        </p>
-                      )}
-
-                      {/* MIRROR TICKER */}
-                      {liveState.ticker_enabled && liveState.ticker_items && liveState.ticker_items.length > 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-6 bg-red-600/20 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-10">
-                           <div className="flex whitespace-nowrap animate-marquee-fast py-1 px-4 text-[9px] font-bold text-white/80 uppercase tracking-widest">
-                              {liveState.ticker_items.join(' • ')} • {liveState.ticker_items.join(' • ')}
-                           </div>
-                        </div>
-                      )}
+                         )}
+                      </div>
+                      
+                      {/* DEDICATED CLEAR PROJECTOR BUTTON - Temporarily commented out
+                      <div className="w-full flex justify-end px-2 shrink-0">
+                          <button
+                            onClick={clearText}
+                            className="px-6 py-2 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-lg uppercase tracking-[0.2em] text-[10px] font-black tracking-widest transition-all border border-red-500/20 shadow-sm active:scale-95"
+                            title="Clears only the Projector Display"
+                          >
+                            Clear Live Screen
+                          </button>
+                      </div>
+                      */}
                    </div>
                 </div>
-
                 {/* BOTTOM BLOCK: UNTOUCHED PLACEHOLDER */}
                 <div className="flex-1 bg-transparent border border-white/5 border-dashed rounded-3xl flex items-center justify-center relative group overflow-hidden">
                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02),transparent)] opacity-20" />
@@ -1074,8 +1163,8 @@ export default function App() {
 
                 {/* Scriptures Tab */}
                 {rightPanelTab === 'scriptures' && (
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col h-full overflow-hidden space-y-4">
+                    <div className="shrink-0 grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-gray-400 uppercase tracking-wider">Bible Translation</label>
                         <select
@@ -1099,7 +1188,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="shrink-0 grid grid-cols-2 gap-3">
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
                           <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 px-1">Chapter</label>
@@ -1145,17 +1234,22 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between px-1">
+                    <div className="flex-1 flex flex-col min-h-0 space-y-3">
+                    <div className="shrink-0 flex items-center justify-between px-1">
                          <h3 className="text-(--accent-color) font-black text-[10px] uppercase tracking-[0.2em]">{selectedBook} {selectedChapter}</h3>
                          <span className="text-[8px] font-bold text-gray-500 uppercase">({settings.bibleVersion})</span>
                       </div>
                       
                       <div 
                         ref={bibleScrollRef}
-                        className="space-y-2 max-h-[45vh] overflow-y-auto no-scrollbar pb-10 pr-1"
+                        className="flex-1 space-y-2 overflow-y-auto no-scrollbar pb-6 pr-1"
                       >
-                        {chapterVerses.length > 0 ? (
+                        {isBibleLoading ? (
+                           <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                              <RefreshCw size={32} className="text-emerald-500 animate-spin" />
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Retrieving Revelation...</p>
+                           </div>
+                        ) : chapterVerses.length > 0 ? (
                           chapterVerses.map((v) => {
                             const isLive = liveState.current_verse?.book === selectedBook && 
                                            liveState.current_verse?.chapter === selectedChapter && 
@@ -1210,7 +1304,7 @@ export default function App() {
                       </div>
                     </div>
                     {displayVersePreview && settings.detectVerses ? (
-                      <div className="bg-(--bg-secondary) p-5 rounded-xl border border-(--accent-color)/30 shadow-sm animate-in fade-in transition-colors">
+                      <div className="shrink-0 bg-(--bg-secondary) p-5 rounded-xl border border-(--accent-color)/30 shadow-sm animate-in fade-in transition-colors mb-2">
                         <h3 className="text-(--accent-color) font-semibold text-lg mb-3 tracking-tight">{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
                         <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVersePreview.text}</p>
                       </div>

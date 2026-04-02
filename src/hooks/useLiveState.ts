@@ -207,10 +207,19 @@ export function useLiveState(
 
           return {
             ...nextState,
+            history: [
+               ...(nextState.history || []),
+               {
+                  id: `note-${Date.now()}`,
+                  type: 'note' as const,
+                  content: cleanChunk,
+                  timestamp: new Date(timestamp).toISOString()
+               }
+            ].slice(-200), // keep the last 200 notes to prevent memory bloat
             session_id: sessionId,
             content_type: contentClassification.type,
             updated_at: new Date(timestamp).toISOString()
-          };
+          } as any;
         });
       },
       onError: (err) => {
@@ -315,14 +324,25 @@ export function useLiveState(
         });
       }
 
+      let nextPreviewVerse = prev.preview_verse;
+      if (prev.preview_verse) {
+         nextPreviewVerse = {
+            ...prev.preview_verse,
+            verse_start: prev.preview_verse.verse_start + 1,
+            // reset verse_end if it was a range
+            verse_end: prev.preview_verse.verse_start + 1 
+         };
+      }
+
       return {
         ...prev,
         current_text: prev.preview_text || '',
         current_verse: prev.preview_verse,
-        is_live_dirty: false,
+        preview_verse: nextPreviewVerse,
+        is_live_dirty: true,
         history: newHistory,
         updated_at: new Date().toISOString()
-      };
+      } as any;
     });
   }, []);
 
