@@ -4,7 +4,7 @@ import {
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
   Activity, Radio, Search,
-  ChevronLeft
+  ChevronLeft, RefreshCw
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
@@ -166,11 +166,23 @@ export default function App() {
   const { connected } = useSync(session.id, liveState, applyLiveState);
 
   const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
+  const bibleScrollRef = React.useRef<HTMLDivElement>(null);
+
   useEffect(() => {
      if (transcriptScrollRef.current) {
         transcriptScrollRef.current.scrollTo({ top: transcriptScrollRef.current.scrollHeight, behavior: 'smooth' });
      }
   }, [liveState.preview_text, interimText]);
+
+  // Auto-scroll Bible Sidebar to active verse
+  useEffect(() => {
+    if (bibleScrollRef.current && liveState.preview_verse) {
+      const activeElement = bibleScrollRef.current.querySelector('[data-active="true"]');
+      if (activeElement) {
+        activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [liveState.preview_verse]);
 
   const [fetchedVerse, setFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
   const [secondaryFetchedVerse, setSecondaryFetchedVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
@@ -195,9 +207,10 @@ export default function App() {
   const [bibleData, setBibleData] = useState<any[]>([]);
   const [selectedBook, setSelectedBook] = useState('Genesis');
   const [selectedChapter, setSelectedChapter] = useState(1);
-  const [chapterText, setChapterText] = useState('Loading book...');
+  const [chapterVerses, setChapterVerses] = useState<{ verse: number; text: string }[]>([]);
   const [lyricSearchQuery, setLyricSearchQuery] = useState('');
   const [lyricSearchResults, setLyricSearchResults] = useState<Song[]>([]);
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectedLyricCategory, setSelectedLyricCategory] = useState('All');
 
   const bibleBooks = [
@@ -228,6 +241,53 @@ export default function App() {
 
     loadBibleData();
   }, [settings.bibleVersion]);
+
+  // Update chapter verses when book or chapter changes
+  useEffect(() => {
+    if (bibleData.length > 0) {
+      const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+      if (book && book.chapters && book.chapters[selectedChapter - 1]) {
+        const verses = book.chapters[selectedChapter - 1].map((text: string, i: number) => ({
+          verse: i + 1,
+          text: text.replace(/\n/g, ' ').trim()
+        }));
+        setChapterVerses(verses);
+      } else {
+        setChapterVerses([]);
+      }
+    }
+  }, [selectedBook, selectedChapter, bibleData]);
+
+  const handleNextChapter = () => {
+    const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+    if (book && selectedChapter < book.chapters.length) {
+      setSelectedChapter(prev => prev + 1);
+    } else {
+      const bookIdx = bibleBooks.findIndex(b => b.toLowerCase() === selectedBook.toLowerCase());
+      if (bookIdx !== -1 && bookIdx < bibleBooks.length - 1) {
+        setSelectedBook(bibleBooks[bookIdx + 1]);
+        setSelectedChapter(1);
+      }
+    }
+  };
+
+  const handlePrevChapter = () => {
+    if (selectedChapter > 1) {
+      setSelectedChapter(prev => prev - 1);
+    } else {
+      const bookIdx = bibleBooks.findIndex(b => b.toLowerCase() === selectedBook.toLowerCase());
+      if (bookIdx > 0) {
+        const prevBookName = bibleBooks[bookIdx - 1];
+        setSelectedBook(prevBookName);
+        const prevBook = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === prevBookName.toLowerCase());
+        if (prevBook) {
+          setSelectedChapter(prevBook.chapters.length);
+        } else {
+          setSelectedChapter(1);
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchVerse = async (ref: string, version: string, isSecondary: boolean) => {
@@ -283,6 +343,25 @@ export default function App() {
       goLive();
     }
   }, [liveState.preview_verse, settings.autoAirVerses, goLive, liveState.current_verse]);
+
+  // Sequential Advance: When a verse goes live, stage the next one automatically
+  useEffect(() => {
+    if (liveState.current_verse) {
+      const currentIdx = chapterVerses.findIndex(v => v.verse === liveState.current_verse?.verse_start);
+      if (currentIdx !== -1 && currentIdx < chapterVerses.length - 1) {
+        const nextVerse = chapterVerses[currentIdx + 1];
+        // Only stage next if we're not manually focusing on something else
+        if (!liveState.preview_verse || (liveState.preview_verse.book === liveState.current_verse.book && liveState.preview_verse.chapter === liveState.current_verse.chapter && liveState.preview_verse.verse_start === liveState.current_verse.verse_start)) {
+          setPreviewVerse({
+            book: selectedBook,
+            chapter: selectedChapter,
+            verse_start: nextVerse.verse,
+            verse_end: 0
+          });
+        }
+      }
+    }
+  }, [liveState.current_verse, chapterVerses, selectedBook, selectedChapter]);
 
   useEffect(() => {
     (async () => {
@@ -1021,15 +1100,31 @@ export default function App() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Chapter</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={selectedChapter}
-                          onChange={(e) => setSelectedChapter(Math.max(1, Math.min(150, Number(e.target.value) || 1)))}
-                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                        />
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 px-1">Chapter</label>
+                          <div className="flex items-center gap-1 mt-1 bg-white/5 border border-white/5 rounded-xl px-1">
+                            <button 
+                              onClick={handlePrevChapter}
+                              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                            >
+                              <ChevronLeft size={16} />
+                            </button>
+                            <input
+                              type="number"
+                              min={1}
+                              value={selectedChapter}
+                              onChange={(e) => setSelectedChapter(Math.max(1, Math.min(150, Number(e.target.value) || 1)))}
+                              className="w-12 bg-transparent text-center py-2 text-sm text-white focus:outline-none"
+                            />
+                            <button 
+                              onClick={handleNextChapter}
+                              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                            >
+                              <ChevronRight size={16} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex items-end justify-end">
                         <button
@@ -1043,17 +1138,75 @@ export default function App() {
                             }
                             setSelectedChapter(Number(selectedChapter));
                           }}
-                          className="px-4 py-2 bg-emerald-500 text-black rounded-lg font-semibold hover:bg-emerald-400 transition-colors"
+                          className="px-6 py-2.5 bg-emerald-500 text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-95"
                         >
-                          Go
+                          Fetch
                         </button>
                       </div>
                     </div>
 
-                    <div className="space-y-3 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 shadow-sm">
-                      <h3 className="text-(--accent-color) font-semibold text-base">{selectedBook} {selectedChapter} <span className="text-gray-400 text-xs">({settings.bibleVersion})</span></h3>
-                      <div className="mt-2 max-h-[250px] overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-gray-200 font-serif">
-                        {chapterText}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between px-1">
+                         <h3 className="text-(--accent-color) font-black text-[10px] uppercase tracking-[0.2em]">{selectedBook} {selectedChapter}</h3>
+                         <span className="text-[8px] font-bold text-gray-500 uppercase">({settings.bibleVersion})</span>
+                      </div>
+                      
+                      <div 
+                        ref={bibleScrollRef}
+                        className="space-y-2 max-h-[45vh] overflow-y-auto no-scrollbar pb-10 pr-1"
+                      >
+                        {chapterVerses.length > 0 ? (
+                          chapterVerses.map((v) => {
+                            const isLive = liveState.current_verse?.book === selectedBook && 
+                                           liveState.current_verse?.chapter === selectedChapter && 
+                                           liveState.current_verse?.verse_start === v.verse;
+                            const isPreview = liveState.preview_verse?.book === selectedBook && 
+                                              liveState.preview_verse?.chapter === selectedChapter && 
+                                              v.verse >= (liveState.preview_verse?.verse_start || 0) && 
+                                              v.verse <= (liveState.preview_verse?.verse_end || liveState.preview_verse?.verse_start || 0);
+
+                            return (
+                              <button 
+                                key={v.verse}
+                                data-active={isPreview || isLive}
+                                onClick={(e) => {
+                                  if (e.shiftKey && selectionStart !== null) {
+                                    const min = Math.min(selectionStart, v.verse);
+                                    const max = Math.max(selectionStart, v.verse);
+                                    setPreviewVerse({ book: selectedBook, chapter: selectedChapter, verse_start: min, verse_end: max });
+                                  } else {
+                                    setSelectionStart(v.verse);
+                                    setPreviewVerse({
+                                      book: selectedBook, chapter: selectedChapter, verse_start: v.verse,
+                                      verse_end: 0
+                                    });
+                                  }
+                                }}
+                                onDoubleClick={() => {
+                                  if (selectionStart === v.verse) {
+                                     goLive();
+                                  }
+                                }}
+                                className={`w-full text-left p-3 rounded-xl border transition-all duration-300 group
+                                  ${isLive 
+                                    ? 'bg-(--accent-color)/10 border-(--accent-color) shadow-lg' 
+                                    : isPreview 
+                                      ? 'bg-white/5 border-(--accent-color)/40' 
+                                      : 'bg-transparent border-white/5 hover:border-white/20'}`}
+                              >
+                                <div className="flex gap-3">
+                                   <span className={`text-[10px] font-black italic shrink-0 mt-0.5 ${isLive ? 'text-(--accent-color)' : 'text-gray-600'}`}>{v.verse}</span>
+                                   <p className={`text-[13px] leading-relaxed transition-colors ${isLive ? 'text-white' : 'text-gray-400 group-hover:text-gray-200'}`}>{v.text}</p>
+                                </div>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="text-center py-12 bg-white/1 rounded-2xl border border-dashed border-white/5">
+                            <RefreshCw size={24} className="mx-auto text-gray-600 opacity-20 mb-2 animate-spin-slow" />
+                            <p className="text-gray-500 text-[10px] uppercase tracking-widest italic">Verse data unavailable</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {displayVersePreview && settings.detectVerses ? (
