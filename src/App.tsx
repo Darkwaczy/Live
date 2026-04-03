@@ -93,6 +93,7 @@ export default function App() {
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isProjector, setProjector] = useState(false);
+  const [projectionRole, setProjectionRole] = useState<'audience' | 'stage'>('audience');
   const [manualLineOffset, setManualLineOffset] = useState(0);
 
   // Global Settings State
@@ -745,32 +746,9 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-1 bg-(--bg-secondary)/80 p-0.5 rounded-lg border border-(--border-color)">
-              {/* <button 
-                onClick={() => setTimerSession(prev => ({ ...prev, isRunning: !prev.isRunning }))}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${timerSession.isRunning ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'}`}
-                title={timerSession.isRunning ? "Pause Stage Timer" : "Start Stage Timer"}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${timerSession.isRunning ? 'bg-red-400 animate-pulse' : 'bg-gray-500'}`}></div>
-                Timer
-              </button>
-              <button 
-                onClick={() => setTimerSession(prev => ({ ...prev, remaining: (settings.timerDuration || 45) * 60, isRunning: false }))}
-                className="p-1.5 text-gray-500 hover:text-white transition-colors"
-                title="Reset Timer"
-              >
-                <X size={12} />
-              </button> */}
-
               <button onClick={isListening ? stop : start} className={`p-2 hover:bg-white/10 rounded-md transition-colors text-(--accent-color)`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
                 {isListening ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
-              {/* <button 
-                onClick={() => { handlePrev(); showToast('Skipped back one line'); }} 
-                className="p-2 hover:bg-white/10 text-white rounded-md transition-colors"
-                title="Previous Lyric/Item"
-              >
-                <SkipBack size={18} fill="currentColor" />
-              </button> */}
               
               <div className="w-px h-5 bg-white/10 mx-1 mr-4"></div>
               
@@ -838,20 +816,25 @@ export default function App() {
                 <FileText size={16} /> Notes
                 {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
-              <button 
-                onClick={() => { setRightPanelTab('broadcast'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'broadcast' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
-                <Radio size={16} /> Broadcast
-                {rightPanelTab === 'broadcast' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
-              </button>
             </nav>
 
             <div className="w-px h-6 bg-gray-700/50 mx-2 hidden lg:block"></div>
 
             <div className="flex items-center gap-4 text-gray-400">
-              <button onClick={() => setActiveView('settings')} className={`p-2 transition-colors ${activeView === 'settings' ? 'text-white bg-white/10 rounded-lg' : 'hover:text-white'}`}><Settings size={20} /></button>
-              <button onClick={() => setProjector(true)} title="Cast to Projector" className="p-2 hover:text-white transition-colors"><Cast size={20} /></button>
-              <button onClick={() => setProjector(true)} title="Open Fullscreen Monitor" className="p-2 hover:text-white transition-colors"><Monitor size={20} /></button>
+              <button 
+                onClick={() => { setRightPanelTab('broadcast'); setIsRightPanelOpen(true); }} 
+                className={`p-2 transition-colors ${rightPanelTab === 'broadcast' && isRightPanelOpen ? 'text-(--accent-color) bg-white/10 rounded-lg' : 'hover:text-white'}`}
+                title="Broadcast Controls"
+              >
+                <Radio size={20} className={rightPanelTab === 'broadcast' && isRightPanelOpen ? 'animate-pulse' : ''} />
+              </button>
+              <button 
+                onClick={() => setProjector(true)} 
+                title="Open Projector View" 
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
+              >
+                <Monitor size={20} />
+              </button>
             </div>
           </div>
         </header>
@@ -1068,14 +1051,22 @@ export default function App() {
                             </div>
                           )}
 
-                         {/* MIRROR TICKER */}
-                         {liveState.ticker_enabled && liveState.ticker_items && liveState.ticker_items.length > 0 && (
-                           <div className="absolute bottom-0 left-0 right-0 h-6 bg-red-600/20 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-10">
-                              <div className="flex whitespace-nowrap animate-marquee-fast py-1 px-4 text-[9px] font-bold text-white/80 uppercase tracking-widest">
-                                 {liveState.ticker_items.join(' • ')} • {liveState.ticker_items.join(' • ')}
-                              </div>
-                           </div>
-                         )}
+                          {liveState.ticker_enabled && (liveState.ticker_items?.length ?? 0) > 0 && (
+                            <div className="absolute bottom-0 left-0 right-0 h-10 bg-red-600/40 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-10 transition-colors">
+                               <div className="animate-marquee h-full flex items-center">
+                                  <div className="flex shrink-0">
+                                     {(liveState.ticker_items || []).map((item, i) => (
+                                       <span key={i} className="px-10 text-[11px] font-black text-white/90 uppercase tracking-widest whitespace-nowrap">{item} <span className="text-red-500/50 mx-4">•</span></span>
+                                     ))}
+                                  </div>
+                                  <div className="flex shrink-0">
+                                     {(liveState.ticker_items || []).map((item, i) => (
+                                       <span key={`dup-${i}`} className="px-10 text-[11px] font-black text-white/90 uppercase tracking-widest whitespace-nowrap">{item} <span className="text-red-500/50 mx-4">•</span></span>
+                                     ))}
+                                  </div>
+                               </div>
+                            </div>
+                          )}
                       </div>
                     </div>
                  </div>
@@ -1406,12 +1397,12 @@ export default function App() {
                       <div className="shrink-0 bg-(--bg-secondary) p-5 rounded-xl border border-(--accent-color)/30 shadow-sm animate-in fade-in transition-colors mb-2">
                         <div className="flex items-start justify-between mb-3">
                             <h3 className="text-(--accent-color) font-semibold text-lg tracking-tight">{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
-                            <button 
-                              onClick={goLive}
-                              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_rgba(16,185,129,0.6)] active:scale-95"
-                            >
-                              AIR
-                            </button>
+                             <button 
+                               onClick={goLive}
+                               className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_rgba(16,185,129,0.6)] active:scale-95"
+                             >
+                               AIR
+                             </button>
                         </div>
                         <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVersePreview.text}</p>
                       </div>
@@ -1625,7 +1616,7 @@ export default function App() {
 
       {/* Full Screen Projector Mode (Redesigned for Premium Cinematic Experience) */}
       {isProjector && (
-        <div className="fixed inset-0 bg-black z-100 flex flex-col items-center justify-center p-12 overflow-hidden animate-in fade-in duration-700">
+        <div className="fixed inset-0 bg-black z-100 flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-700">
           
           {/* ATMOSPHERIC BACKGROUND OVERLAY */}
           <div 
@@ -1637,15 +1628,32 @@ export default function App() {
           />
           <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-black opacity-60" />
 
-          {/* ESCAPE BUTTON */}
-          <button 
-            onClick={() => setProjector(false)}
-            className="absolute top-8 right-8 text-white/5 hover:text-white/40 p-2 transition-all z-150 border border-white/5 rounded-full"
-          >
-            <X size={20} />
-          </button>
+          {/* ESCAPE BUTTON & ROLE SWITCHER */}
+          <div className="absolute top-8 right-8 flex items-center gap-4 z-150">
+            <div className="flex bg-black/40 rounded-full p-1 border border-white/5 opacity-0 hover:opacity-100 transition-opacity">
+               <button 
+                 onClick={() => setProjectionRole('audience')}
+                 className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${projectionRole === 'audience' ? 'bg-emerald-500 text-black' : 'text-gray-500 hover:text-white'}`}
+               >
+                 Audience
+               </button>
+               <button 
+                 onClick={() => setProjectionRole('stage')}
+                 className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${projectionRole === 'stage' ? 'bg-blue-500 text-black' : 'text-gray-500 hover:text-white'}`}
+               >
+                 Stage
+               </button>
+            </div>
+            
+            <button 
+              onClick={() => setProjector(false)}
+              className="text-white/5 hover:text-white/40 p-2 transition-all border border-white/5 rounded-full"
+            >
+              <X size={20} />
+            </button>
+          </div>
           
-          <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[70vh] mb-24' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 transition-all duration-700`}>
+          <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[70vh] mb-24' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 transition-all duration-700 p-12`}>
             
             {/* LYRICS OVERLAY (Karaoke Mode) */}
             {settings.showLyrics && settings.detectSongs && mainLyric && (
@@ -1666,31 +1674,33 @@ export default function App() {
               <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
                 
                 {/* PRIMARY BIBLE CARD */}
-                <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden group">
-                   <div className="absolute inset-0 bg-linear-to-br from-white/5 via-transparent to-transparent opacity-30" />
+                <div className={`glass-panel w-full ${projectionRole === 'stage' ? 'p-12' : 'p-16'} bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden group`}>
+                   <div className="absolute inset-0 bg-linear-to-br from-white/10 via-transparent to-transparent opacity-30" />
                    
-                   <div className="relative space-y-12">
+                   <div className={`relative ${projectionRole === 'stage' ? 'space-y-8' : 'space-y-12'}`}>
                       <div className="flex flex-col items-center gap-4">
-                         <h2 className="text-(--accent-color) text-5xl font-black tracking-[0.2em] uppercase drop-shadow-glow">
+                         <h2 className={`${projectionRole === 'stage' ? 'text-4xl' : 'text-5xl'} text-(--accent-color) font-black tracking-widest uppercase drop-shadow-glow`}>
                             {displayVerseLive.reference} 
                             <span className="opacity-40 text-2xl font-light ml-4 tracking-normal">({settings.bibleVersion})</span>
                          </h2>
-                         <div className="h-1 w-24 rounded-full bg-(--accent-color) opacity-50"></div>
+                         <div className="h-1.5 w-24 rounded-full bg-(--accent-color) opacity-60"></div>
                       </div>
 
-                      <p className="text-white text-[72px] leading-[1.1] font-serif font-semibold tracking-tight max-w-5xl mx-auto drop-shadow-2xl selection:bg-emerald-500/30">
+                      <p className={`text-white ${projectionRole === 'stage' ? 'text-5xl' : 'text-6xl'} leading-[1.1] font-serif font-bold tracking-tight max-w-5xl mx-auto drop-shadow-2xl selection:bg-emerald-500/30 overflow-y-auto max-h-[60vh] no-scrollbar`}>
                          "{displayVerseLive.text}"
                       </p>
 
-                      {/* SECONDARY TRANSLATION (Subtle stack) */}
-                      {secondaryFetchedVerse && (
-                        <div className="pt-12 border-t border-white/10 space-y-4">
-                           <h3 className="text-emerald-500/70 text-2xl font-bold tracking-[0.15em] uppercase italic">
-                              {settings.secondaryBibleVersion}
-                           </h3>
-                           <p className="text-white/60 text-[38px] leading-[1.2] font-serif italic tracking-tight font-medium">
-                              {secondaryFetchedVerse.text}
-                           </p>
+                      {/* STAGE-ONLY NOTES */}
+                      {projectionRole === 'stage' && notes.length > 0 && (
+                        <div className="mt-8 pt-8 border-t border-white/10 text-left">
+                           <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-4">Pastor's Private Notes</h4>
+                           <div className="grid grid-cols-2 gap-4">
+                              {notes.slice(-2).map((n, i) => (
+                                <div key={i} className="bg-white/5 p-4 rounded-2xl border border-white/5 text-sm text-gray-300 italic">
+                                   {n.content}
+                                </div>
+                              ))}
+                           </div>
                         </div>
                       )}
                    </div>
@@ -1715,47 +1725,62 @@ export default function App() {
               </div>
             )}
 
-            {/* STICKY STAGE TIMER */}
-            {settings.autoShowTimer && (
-              <div className="absolute bottom-32 right-0 glass-panel px-10 py-5 bg-black/60 border border-white/10 rounded-l-3xl flex items-center gap-6 animate-in fade-in slide-in-from-right-8 duration-700 shadow-2xl z-120">
-                 <Activity size={32} className="text-emerald-400 animate-pulse" />
-                 <span className="text-white text-6xl font-mono font-black tracking-tighter tabular-nums drop-shadow-glow">
-                    {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
-                 </span>
-              </div>
-            )}
-
-            {/* LIVE NEWS TICKER (Infinite Scroll) */}
-            {liveState.ticker_enabled && (liveState.ticker_items || []).length > 0 && (
-              <div className="absolute bottom-0 left-0 right-0 h-24 bg-black/80 backdrop-blur-3xl border-t-4 border-emerald-500/50 flex items-center overflow-hidden z-130 group">
-                 {/* LABEL TAG */}
-                 <div className="h-full bg-emerald-500 px-10 flex items-center justify-center shadow-[20px_0_40px_rgba(0,0,0,0.4)] z-140 relative">
-                    <span className="text-black text-2xl font-black uppercase tracking-[0.2em] animate-pulse">Live</span>
-                 </div>
-                 
-                 {/* SCROLLING CONTENT */}
-                 <div className="flex-1 whitespace-nowrap flex items-center">
-                    <div className="animate-marquee inline-block">
-                       {liveState.ticker_items?.map((item, i) => (
-                         <span key={i} className="inline-flex items-center text-white text-4xl font-bold font-serif uppercase tracking-wider px-12 group-hover:text-emerald-300 transition-colors">
-                            {item}
-                            <span className="mx-12 text-emerald-500/30 text-5xl">•</span>
-                         </span>
-                       ))}
-                    </div>
-                    {/* Double it for infinite loop appearance */}
-                    <div className="animate-marquee inline-block">
-                       {liveState.ticker_items?.map((item, i) => (
-                         <span key={`dup-${i}`} className="inline-flex items-center text-white text-4xl font-bold font-serif uppercase tracking-wider px-12 group-hover:text-emerald-300 transition-colors">
-                            {item}
-                            <span className="mx-12 text-emerald-500/30 text-5xl">•</span>
-                         </span>
-                       ))}
-                    </div>
-                 </div>
-              </div>
+            {/* STAGE ONLY ELEMENTS (Timer, Metadata) */}
+            {projectionRole === 'stage' && (
+              <>
+                 {settings.autoShowTimer && (
+                  <div className="absolute top-32 right-0 glass-panel px-10 py-5 bg-black/60 border border-white/10 rounded-l-3xl flex items-center gap-6 animate-in fade-in slide-in-from-right-8 duration-700 shadow-2xl z-120">
+                     <Activity size={32} className="text-emerald-400 animate-pulse" />
+                     <span className="text-white text-6xl font-mono font-black tracking-tighter tabular-nums drop-shadow-glow">
+                        {Math.floor(timerSession.remaining / 60)}:{String(timerSession.remaining % 60).padStart(2, '0')}
+                     </span>
+                  </div>
+                )}
+                
+                {/* NEXT VERSE PREVIEW (Stage Only) */}
+                {liveState.preview_verse && (
+                   <div className="absolute top-32 left-10 text-left space-y-2 animate-in fade-in slide-in-from-left-8 duration-700">
+                      <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.4em]">Staged Next</span>
+                      <h4 className="text-emerald-500 text-3xl font-bold font-serif italic">
+                         {liveState.preview_verse.book} {liveState.preview_verse.chapter}:{liveState.preview_verse.verse_start}
+                      </h4>
+                   </div>
+                )}
+              </>
             )}
           </div>
+          
+          {/* PROJECTOR NEWS TICKER (Broadcast Mode) - Pinned to absolute bottom with maximum z-index layer */}
+          {liveState.ticker_enabled && (liveState.ticker_items?.length ?? 0) > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-red-600 border-t-8 border-red-800 flex items-center overflow-hidden z-250 shadow-[0_-20px_50px_rgba(220,38,38,0.4)]">
+               {/* BRAND LABEL (High Urgency) */}
+               <div className="h-full bg-black px-14 flex items-center justify-center shadow-2xl z-260 shrink-0 border-r-4 border-red-800">
+                  <span className="text-white text-5xl font-black uppercase tracking-[0.2em] animate-pulse">LIVE</span>
+               </div>
+               
+               {/* INFINITE SCROLLING CORE */}
+               <div className="flex-1 overflow-hidden h-full">
+                  <div className="animate-marquee h-full flex items-center whitespace-nowrap">
+                     <div className="flex shrink-0">
+                        {(liveState.ticker_items || []).map((item, i) => (
+                          <span key={i} className="inline-flex items-center text-white text-[72px] leading-none font-black uppercase tracking-tighter px-24 whitespace-nowrap drop-shadow-2xl">
+                             {item}
+                             <span className="mx-24 text-white/30 text-8xl font-thin">•</span>
+                          </span>
+                        ))}
+                     </div>
+                     <div className="flex shrink-0">
+                        {(liveState.ticker_items || []).map((item, i) => (
+                          <span key={`dup-${i}`} className="inline-flex items-center text-white text-[72px] leading-none font-black uppercase tracking-tighter px-24 whitespace-nowrap drop-shadow-2xl">
+                             {item}
+                             <span className="mx-24 text-white/30 text-8xl font-thin">•</span>
+                          </span>
+                        ))}
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
         </div>
       )}
     </div>

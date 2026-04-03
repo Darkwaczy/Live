@@ -303,9 +303,7 @@ export function useLiveState(
       current_text: '', 
       current_verse: null,
       current_song_id: null,
-      preview_text: '',
-      preview_verse: null,
-      is_live_dirty: false,
+      is_live_dirty: !!(prev.preview_text || prev.preview_verse), 
       is_blank: false,
       is_logo: false,
       updated_at: new Date().toISOString() 
@@ -315,11 +313,12 @@ export function useLiveState(
   const goLive = useCallback(() => {
     setLiveState(prev => {
       const newHistory = [...(prev.history || [])];
+      
       if (prev.preview_verse) {
         newHistory.push({
           type: 'scripture',
           content: '', 
-          reference: `${prev.preview_verse.book} ${prev.preview_verse.chapter}:${prev.preview_verse.verse_start}`,
+          reference: `${prev.preview_verse.book} ${prev.preview_verse.chapter}:${prev.preview_verse.verse_start}${prev.preview_verse.verse_end && prev.preview_verse.verse_end !== prev.preview_verse.verse_start ? `-${prev.preview_verse.verse_end}` : ''}`,
           timestamp: new Date().toISOString()
         });
       } else if (prev.preview_text && prev.preview_text !== prev.current_text) {
@@ -346,7 +345,7 @@ export function useLiveState(
         current_verse: prev.preview_verse,
         preview_verse: nextPreviewVerse,
         is_live_dirty: true,
-        history: newHistory,
+        history: newHistory.slice(-200),
         updated_at: new Date().toISOString()
       } as any;
     });
