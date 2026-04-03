@@ -89,6 +89,12 @@ export default function App() {
 
   // UI Interactive States
   const [activeView, setActiveView] = useState<ViewMode>('live');
+  const [resourceAssets, setResourceAssets] = useState<any[]>([
+    { id: 'mission', type: 'note', title: 'Mission Statement', content: 'OUR MISSION: To spread the message of love and grace to our local community.', icon: <Activity size={24} />, category: 'Mission' },
+    { id: 'confession', type: 'note', title: 'Faith Confession', content: 'WE BELIEVE: In the power of prayer, the truth of the Word, and the presence of the Holy Spirit.', icon: <Heart size={24} />, category: 'Faith' },
+    { id: 'communion', type: 'scripture', title: 'Communion Script', reference: '1 Corinthians 11:24', detail: 'And when he had given thanks, he broke it...', icon: <BookOpen size={24} />, category: 'Communion' }
+  ]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('notes');
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -491,8 +497,9 @@ export default function App() {
 
   const handleSaveNote = async () => {
     if (!newNote.trim()) return;
+    const safeId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
     const noteObj: Note = {
-      id: Date.now().toString(),
+      id: safeId,
       user_id: user?.id || 'guest',
       session_id: session.id,
       content: newNote,
@@ -504,17 +511,51 @@ export default function App() {
     setNewNote('');
     
     try {
-      await saveNote(noteObj);
-    } catch (err) {
-      console.error('Unable to persist note to Supabase DB', err);
-      try {
-        if (window.sermonSync?.db?.saveNote) {
-          await window.sermonSync.db.saveNote(noteObj);
-        }
-      } catch (localErr) {
-        console.error('Unable to persist note to local DB fallback', localErr);
+      if (window.sermonSync?.db?.saveNote) {
+        await window.sermonSync.db.saveNote(noteObj);
+      } else {
+         await saveNote(noteObj);
       }
+    } catch (err) {
+      console.error('Note persistence error', err);
     }
+  };
+
+  const handleResourceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    const isVideo = file.type.startsWith('video/');
+    
+    const newAsset = {
+      id: Math.random().toString(36).substring(7),
+      type: 'media',
+      mediaType: isVideo ? 'video' : 'image',
+      title: file.name.split('.')[0],
+      url: url,
+      icon: isVideo ? <Play size={18} /> : <Search size={18} />,
+      category: 'Uploads'
+    };
+    
+    setResourceAssets(prev => [newAsset, ...prev]);
+    showToast(`Uploaded: ${file.name}`);
+  };
+
+  const handleNewPoint = () => {
+     const title = prompt("Enter Point Title:");
+     const content = prompt("Enter Sermon Point Content:");
+     if (!title || !content) return;
+     
+     const newAsset = {
+        id: Math.random().toString(36).substring(7),
+        type: 'note',
+        title: title,
+        content: content,
+        icon: <FileText size={18} />,
+        category: 'Custom'
+     };
+     setResourceAssets(prev => [newAsset, ...prev]);
   };
 
   const showToast = (msg: string) => {
@@ -1194,81 +1235,94 @@ export default function App() {
                 <div className="flex items-center justify-between mb-8">
                    <div className="space-y-1">
                       <h2 className="text-3xl text-white font-black uppercase tracking-widest">Sermon Resources</h2>
-                      <p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Ready-to-Air Assets • Mission & Prayer</p>
+                      <p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Ready-to-Air Assets • Mission & Multi-Media</p>
                    </div>
                    <div className="flex gap-3">
-                      <button className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                        Upload PDF
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleResourceUpload} 
+                        style={{ display: 'none' }} 
+                        accept="image/*,video/*"
+                      />
+                      <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        Upload Asset
                       </button>
-                      <button className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95">
+                      <button 
+                        onClick={handleNewPoint}
+                        className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                      >
                         New Point
                       </button>
                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto no-scrollbar pb-10">
-                   {/* RESOURCE: MISSION STATEMENT */}
-                   <div className="group p-8 bg-white/3 hover:bg-white/5 border border-emerald-500/10 hover:border-emerald-500/40 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square">
-                      <div className="space-y-4">
-                         <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-500 shadow-lg">
-                            <Activity size={24} />
-                         </div>
-                         <h3 className="text-xl font-bold text-white tracking-tight">Mission Statement</h3>
-                         <p className="text-gray-400 text-sm leading-relaxed italic">"To spread the message of love and grace to our local community through service and truth."</p>
-                      </div>
-                      <button 
-                        onClick={() => {
-                           setLiveState(prev => ({ ...prev, preview_text: "OUR MISSION: To spread the message of love and grace to our community." }));
-                           setActiveView('live');
-                           showToast("Staged Mission Statement");
-                        }}
-                        className="w-full py-3.5 bg-white/5 group-hover:bg-emerald-500 group-hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                   {resourceAssets.map((asset, idx) => (
+                      <div 
+                        key={asset.id} 
+                        className={`group p-8 bg-white/3 hover:bg-white/5 border border-white/5 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square animate-in slide-in-from-bottom-4 duration-500`}
+                        style={{ animationDelay: `${idx * 50}ms` }}
                       >
-                         STAGE FOR AIR
-                      </button>
-                   </div>
+                         <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg 
+                                  ${asset.category === 'Mission' ? 'bg-emerald-500/20 text-emerald-500' : 
+                                    asset.category === 'Faith' ? 'bg-blue-500/20 text-blue-400' :
+                                    asset.category === 'Uploads' ? 'bg-red-500/20 text-red-500' :
+                                    'bg-amber-500/20 text-amber-500'}`}>
+                                  {asset.icon}
+                               </div>
+                               <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">{asset.category}</span>
+                            </div>
+                            
+                            <h3 className="text-xl font-bold text-white tracking-tight">{asset.title}</h3>
+                            
+                            {(asset.type === 'note' || asset.type === 'media') && (
+                              <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-3">
+                                {asset.content || `Media: ${asset.title}`}
+                              </p>
+                            )}
 
-                   {/* RESOURCE: FAITH CONFESSION */}
-                   <div className="group p-8 bg-white/3 hover:bg-white/5 border border-blue-500/10 hover:border-blue-500/40 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square">
-                      <div className="space-y-4">
-                         <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
-                            <Heart size={24} />
-                         </div>
-                         <h3 className="text-xl font-bold text-white tracking-tight">Faith Confession</h3>
-                         <p className="text-gray-400 text-sm leading-relaxed italic">"We believe in the power of prayer, the truth of the Word, and the presence of the Holy Spirit."</p>
-                      </div>
-                      <button 
-                        onClick={() => {
-                           setLiveState(prev => ({ ...prev, preview_text: "WE BELIEVE: In the power of prayer, the truth of the Word, and the presence of the Holy Spirit." }));
-                           setActiveView('live');
-                           showToast("Staged Confession");
-                        }}
-                        className="w-full py-3.5 bg-white/5 group-hover:bg-blue-600 group-hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
-                      >
-                         STAGE FOR AIR
-                      </button>
-                   </div>
+                            {asset.type === 'scripture' && (
+                               <div className="p-4 bg-white/2 rounded-2xl border border-white/5 italic text-gray-400 text-sm">
+                                  {asset.reference}: {asset.detail}
+                               </div>
+                            )}
 
-                   {/* RESOURCE: COMMUNION VERSE */}
-                   <div className="group p-8 bg-white/3 hover:bg-white/5 border border-amber-500/10 hover:border-amber-500/40 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square">
-                      <div className="space-y-4">
-                         <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500 shadow-lg">
-                            <BookOpen size={24} />
+                            {asset.type === 'media' && asset.url && (
+                               <div className="mt-2 w-full h-24 rounded-xl overflow-hidden border border-white/5 bg-black">
+                                  {asset.mediaType === 'video' ? (
+                                     <video src={asset.url} className="w-full h-full object-cover" />
+                                  ) : (
+                                     <img src={asset.url} className="w-full h-full object-cover" />
+                                  )}
+                               </div>
+                            )}
                          </div>
-                         <h3 className="text-xl font-bold text-white tracking-tight">Communion Script</h3>
-                         <p className="text-gray-400 text-sm leading-relaxed italic">"1 Corinthians 11:24 - And when he had given thanks, he broke it and said..."</p>
+
+                         <button 
+                           onClick={() => {
+                              if (asset.type === 'media') {
+                                 setLiveState(prev => ({ ...prev, preview_media: asset.url }));
+                                 showToast(`Staged Media: ${asset.title}`);
+                              } else if (asset.type === 'scripture') {
+                                 const parts = asset.reference.match(/^(.+)\s+(\d+):(\d+)/);
+                                 if (parts) setPreviewVerse({ book: parts[1], chapter: parseInt(parts[2]), verse_start: parseInt(parts[3]), verse_end: parseInt(parts[3]) });
+                              } else {
+                                 setLiveState(prev => ({ ...prev, preview_text: asset.content }));
+                              }
+                              setActiveView('live');
+                           }}
+                           className="w-full py-3.5 bg-white/5 group-hover:bg-(--accent-color) group-hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                         >
+                            STAGE FOR AIR
+                         </button>
                       </div>
-                      <button 
-                        onClick={() => {
-                           setPreviewVerse({ book: "1 Corinthians", chapter: 11, verse_start: 24, verse_end: 24 });
-                           setActiveView('live');
-                           showToast("Staged 1 Cor 11:24");
-                        }}
-                        className="w-full py-3.5 bg-white/5 group-hover:bg-amber-500 group-hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
-                      >
-                         STAGE SCRIPTURE
-                      </button>
-                   </div>
+                   ))}
                 </div>
               </div>
             ) : activeView === 'settings' ? (
@@ -1793,6 +1847,30 @@ export default function App() {
              }} 
           />
           <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-black opacity-60" />
+
+          {/* MEDIA OVERLAY (Offering Images, Slide Decks, Videos) */}
+          {liveState.current_media && (
+             <div className="absolute inset-0 z-50 flex items-center justify-center p-12 animate-in zoom-in-95 duration-1000 bg-black/40">
+                <div className="relative w-full h-full max-w-6xl max-h-[85vh] rounded-[48px] overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5">
+                   {liveState.current_media.match(/\.(mp4|webm|ogg)$/i) ? (
+                      <video 
+                        src={liveState.current_media} 
+                        autoPlay 
+                        loop 
+                        className="w-full h-full object-contain"
+                      />
+                   ) : (
+                      <img 
+                        src={liveState.current_media} 
+                        alt="Current Broadcast Media" 
+                        className="w-full h-full object-contain"
+                      />
+                   )}
+                   {/* Cinematic Gradient Overlays for Media */}
+                   <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-40"></div>
+                </div>
+             </div>
+          )}
 
           {/* ESCAPE BUTTON & ROLE SWITCHER */}
           <div className="absolute top-8 right-8 flex items-center gap-4 z-150">

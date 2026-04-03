@@ -22,6 +22,8 @@ export interface LiveState {
   current_line?: number;
   preview_text?: string;
   preview_verse?: BibleVerse | null;
+  preview_media?: string | null;  // URL for staged images/videos
+  current_media?: string | null;  // URL for airing images/videos
   is_live_dirty: boolean;
   is_analyzing: boolean;
   detection_history: Array<{
@@ -32,7 +34,7 @@ export interface LiveState {
     is_paraphrase?: boolean;
   }>;
   history: LiveHistoryItem[];
-  content_type?: 'scripture' | 'lyrics' | 'notes';
+  content_type?: 'scripture' | 'lyrics' | 'notes' | 'media';
   ticker_items?: string[];
   ticker_enabled?: boolean;
   is_blank?: boolean;
