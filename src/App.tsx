@@ -133,6 +133,7 @@ export default function App() {
     timerDuration: 45,
     autoShowTimer: false,
     projectorBg: '/worship-bg.png', // obsidian/emerald
+    churchLogo: '/logo-placeholder.png', // Default church logo
     theme: 'obsidian',
   });
 
@@ -162,7 +163,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, setPreviewVerse, setSecondaryVerse, removeDetection, setLiveState
+    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, setPreviewVerse, setSecondaryVerse, removeDetection, setBlank, setLogo, setLiveState
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -754,22 +755,42 @@ export default function App() {
                 <SkipBack size={18} fill="currentColor" />
               </button>
               
-              {(() => {
-                 const isLive = (liveState.current_verse && liveState.preview_verse && liveState.current_verse.book === liveState.preview_verse.book && liveState.current_verse.chapter === liveState.preview_verse.chapter && liveState.current_verse.verse_start === liveState.preview_verse.verse_start) || 
-                                (mainLyric && airedLyric && mainLyric === airedLyric);
-                 
-                 return (
-                   <button 
-                     onClick={isLive ? clearText : goLive}
-                     className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-xs tracking-wider uppercase transition-all ml-2
-                       ${isLive ? 'bg-white/10 text-gray-400 hover:bg-white/20' : 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)] animate-pulse'}`}
-                     title={isLive ? "Clear Currently Airing Text" : "Send Screen to Air!"}
-                   >
-                     {isLive ? <X size={14} /> : <SkipForward size={14} fill="currentColor" />}
-                     {isLive ? 'Clear Text' : 'Go Live (Air)'}
-                   </button>
-                 );
-              })()}
+              <div className="w-px h-5 bg-white/10 mx-1 mr-4"></div>
+              
+              {/* UNIVERSAL COMPACT HARWARE SWITCHER */}
+              <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/5 shadow-inner">
+                <button 
+                  onClick={clearText}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all text-gray-400 hover:text-white hover:bg-white/10"
+                  title="Clear Foreground Text"
+                >
+                  <X size={12} strokeWidth={3} /> Clear
+                </button>
+                
+                <button 
+                  onClick={() => setLogo(!liveState.is_logo)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all ${liveState.is_logo ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-blue-400 hover:bg-blue-500/10'}`}
+                  title="Show Church Logo"
+                >
+                  <LayoutGrid size={12} strokeWidth={2.5} /> Theme
+                </button>
+                
+                <button 
+                  onClick={() => setBlank(!liveState.is_blank)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all ${liveState.is_blank ? 'bg-gray-800 text-white shadow-lg border-gray-600' : 'text-gray-400 hover:text-white hover:bg-black border border-transparent hover:border-gray-600'}`}
+                  title="Pitch Black Out"
+                >
+                  <div className={`w-2.5 h-2.5 rounded-[2px] transition-colors ${liveState.is_blank ? 'bg-red-500 animate-pulse' : 'bg-black border border-gray-500'}`}></div> Blank
+                </button>
+              </div>
+
+              <button 
+                onClick={goLive}
+                className="flex items-center gap-1.5 px-6 py-2 rounded-lg font-bold text-xs tracking-wider uppercase transition-all bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] active:scale-95 ml-2"
+                title="Send Screen to Air!"
+              >
+                <SkipForward size={14} fill="currentColor" /> GO LIVE
+              </button>
             </div>
           </div>
 
@@ -965,6 +986,7 @@ export default function App() {
                      )}
                    </div>
 
+
                    {/* LIVE ON SCREEN & CLEAR BUTTON CONTAINER */}
                    <div className="flex-1 flex flex-col gap-3 min-w-0 h-full">
                       {/* LIVE ON SCREEN (Top Right - Landscape) */}
@@ -999,6 +1021,29 @@ export default function App() {
                             </div>
                           )}
 
+                          {/* MASTER OVERLAYS (BLANK / LOGO) */}
+                          {liveState.is_blank && (
+                            <div className="absolute inset-0 bg-black z-40 flex flex-col items-center justify-center animate-in fade-in transition-all">
+                               <div className="p-4 bg-red-600/20 border border-red-500/40 rounded-2xl flex flex-col items-center gap-2">
+                                  <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.8)]"></div>
+                                  <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.4em]">Projector Blanked</p>
+                               </div>
+                            </div>
+                          )}
+
+                          {liveState.is_logo && (
+                            <div className="absolute inset-0 bg-black z-40 flex flex-col items-center justify-center animate-in fade-in transition-all">
+                               {settings.churchLogo ? (
+                                 <img src={settings.churchLogo} alt="Church Logo" className="max-w-[40%] max-h-[40%] object-contain drop-shadow-2xl" />
+                               ) : (
+                                 <LayoutGrid size={64} className="text-blue-500/20" />
+                               )}
+                               <div className="absolute top-4 right-4 bg-blue-600/20 px-3 py-1 rounded-full border border-blue-500/30">
+                                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Logo Mode</p>
+                               </div>
+                            </div>
+                          )}
+
                          {/* MIRROR TICKER */}
                          {liveState.ticker_enabled && liveState.ticker_items && liveState.ticker_items.length > 0 && (
                            <div className="absolute bottom-0 left-0 right-0 h-6 bg-red-600/20 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-10">
@@ -1008,20 +1053,8 @@ export default function App() {
                            </div>
                          )}
                       </div>
-                      
-                      {/* DEDICATED CLEAR PROJECTOR BUTTON - Temporarily commented out
-                      <div className="w-full flex justify-end px-2 shrink-0">
-                          <button
-                            onClick={clearText}
-                            className="px-6 py-2 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-lg uppercase tracking-[0.2em] text-[10px] font-black tracking-widest transition-all border border-red-500/20 shadow-sm active:scale-95"
-                            title="Clears only the Projector Display"
-                          >
-                            Clear Live Screen
-                          </button>
-                      </div>
-                      */}
-                   </div>
-                </div>
+                    </div>
+                 </div>
                 {/* BOTTOM BLOCK: UNTOUCHED PLACEHOLDER */}
                 <div className="flex-1 bg-transparent border border-white/5 border-dashed rounded-3xl flex items-center justify-center relative group overflow-hidden">
                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02),transparent)] opacity-20" />
@@ -1164,6 +1197,48 @@ export default function App() {
                 {/* Scriptures Tab */}
                 {rightPanelTab === 'scriptures' && (
                   <div className="flex flex-col h-full overflow-hidden space-y-4">
+                    {/* QUICK-FIRE LAUNCHER */}
+                    <div className="shrink-0 mt-1">
+                       <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                           <Activity size={12} className="text-emerald-500 animate-pulse" />
+                           Quick-Fire Search
+                       </label>
+                       <div className="relative group">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500/50 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                          <input 
+                            type="text"
+                            placeholder="e.g. Gen 10:3, 1 John 3:16"
+                            className="w-full bg-[#1c1c1f] border border-emerald-500/30 rounded-xl pl-10 pr-4 py-3.5 text-sm text-white focus:border-emerald-500 outline-none transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)] focus:shadow-[0_0_25px_rgba(16,185,129,0.2)] font-mono font-bold"
+                            onKeyDown={(e) => {
+                               if (e.key === 'Enter') {
+                                  const val = (e.target as HTMLInputElement).value.trim();
+                                  const match = val.match(/^(\d?\s?[A-Za-z]+)\s+(\d+)[:\s](\d+)/);
+                                  if (match) {
+                                     const rawBook = match[1].toLowerCase().replace(/\s/g, '');
+                                     const chapter = parseInt(match[2], 10);
+                                     const verseNum = parseInt(match[3], 10);
+                                     
+                                     // Smart prefix matching (e.g. "1joh" -> "1 John", "gen" -> "Genesis")
+                                     const matchedBook = bibleBooks.find(b => b.toLowerCase().replace(/\s/g, '').startsWith(rawBook));
+                                     if (matchedBook) {
+                                        setSelectedBook(matchedBook);
+                                        setSelectedChapter(chapter);
+                                        
+                                        // Wait slightly for local chapter refetch, then queue preview
+                                        setTimeout(() => {
+                                           setPreviewVerse({ book: matchedBook, chapter: chapter, verse_start: verseNum, verse_end: verseNum });
+                                           // Clear input on success
+                                           (e.target as HTMLInputElement).value = '';
+                                        }, 400);
+                                     }
+                                  }
+                               }
+                            }}
+                          />
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-500 uppercase tracking-widest bg-white/5 px-2 py-1 rounded">ENTER</div>
+                       </div>
+                    </div>
+
                     <div className="shrink-0 grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-gray-400 uppercase tracking-wider">Bible Translation</label>

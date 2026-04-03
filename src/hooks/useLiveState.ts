@@ -29,6 +29,8 @@ export function useLiveState(
     is_analyzing: false,
     ticker_enabled: true,
     ticker_items: [],
+    is_blank: false,
+    is_logo: false,
     detection_history: [],
     history: [],
     updated_at: new Date().toISOString()
@@ -302,6 +304,8 @@ export function useLiveState(
       preview_text: '',
       preview_verse: null,
       is_live_dirty: false,
+      is_blank: false,
+      is_logo: false,
       updated_at: new Date().toISOString() 
     }));
   }, []);
@@ -383,6 +387,24 @@ export function useLiveState(
     }));
   }, []);
 
+  const setBlank = useCallback((blankValue: boolean) => {
+    setLiveState(prev => ({
+      ...prev,
+      is_blank: blankValue,
+      is_logo: blankValue ? false : prev.is_logo,
+      updated_at: new Date().toISOString()
+    }));
+  }, []);
+
+  const setLogo = useCallback((logoValue: boolean) => {
+    setLiveState(prev => ({
+      ...prev,
+      is_logo: logoValue,
+      is_blank: logoValue ? false : prev.is_blank,
+      updated_at: new Date().toISOString()
+    }));
+  }, []);
+
   return {
     liveState,
     interimText,
@@ -399,6 +421,8 @@ export function useLiveState(
     setPreviewVerse,
     setSecondaryVerse,
     removeDetection,
+    setBlank,
+    setLogo,
     setLiveState,
     speechStats,
     wordRate,

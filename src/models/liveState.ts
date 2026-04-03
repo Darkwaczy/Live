@@ -34,5 +34,7 @@ export interface LiveState {
   content_type?: 'scripture' | 'lyrics' | 'notes';
   ticker_items?: string[];
   ticker_enabled?: boolean;
+  is_blank?: boolean;
+  is_logo?: boolean;
   updated_at: string;
 }
