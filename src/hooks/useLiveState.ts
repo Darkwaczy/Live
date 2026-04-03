@@ -301,6 +301,8 @@ export function useLiveState(
     setLiveState(prev => ({ 
       ...prev, 
       current_text: '', 
+      current_verse: null,
+      current_song_id: null,
       preview_text: '',
       preview_verse: null,
       is_live_dirty: false,
