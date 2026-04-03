@@ -719,16 +719,16 @@ export default function App() {
         {/* Top Navbar */}
         <header className="h-[72px] flex items-center justify-between px-6 border-b border-(--border-color) bg-transparent z-10 shrink-0 transition-colors">
           <div className="flex items-center gap-6">
-            <button onClick={() => showToast('Burger menu clicked')} className="text-(--text-secondary) hover:text-(--text-primary) transition-colors">
+            {/* <button onClick={() => showToast('Burger menu clicked')} className="text-(--text-secondary) hover:text-(--text-primary) transition-colors">
               <Menu size={24} />
-            </button>
+            </button> */}
             <div className={`flex items-center gap-2 rounded-md px-2.5 py-1 transition-colors ${isOnline ? 'bg-emerald-500' : 'bg-gray-600'}`} title={isOnline ? "Connected to the Internet" : "Offline / Local Mode"}>
               <div className={`w-1.5 h-1.5 rounded-full bg-white ${isOnline ? 'animate-pulse' : ''}`}></div>
               <span className="text-[11px] font-bold text-white tracking-widest uppercase">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </div>
             
             <div className="flex items-center gap-1 bg-(--bg-secondary)/80 p-0.5 rounded-lg border border-(--border-color)">
-              <button 
+              {/* <button 
                 onClick={() => setTimerSession(prev => ({ ...prev, isRunning: !prev.isRunning }))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${timerSession.isRunning ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-white/5 text-gray-400 hover:text-white border border-white/5'}`}
                 title={timerSession.isRunning ? "Pause Stage Timer" : "Start Stage Timer"}
@@ -742,18 +742,18 @@ export default function App() {
                 title="Reset Timer"
               >
                 <X size={12} />
-              </button>
+              </button> */}
 
               <button onClick={isListening ? stop : start} className={`p-2 hover:bg-white/10 rounded-md transition-colors text-(--accent-color)`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
                 {isListening ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
-              <button 
+              {/* <button 
                 onClick={() => { handlePrev(); showToast('Skipped back one line'); }} 
                 className="p-2 hover:bg-white/10 text-white rounded-md transition-colors"
                 title="Previous Lyric/Item"
               >
                 <SkipBack size={18} fill="currentColor" />
-              </button>
+              </button> */}
               
               <div className="w-px h-5 bg-white/10 mx-1 mr-4"></div>
               
