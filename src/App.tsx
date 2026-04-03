@@ -3,7 +3,7 @@ import {
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
-  Activity, Radio, Search,
+  Activity, Radio, Search, Heart,
   ChevronLeft, RefreshCw
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
@@ -1106,21 +1106,187 @@ export default function App() {
                   </div>
                 )}
               </>
+            ) : activeView === 'history' ? (
+              <div className="flex-1 flex flex-col p-10 overflow-hidden bg-(--bg-primary) animate-in fade-in duration-500">
+                <div className="flex items-center justify-between mb-8">
+                   <div className="space-y-1">
+                      <h2 className="text-3xl text-white font-black uppercase tracking-widest">Aired History</h2>
+                      <p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Session Audit Log • {liveState.history.length} Events</p>
+                   </div>
+                   <button 
+                     onClick={() => setLiveState(prev => ({ ...prev, history: [] }))}
+                     className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                   >
+                     Clear History
+                   </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto no-scrollbar pr-4 -mr-4 space-y-4">
+                   {liveState.history.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center opacity-20 py-20 grayscale border-2 border-dashed border-white/5 rounded-[48px]">
+                         <Activity size={64} className="mb-6" />
+                         <p className="text-sm font-black uppercase tracking-[0.5em]">No history recorded yet</p>
+                         <p className="text-[10px] mt-2 italic opacity-60">Items will appear here after you click "GO LIVE"</p>
+                      </div>
+                   ) : (
+                      [...liveState.history].reverse().map((item, idx) => (
+                         <div 
+                           key={item.id || idx} 
+                           className="group flex items-center gap-6 p-6 bg-white/3 hover:bg-white/5 border border-white/5 hover:border-emerald-500/30 rounded-[32px] transition-all relative overflow-hidden animate-in slide-in-from-right-4 duration-300"
+                           style={{ animationDelay: `${idx * 50}ms` }}
+                         >
+                            {/* Type Icon */}
+                            <div className={`p-4 rounded-2xl shrink-0 shadow-lg ${
+                               item.type === 'scripture' ? 'bg-emerald-500/20 text-emerald-500' :
+                               item.type === 'lyrics' ? 'bg-blue-500/20 text-blue-400' :
+                               'bg-amber-500/20 text-amber-500'
+                            }`}>
+                               {item.type === 'scripture' ? <BookOpen size={24} /> :
+                                item.type === 'lyrics' ? <Music size={24} /> :
+                                <FileText size={24} />}
+                            </div>
+
+                            {/* Content Info */}
+                            <div className="flex-1 min-w-0 pr-10">
+                               <div className="flex items-center gap-3 mb-2">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">
+                                     {item.type}
+                                  </span>
+                                  <span className="w-1 h-1 rounded-full bg-white/10"></span>
+                                  <span className="text-[9px] font-mono text-gray-600 uppercase">
+                                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                  </span>
+                               </div>
+                               {item.reference && (
+                                  <h3 className="text-white font-black text-xl mb-1 tracking-tight drop-shadow-sm">{item.reference}</h3>
+                               )}
+                               <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-2 pr-4">{item.content || '(Content Captured)'}</p>
+                            </div>
+
+                            {/* Re-Air Button */}
+                            <button 
+                              onClick={() => {
+                                 if (item.type === 'scripture' && item.reference) {
+                                    // Parse reference to re-stage
+                                    const match = item.reference.match(/^(.+)\s+(\d+):(\d+)/);
+                                    if (match) {
+                                       setPreviewVerse({ book: match[1], chapter: parseInt(match[2]), verse_start: parseInt(match[3]), verse_end: parseInt(match[3]) });
+                                       setActiveView('live');
+                                       showToast(`Re-staged: ${item.reference}`);
+                                    }
+                                 } else if (item.content) {
+                                    setLiveState(prev => ({ ...prev, preview_text: item.content }));
+                                    setActiveView('live');
+                                    showToast("Re-staged Note");
+                                 }
+                              }}
+                              className="absolute right-6 opacity-0 group-hover:opacity-100 flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-full font-black text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95"
+                            >
+                               <Play size={12} fill="currentColor" /> RE-AIR
+                            </button>
+                         </div>
+                      ))
+                   )}
+                </div>
+              </div>
+            ) : activeView === 'documents' ? (
+              <div className="flex-1 flex flex-col p-10 overflow-hidden bg-(--bg-primary) animate-in fade-in duration-500">
+                <div className="flex items-center justify-between mb-8">
+                   <div className="space-y-1">
+                      <h2 className="text-3xl text-white font-black uppercase tracking-widest">Sermon Resources</h2>
+                      <p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Ready-to-Air Assets • Mission & Prayer</p>
+                   </div>
+                   <div className="flex gap-3">
+                      <button className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                        Upload PDF
+                      </button>
+                      <button className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95">
+                        New Point
+                      </button>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto no-scrollbar pb-10">
+                   {/* RESOURCE: MISSION STATEMENT */}
+                   <div className="group p-8 bg-white/3 hover:bg-white/5 border border-emerald-500/10 hover:border-emerald-500/40 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square">
+                      <div className="space-y-4">
+                         <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-500 shadow-lg">
+                            <Activity size={24} />
+                         </div>
+                         <h3 className="text-xl font-bold text-white tracking-tight">Mission Statement</h3>
+                         <p className="text-gray-400 text-sm leading-relaxed italic">"To spread the message of love and grace to our local community through service and truth."</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                           setLiveState(prev => ({ ...prev, preview_text: "OUR MISSION: To spread the message of love and grace to our community." }));
+                           setActiveView('live');
+                           showToast("Staged Mission Statement");
+                        }}
+                        className="w-full py-3.5 bg-white/5 group-hover:bg-emerald-500 group-hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                      >
+                         STAGE FOR AIR
+                      </button>
+                   </div>
+
+                   {/* RESOURCE: FAITH CONFESSION */}
+                   <div className="group p-8 bg-white/3 hover:bg-white/5 border border-blue-500/10 hover:border-blue-500/40 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square">
+                      <div className="space-y-4">
+                         <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 shadow-lg">
+                            <Heart size={24} />
+                         </div>
+                         <h3 className="text-xl font-bold text-white tracking-tight">Faith Confession</h3>
+                         <p className="text-gray-400 text-sm leading-relaxed italic">"We believe in the power of prayer, the truth of the Word, and the presence of the Holy Spirit."</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                           setLiveState(prev => ({ ...prev, preview_text: "WE BELIEVE: In the power of prayer, the truth of the Word, and the presence of the Holy Spirit." }));
+                           setActiveView('live');
+                           showToast("Staged Confession");
+                        }}
+                        className="w-full py-3.5 bg-white/5 group-hover:bg-blue-600 group-hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                      >
+                         STAGE FOR AIR
+                      </button>
+                   </div>
+
+                   {/* RESOURCE: COMMUNION VERSE */}
+                   <div className="group p-8 bg-white/3 hover:bg-white/5 border border-amber-500/10 hover:border-amber-500/40 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square">
+                      <div className="space-y-4">
+                         <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500 shadow-lg">
+                            <BookOpen size={24} />
+                         </div>
+                         <h3 className="text-xl font-bold text-white tracking-tight">Communion Script</h3>
+                         <p className="text-gray-400 text-sm leading-relaxed italic">"1 Corinthians 11:24 - And when he had given thanks, he broke it and said..."</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                           setPreviewVerse({ book: "1 Corinthians", chapter: 11, verse_start: 24, verse_end: 24 });
+                           setActiveView('live');
+                           showToast("Staged 1 Cor 11:24");
+                        }}
+                        className="w-full py-3.5 bg-white/5 group-hover:bg-amber-500 group-hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                      >
+                         STAGE SCRIPTURE
+                      </button>
+                   </div>
+                </div>
+              </div>
             ) : activeView === 'settings' ? (
               <div className="absolute inset-0 z-10 flex">
                  <SettingsView settings={draftSettings} onUpdate={updateDraftSetting} onSave={commitSettings} />
               </div>
             ) : (
-              // Placeholder for other views
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                 <div className="bg-[#1e1e1e] p-12 rounded-2xl border border-white/5 shadow-xl max-w-lg">
-                    <h2 className="text-3xl text-white font-semibold mb-4 capitalize">{activeView} View</h2>
-                    <p className="text-gray-400 text-lg leading-relaxed">
-                      You navigated to the {activeView} module. Functionality for this view will be built out in the relevant subsystem structure. Return to "Live Session" via the sidebar monitor icon.
+              // Placeholder for future views
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-(--bg-primary) animate-in fade-in duration-500">
+                 <div className="bg-[#1e1e1e] p-12 rounded-[48px] border border-white/5 shadow-2xl max-w-lg relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.02),transparent)] opacity-40"></div>
+                    <h2 className="text-3xl text-white font-black uppercase tracking-widest mb-4">Expansion Zone</h2>
+                    <p className="text-gray-400 text-lg leading-relaxed relative z-10">
+                      This area is reserved for future church administration modules. Return to the "Live Session" via the sidebar monitor icon to continue your broadcast.
                     </p>
                     <button 
                       onClick={() => setActiveView('live')}
-                      className="mt-8 bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-xl font-medium transition-colors"
+                      className="mt-10 bg-emerald-500 hover:bg-emerald-600 px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase tracking-widest text-black transition-all shadow-lg hover:shadow-emerald-500/20 active:scale-95 relative z-10"
                     >
                       Return to Live
                     </button>

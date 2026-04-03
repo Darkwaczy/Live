@@ -1,4 +1,5 @@
 export interface LiveHistoryItem {
+  id: string;
   type: 'scripture' | 'lyrics' | 'note';
   content: string;
   reference?: string;

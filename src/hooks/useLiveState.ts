@@ -316,6 +316,7 @@ export function useLiveState(
       
       if (prev.preview_verse) {
         newHistory.push({
+          id: Math.random().toString(36).substring(2, 9),
           type: 'scripture',
           content: '', 
           reference: `${prev.preview_verse.book} ${prev.preview_verse.chapter}:${prev.preview_verse.verse_start}${prev.preview_verse.verse_end && prev.preview_verse.verse_end !== prev.preview_verse.verse_start ? `-${prev.preview_verse.verse_end}` : ''}`,
@@ -323,6 +324,7 @@ export function useLiveState(
         });
       } else if (prev.preview_text && prev.preview_text !== prev.current_text) {
         newHistory.push({
+          id: Math.random().toString(36).substring(2, 9),
           type: 'note',
           content: prev.preview_text.split(' ').slice(-10).join(' ') + '...',
           timestamp: new Date().toISOString()
