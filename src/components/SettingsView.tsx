@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mic, Cpu, Monitor, Activity, Volume2, Save, Database, Bell, Download, Trash2, Cloud, Palette } from 'lucide-react';
+import { Mic, Cpu, Monitor, Activity, Volume2, Save, Database, Bell, Download, Trash2, Cloud, Palette, X } from 'lucide-react';
 import { THEMES } from '../config/themes';
 
 export default function SettingsView({ settings, onUpdate, onSave }: any) {
@@ -430,6 +430,58 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                       <div className="aspect-video bg-[url('/worship-bg-amber.png')] bg-cover bg-center rounded-lg border border-white/10" />
                       <span className={`text-[10px] font-black uppercase text-center ${settings.projectorBg === '/worship-bg-amber.png' ? 'text-(--accent-color)' : 'text-(--text-secondary)'}`}>Sunrise Amber</span>
                     </button>
+                  </div>
+                </div>
+
+                <hr className="border-(--border-color)" />
+
+                {/* LOGO & BRANDING */}
+                <div>
+                  <h4 className="text-(--text-secondary) text-sm font-medium uppercase tracking-wider mb-4">Logo & Branding (Theme Mode)</h4>
+                  <div className="bg-black/20 p-6 rounded-2xl border border-dashed border-white/10 flex flex-col items-center gap-6">
+                    {settings.churchLogo ? (
+                      <div className="relative group">
+                        <img 
+                          src={settings.churchLogo} 
+                          alt="Logo Preview" 
+                          className="max-h-40 max-w-full object-contain rounded-lg shadow-2xl transition-transform group-hover:scale-105"
+                          onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/300?text=Upload+Logo')}
+                        />
+                        <button 
+                           onClick={() => onUpdate('churchLogo', '')}
+                           className="absolute -top-2 -right-2 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-40 h-40 bg-white/5 rounded-2xl flex flex-col items-center justify-center border border-white/5 gap-3">
+                         <Palette size={48} className="text-gray-700" />
+                         <span className="text-[10px] uppercase font-black tracking-widest text-gray-600">No Logo Set</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col items-center gap-2">
+                       <label className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest cursor-pointer transition-all shadow-[0_4px_15px_rgba(16,185,129,0.3)] active:scale-95">
+                          Change Logo / Flyer
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  onUpdate('churchLogo', event.target?.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                       </label>
+                       <p className="text-[9px] text-gray-500 uppercase tracking-widest">Recommended: Transparent PNG or Hi-Res Flyer</p>
+                    </div>
                   </div>
                 </div>
 

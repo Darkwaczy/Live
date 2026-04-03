@@ -645,6 +645,23 @@ export default function App() {
               {nextLyric && <p className="text-3xl text-(--text-secondary) italic mt-4">{nextLyric}</p>}
            </div>
         )}
+        {/* MASTER OVERLAYS (BLANK / LOGO) */}
+        {liveState.is_blank && (
+          <div className="absolute inset-0 bg-black z-100 transition-opacity animate-in fade-in flex items-center justify-center cursor-none">
+             <div className="sr-only">Projector Blanked</div>
+          </div>
+        )}
+
+        {liveState.is_logo && (
+          <div className="absolute inset-0 bg-black z-100 transition-opacity animate-in fade-in flex items-center justify-center cursor-none">
+             {settings.churchLogo ? (
+               <img src={settings.churchLogo} alt="Church Logo" className="w-full h-full object-contain" />
+             ) : (
+               <LayoutGrid size={120} className="text-blue-500/10" />
+             )}
+          </div>
+        )}
+
       </div>
     );
   }
@@ -757,41 +774,48 @@ export default function App() {
               
               <div className="w-px h-5 bg-white/10 mx-1 mr-4"></div>
               
-              {/* UNIVERSAL COMPACT HARWARE SWITCHER */}
-              <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/5 shadow-inner">
-                <button 
-                  onClick={clearText}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all text-gray-400 hover:text-white hover:bg-white/10"
-                  title="Clear Foreground Text"
-                >
-                  <X size={12} strokeWidth={3} /> Clear
-                </button>
-                
-                <button 
-                  onClick={() => setLogo(!liveState.is_logo)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all ${liveState.is_logo ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-blue-400 hover:bg-blue-500/10'}`}
-                  title="Show Church Logo"
-                >
-                  <LayoutGrid size={12} strokeWidth={2.5} /> Theme
-                </button>
-                
-                <button 
-                  onClick={() => setBlank(!liveState.is_blank)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all ${liveState.is_blank ? 'bg-gray-800 text-white shadow-lg border-gray-600' : 'text-gray-400 hover:text-white hover:bg-black border border-transparent hover:border-gray-600'}`}
-                  title="Pitch Black Out"
-                >
-                  <div className={`w-2.5 h-2.5 rounded-[2px] transition-colors ${liveState.is_blank ? 'bg-red-500 animate-pulse' : 'bg-black border border-gray-500'}`}></div> Blank
-                </button>
-              </div>
-
               <button 
                 onClick={goLive}
-                className="flex items-center gap-1.5 px-6 py-2 rounded-lg font-bold text-xs tracking-wider uppercase transition-all bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.3)] hover:shadow-[0_0_25px_rgba(220,38,38,0.5)] active:scale-95 ml-2"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.2)] hover:shadow-[0_0_30px_rgba(220,38,38,0.35)] active:scale-95 ml-2"
                 title="Send Screen to Air!"
               >
                 <SkipForward size={14} fill="currentColor" /> GO LIVE
               </button>
             </div>
+          </div>
+
+          {/* MASTER CENTERED HARDWARE SWITCHER */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-[#1a1a1c]/60 backdrop-blur-md p-0.5 rounded-lg border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)] scale-90 lg:scale-100">
+            <button 
+              onClick={clearText}
+              className="px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all text-gray-500 hover:text-white hover:bg-white/5 active:bg-white/10 flex items-center gap-1.5"
+              title="Clear Foreground Text"
+            >
+              <X size={10} strokeWidth={3} className="text-gray-600" /> 
+              <span>Clear</span>
+            </button>
+            
+            <div className="w-px h-3 bg-white/5 mx-0.5" />
+
+            <button 
+              onClick={() => setLogo(!liveState.is_logo)}
+              className={`px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all flex items-center gap-1.5 ${liveState.is_logo ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-gray-500 hover:text-blue-400 hover:bg-blue-500/5'}`}
+              title="Show Church Logo"
+            >
+              <LayoutGrid size={10} strokeWidth={2.5} /> 
+              <span>Theme</span>
+            </button>
+            
+            <div className="w-px h-3 bg-white/5 mx-0.5" />
+
+            <button 
+              onClick={() => setBlank(!liveState.is_blank)}
+              className={`px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all flex items-center gap-1.5 ${liveState.is_blank ? 'bg-gray-800 text-white shadow-lg border border-gray-600' : 'text-gray-500 hover:text-white hover:bg-black'}`}
+              title="Pitch Black Out"
+            >
+              <div className={`w-2 h-2 rounded-[2px] transition-colors ${liveState.is_blank ? 'bg-red-500 animate-pulse' : 'bg-black border border-gray-600'}`}></div> 
+              <span>Blank</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-6">
@@ -1034,7 +1058,7 @@ export default function App() {
                           {liveState.is_logo && (
                             <div className="absolute inset-0 bg-black z-40 flex flex-col items-center justify-center animate-in fade-in transition-all">
                                {settings.churchLogo ? (
-                                 <img src={settings.churchLogo} alt="Church Logo" className="max-w-[40%] max-h-[40%] object-contain drop-shadow-2xl" />
+                                 <img src={settings.churchLogo} alt="Church Logo" className="w-full h-full object-contain" />
                                ) : (
                                  <LayoutGrid size={64} className="text-blue-500/20" />
                                )}
