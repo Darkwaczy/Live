@@ -1214,6 +1214,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* LYRICS KARAOKE CARD — commented out
                 {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
                    <div className="absolute bottom-6 left-10 right-10 p-6 bg-[#161b22]/90 border border-white/5 flex flex-col gap-4 z-10 rounded-3xl backdrop-blur-xl">
                       <div className="flex items-center gap-3 text-gray-400 mb-2">
@@ -1227,6 +1228,7 @@ export default function App() {
                       </div>
                    </div>
                 )}
+                */}
               </div>
             ) : activeView === 'history' ? (
               <div className="flex-1 flex flex-col p-10 overflow-hidden bg-(--bg-primary) animate-in fade-in duration-500">
@@ -1626,22 +1628,25 @@ export default function App() {
                        <h3 className="text-white font-bold text-lg">Worship Lyrics</h3>
                        <button 
                          onClick={() => {
-                           const p = prompt("Paste lyrics here (each line will be a slide):");
-                           if (p) {
-                             const lines = p.split('\n').filter(l => l.trim().length > 0);
-                             const newId = `pasted-${Date.now()}`;
-                             const newSong: Song = {
-                               id: newId,
-                               title: 'Pasted Lyrics',
-                               artist: 'Operator',
-                               lyrics: lines.map((l, i) => ({ order: i, line: l.trim() }))
-                             };
-                             addPastedSong(newSong);
-                             savePastedSong(newSong); // Persist to local store
-                             setLyricSearchResults(prev => [newSong, ...prev]);
-                             showToast("Lyrics pasted and saved!");
-                           }
-                         }}
+                            const title = prompt("Song title:");
+                            if (!title) return;
+                            const p = prompt(`Paste lyrics for "${title}" (each line will be a slide):`);
+                            if (p) {
+                              const lines = p.split('\n').filter(l => l.trim().length > 0);
+                              const newId = `pasted-${Date.now()}`;
+                              const newSong: Song = {
+                                id: newId,
+                                title: title.trim(),
+                                artist: 'Operator',
+                                lyrics: lines.map((l, i) => ({ order: i, line: l.trim() }))
+                              };
+                              addPastedSong(newSong);
+                              savePastedSong(newSong);
+                              setLyricSearchResults(prev => [newSong, ...prev]);
+                              loadSong(newSong);
+                              showToast(`"${title}" loaded & ready!`);
+                            }
+                          }}
                          className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-2 py-1 rounded-md"
                        >
                          Live Paste
