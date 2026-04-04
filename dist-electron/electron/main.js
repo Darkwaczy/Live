@@ -58,7 +58,9 @@ function createWindow() {
         win.webContents.openDevTools();
     }
     else {
-        win.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
+        // In production, the executable is inside dist-electron/electron,
+        // so we need to go up two levels to reach the root dist folder.
+        win.loadFile(path_1.default.join(__dirname, '../../dist/index.html'));
     }
     return win;
 }
@@ -123,8 +125,9 @@ electron_1.ipcMain.handle('app:open-projector', async () => {
         projectorWin.loadURL(urlPath);
     }
     else {
-        // In production, we need to handle the query param for a local file
-        projectorWin.loadFile(path_1.default.join(__dirname, '../dist/index.html'), { query: { projector: 'true' } });
+        // In production, the executable is inside dist-electron/electron,
+        // so we need to go up two levels to reach the root dist folder.
+        projectorWin.loadFile(path_1.default.join(__dirname, '../../dist/index.html'), { query: { projector: 'true' } });
     }
     return true;
 });

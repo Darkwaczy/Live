@@ -140,8 +140,6 @@ export default function App() {
     highlightColor: 'emerald',
     highlightAnimation: 'glow',
     transparency: 50,
-    autoSave: true,
-    saveHistory: true,
     exportFormat: 'txt',
     cloudSync: false,
     alertVisual: true,
@@ -156,6 +154,17 @@ export default function App() {
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isProjectorActive, setIsProjectorActive] = useState(false);
+
+  // Sync Projector Window Status from Electron
+  useEffect(() => {
+    if ((window as any).sermonSync?.getProjectorStatus) {
+      (window as any).sermonSync.getProjectorStatus().then(setIsProjectorActive);
+    }
+    if ((window as any).sermonSync?.onProjectorStatus) {
+      (window as any).sermonSync.onProjectorStatus(setIsProjectorActive);
+    }
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -766,22 +775,6 @@ export default function App() {
             <span className="text-[8px] font-black tracking-widest uppercase">DOCS</span>
           </button>
 
-          <div className="h-px w-8 bg-white/5 mx-auto my-2" />
-
-          <button 
-            onClick={() => {
-              if ((window as any).sermonSync?.openProjector) {
-                (window as any).sermonSync.openProjector();
-              } else {
-                window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720');
-              }
-            }}
-            className="flex flex-col items-center gap-1 py-4 rounded-xl relative group transition-all text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20" 
-            title="Launch Projector Window">
-            <Cast size={20} />
-            <span className="text-[8px] font-black tracking-widest uppercase text-emerald-500">GO LIVE</span>
-          </button>
-
           <div className="flex-1 min-h-[40px]"></div>
 
           <button 
@@ -904,12 +897,19 @@ export default function App() {
               >
                 <Radio size={20} className={rightPanelTab === 'broadcast' && isRightPanelOpen ? 'animate-pulse' : ''} />
               </button>
+              
               <button 
-                onClick={() => setProjector(true)} 
-                title="Open Projector View" 
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors active:scale-95"
-              >
-                <Monitor size={20} />
+                onClick={() => {
+                  if ((window as any).sermonSync?.openProjector) {
+                    (window as any).sermonSync.openProjector();
+                  } else {
+                    window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720');
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all active:scale-95 group ${isProjectorActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/5'}`} 
+                title={isProjectorActive ? "Stop TV Broadcast" : "Launch TV / Projector"}>
+                <Cast size={18} className={isProjectorActive ? 'animate-pulse' : 'group-hover:animate-pulse'} />
+                <span className="text-[10px] font-black uppercase tracking-widest">{isProjectorActive ? 'LIVE ON TV' : 'Projector'}</span>
               </button>
             </div>
           </div>
@@ -1043,7 +1043,12 @@ export default function App() {
                         <div className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse"></div>
                         PREVIEW
                       </div>
-                      {displayVersePreview && settings.detectVerses ? (
+                      {liveState.preview_lyric_line ? (
+                         <div className="w-full h-full flex flex-col justify-center p-4 gap-2">
+                           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/70 text-center">{currentSong?.title}</p>
+                           <p className="text-sm font-bold text-white text-center leading-relaxed font-serif italic">"{liveState.preview_lyric_line}"</p>
+                         </div>
+                       ) : displayVersePreview && settings.detectVerses ? (
                         <div className="w-full h-full flex flex-col justify-center">
                           <div className="text-center space-y-3">
                              <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
@@ -1203,17 +1208,17 @@ export default function App() {
                                 )}
                              </div>
                            </div>
-                         ) : displayVerseLive ? (
-                            <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
-                               <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase">{displayVerseLive.reference}</h4>
-                               <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
-                            </div>
-                          ) : liveState.current_lyric_line ? (
+                         ) : liveState.current_lyric_line ? (
                             <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/70 mb-2">{currentSong?.title}</p>
                                <p className="text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-glow font-serif italic">"{liveState.current_lyric_line}"</p>
                                {liveState.preview_lyric_line && <p className="text-white/30 text-sm italic mt-2">{liveState.preview_lyric_line}</p>}
                             </div>
+                          ) : displayVerseLive ? (
+                             <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
+                                <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase">{displayVerseLive.reference}</h4>
+                                <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
+                             </div>
                           ) : liveState.current_text ? (
                              <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
                                 <p className="text-xl font-black text-emerald-400 tracking-tight drop-shadow-glow italic font-serif">"{liveState.current_text}"</p>

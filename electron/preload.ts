@@ -3,6 +3,10 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('sermonSync', {
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   openProjector: () => ipcRenderer.invoke('app:open-projector'),
+  getProjectorStatus: () => ipcRenderer.invoke('app:get-projector-status'),
+  onProjectorStatus: (callback: (isActive: boolean) => void) => {
+    ipcRenderer.on('projector-status-changed', (_event, isActive) => callback(isActive));
+  },
   send: (channel: string, data: any) => {
     const validChannels = ['transcription:start', 'notes:save', 'sync:status'];
     if (validChannels.includes(channel)) {

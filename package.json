@@ -72,13 +72,15 @@
       "target": [
         "nsis"
       ],
-      "publisherName": "SermonSync"
+      "publisherName": "SermonSync",
+      "cscLink": null,
+      "forceCodeSigning": false
     },
     "nsis": {
-      "oneClick": false,
-      "perMachine": false,
+      "oneClick": true,
+      "perMachine": true,
       "allowElevation": true,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": false
     }
   }
 }

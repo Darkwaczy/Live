@@ -5,8 +5,11 @@ import * as db from './db.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+let mainWindow: BrowserWindow | null = null;
+let projectorWindow: BrowserWindow | null = null;
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1400,
     height: 920,
     minWidth: 1024,
@@ -19,14 +22,21 @@ function createWindow() {
     }
   });
 
+
   if (isDev) {
-    win.loadURL('http://localhost:5173');
-    win.webContents.openDevTools();
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'));
+    // In production, the executable is inside dist-electron/electron,
+    // so we need to go up two levels to reach the root dist folder.
+    mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
   }
 
-  return win;
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  return mainWindow;
 }
 
 app.on('ready', () => {
@@ -73,6 +83,12 @@ ipcMain.handle('db:get-session', async (event, sessionId) => {
 
 // Professional Projector Auto-Launch (Like EasyWorship/ProPresenter)
 ipcMain.handle('app:open-projector', async () => {
+  // Toggle Off: If it's already open, close it.
+  if (projectorWindow) {
+    projectorWindow.close();
+    return false;
+  }
+
   const displays = screen.getAllDisplays();
   const externalDisplay = displays.find((display) => {
     return display.bounds.x !== 0 || display.bounds.y !== 0;
@@ -81,7 +97,7 @@ ipcMain.handle('app:open-projector', async () => {
   // Default to primary if no external found, but on external monitor bounds if found
   const bounds = externalDisplay ? externalDisplay.bounds : screen.getPrimaryDisplay().bounds;
 
-  const projectorWin = new BrowserWindow({
+  projectorWindow = new BrowserWindow({
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
@@ -100,13 +116,31 @@ ipcMain.handle('app:open-projector', async () => {
   const urlPath = isDev ? 'http://localhost:5173?projector' : `file://${path.join(__dirname, '../dist/index.html?projector')}`;
   
   if (isDev) {
-    projectorWin.loadURL(urlPath);
+    projectorWindow.loadURL(urlPath);
   } else {
-    // In production, we need to handle the query param for a local file
-    projectorWin.loadFile(path.join(__dirname, '../dist/index.html'), { query: { projector: 'true' } });
+    // In production, the executable is inside dist-electron/electron,
+    // so we need to go up two levels to reach the root dist folder.
+    projectorWindow.loadFile(path.join(__dirname, '../../dist/index.html'), { query: { projector: 'true' } });
   }
 
+  // Notify the renderer that the projector is open
+  if (mainWindow) {
+    mainWindow.webContents.send('projector-status-changed', true);
+  }
+
+  projectorWindow.on('closed', () => {
+    projectorWindow = null;
+    // Notify the renderer that the projector is closed
+    if (mainWindow) {
+      mainWindow.webContents.send('projector-status-changed', false);
+    }
+  });
+
   return true;
+});
+
+ipcMain.handle('app:get-projector-status', async () => {
+  return !!projectorWindow;
 });
 
 

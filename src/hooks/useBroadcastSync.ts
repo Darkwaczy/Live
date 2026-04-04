@@ -68,17 +68,31 @@ export function useBroadcastSync(
     };
   }, [isProjectorMode]);
 
+  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Operator: publish every time state changes
   useEffect(() => {
     if (isProjectorMode) return; // Projector only listens, never publishes
-    const currentKey = JSON.stringify(state);
-    if (currentKey === lastPublished.current) return;
-    lastPublished.current = currentKey;
     
-    // Primary sync: Channel
-    channelRef.current?.postMessage({ type: 'LIVE_STATE', state });
-    
-    // Backup sync: LocalStorage (extremely reliable for same-machine windows)
-    localStorage.setItem('ca_live_sync_v1', currentKey);
+    const publish = () => {
+      const currentKey = JSON.stringify(state);
+      if (currentKey === lastPublished.current) return;
+      lastPublished.current = currentKey;
+      
+      // Primary sync: Channel
+      channelRef.current?.postMessage({ type: 'LIVE_STATE', state });
+      
+      // Backup sync: LocalStorage (extremely reliable for same-machine windows)
+      localStorage.setItem('ca_live_sync_v1', currentKey);
+    };
+
+    // Throttle: Max 10 updates per second (100ms)
+    // Ensures final state always lands via trailing edge
+    if (throttleTimeoutRef.current) clearTimeout(throttleTimeoutRef.current);
+    throttleTimeoutRef.current = setTimeout(publish, 100);
+
+    return () => {
+      if (throttleTimeoutRef.current) clearTimeout(throttleTimeoutRef.current);
+    };
   }, [state, isProjectorMode]);
 }

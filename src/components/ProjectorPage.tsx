@@ -156,7 +156,7 @@ export default function ProjectorPage() {
       )}
 
       {/* CONTENT AREA */}
-      <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[65vh] mb-32' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 p-12 transition-all duration-700`}>
+      <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[65vh] mb-32' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 p-12 transition-all duration-300`}>
 
         {/* MANUAL LYRIC MODE */}
         {liveState.current_lyric_line && !liveState.current_media && (
@@ -168,7 +168,7 @@ export default function ProjectorPage() {
 
         {/* SCRIPTURE OVERLAY */}
         {liveState.current_verse && (liveState.current_verse_text || liveState.current_text) && !liveState.current_lyric_line && !liveState.current_media && (
-          <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
+          <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
             <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden">
               <div className="absolute inset-0 bg-linear-to-br from-white/10 via-transparent to-transparent opacity-30" />
               <div className="relative space-y-12">
@@ -188,7 +188,7 @@ export default function ProjectorPage() {
 
         {/* SERMON POINT */}
         {liveState.is_point && liveState.current_text && !liveState.current_verse && !liveState.current_lyric_line && !liveState.current_media && (
-          <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-1000">
+          <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-400">
             <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border-2 border-amber-500/20 rounded-[64px] shadow-[0_40px_120px_rgba(0,0,0,0.8)] relative overflow-hidden">
               <div className="relative space-y-10">
                 <div className="flex flex-col items-center gap-4">
