@@ -74,7 +74,10 @@ const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass 
 
 export default function App() {
   // Check if we are in standalone projector mode
-  const isProjectorMode = typeof window !== 'undefined' && window.location.search.includes('projector');
+  // Only enter projector mode if we are NOT in the windows app's main view
+  const isProjectorMode = typeof window !== 'undefined' && 
+                          window.location.search.includes('projector') && 
+                          !window.location.pathname.includes('index.html'); // Ensure main app stays main app
 
   if (isProjectorMode) {
     return <ProjectorPage />;
@@ -734,28 +737,34 @@ export default function App() {
         <button onClick={() => showToast('Menu opened')} className="p-3 hover:bg-white/5 rounded-xl mb-8 transition-colors">
           <Menu size={24} className={activeView === 'settings' ? 'text-white' : 'text-gray-400'} />
         </button>
-        <nav className="flex flex-col gap-6 w-full px-3">
+        <nav className="flex flex-col gap-2 w-full px-2">
           <button 
             onClick={() => setActiveView('live')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors ${activeView === 'live' ? 'bg-red-500/10 text-red-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
+            className={`flex flex-col items-center gap-1 py-3 rounded-xl relative group transition-all ${activeView === 'live' ? 'bg-red-500/10 text-red-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
             title="Live Session">
-            {activeView === 'live' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-red-500 rounded-r-lg"></div>}
-            <Monitor size={22} />
+            {activeView === 'live' && <div className="absolute inset-y-0 left-[-8px] w-[3px] bg-red-500 rounded-r-lg"></div>}
+            <Monitor size={20} />
+            <span className="text-[8px] font-black tracking-widest uppercase">LIVE</span>
           </button>
           <button 
             onClick={() => setActiveView('history')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors ${activeView === 'history' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
+            className={`flex flex-col items-center gap-1 py-3 rounded-xl relative group transition-all ${activeView === 'history' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
             title="History">
-            {activeView === 'history' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-emerald-500 rounded-r-lg"></div>}
-            <BookOpen size={22} />
+            {activeView === 'history' && <div className="absolute inset-y-0 left-[-8px] w-[3px] bg-emerald-500 rounded-r-lg"></div>}
+            <BookOpen size={20} />
+            <span className="text-[8px] font-black tracking-widest uppercase">HISTORY</span>
           </button>
           <button 
             onClick={() => setActiveView('documents')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors ${activeView === 'documents' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
+            className={`flex flex-col items-center gap-1 py-3 rounded-xl relative group transition-all ${activeView === 'documents' ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
             title="Documents">
-            {activeView === 'documents' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-emerald-500 rounded-r-lg"></div>}
-            <FileText size={22} />
+            {activeView === 'documents' && <div className="absolute inset-y-0 left-[-8px] w-[3px] bg-emerald-500 rounded-r-lg"></div>}
+            <FileText size={20} />
+            <span className="text-[8px] font-black tracking-widest uppercase">DOCS</span>
           </button>
+
+          <div className="h-px w-8 bg-white/5 mx-auto my-2" />
+
           <button 
             onClick={() => {
               if ((window as any).sermonSync?.openProjector) {
@@ -764,17 +773,21 @@ export default function App() {
                 window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720');
               }
             }}
-            className="flex justify-center p-3 rounded-xl relative group transition-colors text-gray-500 hover:text-emerald-400 hover:bg-white/5" 
+            className="flex flex-col items-center gap-1 py-4 rounded-xl relative group transition-all text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20" 
             title="Launch Projector Window">
-            <Cast size={22} />
+            <Cast size={20} />
+            <span className="text-[8px] font-black tracking-widest uppercase text-emerald-500">GO LIVE</span>
           </button>
-          <div className="flex-1"></div>
+
+          <div className="flex-1 min-h-[40px]"></div>
+
           <button 
             onClick={() => setActiveView('settings')}
-            className={`flex justify-center p-3 rounded-xl relative group transition-colors mt-auto ${activeView === 'settings' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
+            className={`flex flex-col items-center gap-1 py-3 rounded-xl relative group transition-all mt-auto ${activeView === 'settings' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
             title="Settings">
-            {activeView === 'settings' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-white rounded-r-lg"></div>}
-            <Settings size={22} />
+            {activeView === 'settings' && <div className="absolute inset-y-0 left-[-8px] w-[3px] bg-white rounded-r-lg"></div>}
+            <Settings size={20} />
+            <span className="text-[8px] font-black tracking-widest uppercase">CONFIG</span>
           </button>
         </nav>
       </aside>
