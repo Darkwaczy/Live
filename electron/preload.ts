@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('sermonSync', {
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
+  openProjector: () => ipcRenderer.invoke('app:open-projector'),
   send: (channel: string, data: any) => {
     const validChannels = ['transcription:start', 'notes:save', 'sync:status'];
     if (validChannels.includes(channel)) {

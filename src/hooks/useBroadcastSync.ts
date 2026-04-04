@@ -37,6 +37,29 @@ export function useBroadcastSync(
     // If projector, ask operator for current state immediately
     if (isProjectorMode) {
       channel.postMessage({ type: 'REQUEST_STATE' });
+      
+      // Fallback: Check localStorage for any existing state on load
+      const saved = localStorage.getItem('ca_live_sync_v1');
+      if (saved) {
+        try {
+          onRemoteUpdateRef.current(JSON.parse(saved));
+        } catch {}
+      }
+
+      // Listen for localStorage changes (backup for Electron windows)
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === 'ca_live_sync_v1' && e.newValue) {
+          try {
+            onRemoteUpdateRef.current(JSON.parse(e.newValue));
+          } catch {}
+        }
+      };
+      window.addEventListener('storage', handleStorage);
+      return () => {
+        channel.close();
+        window.removeEventListener('storage', handleStorage);
+        channelRef.current = null;
+      };
     }
 
     return () => {
@@ -51,6 +74,11 @@ export function useBroadcastSync(
     const currentKey = JSON.stringify(state);
     if (currentKey === lastPublished.current) return;
     lastPublished.current = currentKey;
+    
+    // Primary sync: Channel
     channelRef.current?.postMessage({ type: 'LIVE_STATE', state });
+    
+    // Backup sync: LocalStorage (extremely reliable for same-machine windows)
+    localStorage.setItem('ca_live_sync_v1', currentKey);
   }, [state, isProjectorMode]);
 }

@@ -194,7 +194,7 @@ export default function App() {
 
   // Sync state between Operator and Projector windows via BroadcastChannel
   // No internet required, same-origin only.
-  useBroadcastSync(liveState, applyLiveState, false);
+  useBroadcastSync(liveState, applyLiveState, isProjectorMode);
 
   const [airedVerse, setAiredVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
   const [airedLyric, setAiredLyric] = useState<string | null>(null);
@@ -757,7 +757,13 @@ export default function App() {
             <FileText size={22} />
           </button>
           <button 
-            onClick={() => window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720')}
+            onClick={() => {
+              if ((window as any).sermonSync?.openProjector) {
+                (window as any).sermonSync.openProjector();
+              } else {
+                window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720');
+              }
+            }}
             className="flex justify-center p-3 rounded-xl relative group transition-colors text-gray-500 hover:text-emerald-400 hover:bg-white/5" 
             title="Launch Projector Window">
             <Cast size={22} />
