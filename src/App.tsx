@@ -568,36 +568,42 @@ export default function App() {
      showToast("Resource removed from library");
   };
 
-  // RESILIENT AUDIO ENGINE SYNC
+  // RESILIENT MEDIA ENGINE SYNC (Hardware-Level Overrides)
   useEffect(() => {
     const video = projectorVideoRef.current;
     if (!video) return;
 
-    // Direct hardware override for volume and mute
-    const syncAudio = async () => {
+    const syncMediaHardware = async () => {
       try {
         if (!video) return;
-        // IMPERATIVE OVERRIDE: Set hardware state directly on the element
+        
+        // 1. Force state on the physical element bypassing React delay
         video.muted = liveState.media_muted ?? true;
         video.volume = liveState.media_volume ?? 1.0;
         
-        if (liveState.current_media && !liveState.media_muted) {
-           const playPromise = video.play();
-           if (playPromise !== undefined) {
-             playPromise.catch((e) => {
-               console.warn("Audio Context Blocked:", e);
-               // If play fails when unmuted, show the rescue button
-               setAudioBlocked(true);
-             });
+        if (liveState.current_media) {
+           // 2. Transmit hard pause/play signals securely
+           if (liveState.media_playing) {
+             const playPromise = video.play();
+             if (playPromise !== undefined) {
+               playPromise.catch((e) => {
+                 console.warn("Media Context Blocked Play:", e);
+                 // Only show rescue overlay if attempting to play unmuted
+                 if (!liveState.media_muted) setAudioBlocked(true);
+               });
+             }
+           } else {
+             // CRITICAL: Force the browser to halt playback on frame (rather than just clearing autoPlay)
+             video.pause();
            }
         }
       } catch (err) {
-        console.error("Critical Audio Engine Sync Error:", err);
+        console.error("Critical Media Engine Sync Error:", err);
       }
     };
 
-    syncAudio();
-  }, [liveState.media_muted, liveState.media_volume, liveState.current_media]);
+    syncMediaHardware();
+  }, [liveState.media_muted, liveState.media_volume, liveState.media_playing, liveState.current_media]);
 
   const handleBroadcastActivation = () => {
      setAudioBlocked(false);
@@ -1149,6 +1155,19 @@ export default function App() {
                               {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
                            </div>
                          ) : (<div className="opacity-30 z-10"><Monitor size={48} className="text-gray-500 mb-3" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Screen is Clear</p></div>)}
+                         
+                         {liveState.is_logo && (
+                           <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-35 flex items-center justify-center animate-in fade-in">
+                              {settings.churchLogo && settings.churchLogo !== '/logo-placeholder.png' ? (
+                                 <img src={settings.churchLogo} alt="Theme Overlay" className="max-h-[80%] max-w-[80%] object-contain" />
+                              ) : (
+                                 <div className="p-8 bg-white/5 border border-white/10 rounded-3xl flex flex-col items-center">
+                                    <Monitor size={48} className="text-emerald-500/50 mb-3" />
+                                    <h2 className="text-xl font-black tracking-[0.4em] uppercase text-emerald-400 text-center">Theme Active</h2>
+                                 </div>
+                              )}
+                           </div>
+                         )}
                          
                          {liveState.is_blank && (<div className="absolute inset-0 bg-black z-40 flex items-center justify-center animate-in fade-in">
                            <div className="p-4 bg-red-600/20 border border-red-500/40 rounded-2xl flex flex-col items-center gap-2">
@@ -1733,8 +1752,7 @@ export default function App() {
       </main>
 
       {/* Full Screen Projector Mode (Redesigned for Premium Cinematic Experience) */}
-      {isProjector && (
-        <div className="fixed inset-0 bg-black z-100 flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-700">
+      <div className={`fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden transition-all duration-700 ${isProjector ? 'opacity-100 z-100 pointer-events-auto' : 'opacity-0 -z-50 pointer-events-none'}`}>
           
           {/* ATMOSPHERIC BACKGROUND OVERLAY */}
           <div 
@@ -1946,6 +1964,30 @@ export default function App() {
             )}
           </div>
           
+          {/* THEME OVERLAY (Hides text/media, shows atmospheric logo state) */}
+          {liveState.is_logo && (
+             <div className="absolute inset-0 z-200 flex animate-in fade-in flex-col items-center justify-center bg-black/60 backdrop-blur-xl">
+                {settings.churchLogo && settings.churchLogo !== '/logo-placeholder.png' ? (
+                   <img src={settings.churchLogo} alt="Theme" className="max-h-screen max-w-full object-contain" />
+                ) : (
+                   <div className="relative">
+                      <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full scale-150"></div>
+                      <div className="text-white/80 p-16 bg-black/40 backdrop-blur-md shadow-[0_0_100px_rgba(0,0,0,0.5)] rounded-full border border-white/10 flex flex-col items-center">
+                         <Monitor size={100} className="mb-8 text-emerald-500/70" />
+                         <h2 className="text-4xl font-black tracking-[0.4em] uppercase text-white/50 text-center">
+                            Worship Live
+                         </h2>
+                      </div>
+                   </div>
+                )}
+             </div>
+          )}
+
+          {/* BLANK OVERLAY (Absolute Blackout) */}
+          {liveState.is_blank && (
+             <div className="absolute inset-0 z-300 bg-black pointer-events-none transition-all duration-700"></div>
+          )}
+          
           {/* PROJECTOR NEWS TICKER (Broadcast Mode) - Pinned to absolute bottom with maximum z-index layer */}
           {liveState.ticker_enabled && (liveState.ticker_items?.length ?? 0) > 0 && (
             <div className="absolute bottom-0 left-0 right-0 h-32 bg-red-600 border-t-8 border-red-800 flex items-center overflow-hidden z-250 shadow-[0_-20px_50px_rgba(220,38,38,0.4)]">
@@ -1978,7 +2020,6 @@ export default function App() {
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }

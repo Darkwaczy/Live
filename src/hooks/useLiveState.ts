@@ -311,6 +311,8 @@ export function useLiveState(
       current_text: '', 
       current_verse: null,
       current_song_id: null,
+      current_media: null,
+      media_playing: false,
       is_live_dirty: !!(prev.preview_text || prev.preview_verse), 
       is_blank: false,
       is_logo: false,
