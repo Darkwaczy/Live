@@ -31,6 +31,10 @@ export function useLiveState(
     ticker_items: [],
     is_blank: false,
     is_logo: false,
+    is_point: false,
+    media_muted: true,
+    media_playing: true,
+    media_volume: 1.0,
     detection_history: [],
     history: [],
     updated_at: new Date().toISOString()
@@ -322,6 +326,13 @@ export function useLiveState(
           reference: `${prev.preview_verse.book} ${prev.preview_verse.chapter}:${prev.preview_verse.verse_start}${prev.preview_verse.verse_end && prev.preview_verse.verse_end !== prev.preview_verse.verse_start ? `-${prev.preview_verse.verse_end}` : ''}`,
           timestamp: new Date().toISOString()
         });
+      } else if (prev.preview_media) {
+         newHistory.push({
+            id: Math.random().toString(36).substring(2, 9),
+            type: 'lyrics',
+            content: 'Multimedia: ' + (prev.preview_media.split('/').pop() || 'Asset'),
+            timestamp: new Date().toISOString()
+         });
       } else if (prev.preview_text && prev.preview_text !== prev.current_text) {
         newHistory.push({
           id: Math.random().toString(36).substring(2, 9),
@@ -336,21 +347,53 @@ export function useLiveState(
          nextPreviewVerse = {
             ...prev.preview_verse,
             verse_start: prev.preview_verse.verse_start + 1,
-            // reset verse_end if it was a range
             verse_end: prev.preview_verse.verse_start + 1 
          };
       }
 
       return {
         ...prev,
-        current_text: prev.preview_text || '',
         current_verse: prev.preview_verse,
+        current_media: prev.preview_media,
+        is_point: false, // Normal Go Live from transcription is NOT a "Point" by default
+        media_muted: prev.preview_media ? true : prev.media_muted,
+        media_playing: true,
+        media_volume: 1.0,
         preview_verse: nextPreviewVerse,
+        preview_text: '',
+        preview_media: null,
         is_live_dirty: true,
         history: newHistory.slice(-200),
         updated_at: new Date().toISOString()
       } as any;
     });
+  }, []);
+
+  const directAir = useCallback((data: { type: 'scripture' | 'lyrics' | 'note', content?: string, media?: string, reference?: string }) => {
+     setLiveState(prev => {
+        const newHistory = [...(prev.history || [])];
+        newHistory.push({
+           id: Math.random().toString(36).substring(2, 9),
+           type: data.type,
+           content: data.content || '',
+           reference: data.reference,
+           timestamp: new Date().toISOString()
+        });
+
+        return {
+           ...prev,
+           current_text: data.content || '',
+           current_verse: data.type === 'scripture' && data.reference ? { book: data.reference.split(' ')[0], chapter: 1, verse_start: 1, verse_end: 1 } : null,
+           current_media: data.media || null,
+           is_point: data.type === 'note',
+           media_muted: data.media ? true : prev.media_muted,
+           media_playing: true,
+           media_volume: 1.0,
+           is_live_dirty: true,
+           history: newHistory.slice(-200),
+           updated_at: new Date().toISOString()
+        };
+     });
   }, []);
 
   const setSecondaryVerse = useCallback((text: string | null) => {
@@ -421,6 +464,7 @@ export function useLiveState(
     clearPreview,
     applyLiveState,
     goLive,
+    directAir,
     setPreviewVerse,
     setSecondaryVerse,
     removeDetection,

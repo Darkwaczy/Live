@@ -4,7 +4,7 @@ import {
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
   Activity, Radio, Search, Heart,
-  ChevronLeft, RefreshCw
+  ChevronLeft, RefreshCw, Volume2, VolumeX
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
@@ -95,6 +95,8 @@ export default function App() {
     { id: 'communion', type: 'scripture', title: 'Communion Script', reference: '1 Corinthians 11:24', detail: 'And when he had given thanks, he broke it...', icon: <BookOpen size={24} />, category: 'Communion' }
   ]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const projectorVideoRef = React.useRef<HTMLVideoElement>(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('notes');
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -170,7 +172,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, setPreviewVerse, setSecondaryVerse, removeDetection, setBlank, setLogo, setLiveState
+    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, directAir, setPreviewVerse, setSecondaryVerse, removeDetection, setBlank, setLogo, setLiveState
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -525,8 +527,9 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const url = URL.createObjectURL(file);
     const isVideo = file.type.startsWith('video/');
+    // Append hash to blob URL for easy type detection in the UI
+    const url = URL.createObjectURL(file) + (isVideo ? '#video' : '#image');
     
     const newAsset = {
       id: Math.random().toString(36).substring(7),
@@ -556,6 +559,11 @@ export default function App() {
         category: 'Custom'
      };
      setResourceAssets(prev => [newAsset, ...prev]);
+  };
+
+  const handleDeleteResource = (id: string) => {
+     setResourceAssets(prev => prev.filter(a => a.id !== id));
+     showToast("Resource removed from library");
   };
 
   const showToast = (msg: string) => {
@@ -707,6 +715,7 @@ export default function App() {
       </div>
     );
   }
+
 
   return (
     <div 
@@ -1000,351 +1009,218 @@ export default function App() {
           
           {/* Main Content Area based on ViewMode */}
           <div className="flex-1 flex flex-col relative px-10 py-8 overflow-hidden z-0">
-            {activeView === 'live' ? (
-              <>
+             {activeView === 'live' ? (
               <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-                {/* Center Header: Same-Height Side-by-Side Preview and Live */}
                 <div className="flex items-start gap-4 h-[300px] p-1 shrink-0">
-                   
-                   {/* PREVIEW PANE (Top Left - Square) */}
                    <div className="h-full aspect-square flex flex-col items-center justify-center p-6 bg-(--bg-secondary) rounded-3xl border border-(--border-color) relative overflow-hidden group shrink-0 transition-colors">
-                     <div className="absolute top-4 left-4 flex items-center gap-2 text-[9px] font-bold tracking-widest text-(--accent-color) bg-(--accent-color)/10 px-2 py-1 rounded-full">
-                       <div className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse"></div>
-                       PREVIEW
-                     </div>
-                     
-                    {displayVersePreview && settings.detectVerses ? (
-                       <div className="w-full h-full flex flex-col justify-center">
-                         <div className="text-center space-y-3">
-                            <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
-                            <p className="text-(--text-primary) text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
+                      <div className="absolute top-4 left-4 flex items-center gap-2 text-[9px] font-bold tracking-widest text-(--accent-color) bg-(--accent-color)/10 px-2 py-1 rounded-full">
+                        <div className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse"></div>
+                        PREVIEW
+                      </div>
+                      {displayVersePreview && settings.detectVerses ? (
+                        <div className="w-full h-full flex flex-col justify-center">
+                          <div className="text-center space-y-3">
+                             <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
+                             <p className="text-(--text-primary) text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
+                          </div>
+                        </div>
+                      ) : liveState.preview_media ? (
+                         <div className="w-full h-full flex items-center justify-center p-2">
+                           <div className="w-full h-full rounded-2xl overflow-hidden border border-emerald-500/30 bg-black/40">
+                              {liveState.preview_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.preview_media.includes('#video') ? (
+                                 <video src={liveState.preview_media} className="w-full h-full object-contain" autoPlay loop muted playsInline />
+                              ) : (
+                                 <img src={liveState.preview_media} className="w-full h-full object-contain" />
+                              )}
+                           </div>
                          </div>
-                         
-
-                       </div>
-                     ) : (
-                       <div className="w-full text-center opacity-30 group-hover:opacity-50 transition-opacity">
-                         <div className="relative inline-block mb-4">
-                            <FileText size={48} className="mx-auto text-gray-400" />
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-ping"></div>
+                      ) : liveState.preview_text ? (
+                         <div className="w-full h-full flex flex-col justify-center p-4">
+                            <p className="text-sm font-bold text-emerald-400 text-center leading-relaxed font-serif italic">"{liveState.preview_text}"</p>
                          </div>
-                         <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-300">Ready to Stage</p>
-                         <p className="text-[8px] text-gray-500 mt-1 uppercase">Click Queue or Speak Verse</p>
-                       </div>
-                     )}
+                      ) : (
+                        <div className="w-full text-center opacity-30 group-hover:opacity-50 transition-opacity">
+                          <FileText size={48} className="mx-auto text-gray-400 mb-4" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-300">Ready to Stage</p>
+                        </div>
+                      )}
                    </div>
 
-
-                   {/* LIVE ON SCREEN & CLEAR BUTTON CONTAINER */}
                    <div className="flex-1 flex flex-col gap-3 min-w-0 h-full">
-                      {/* LIVE ON SCREEN (Top Right - Landscape) */}
                       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black rounded-3xl border-2 border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)] relative overflow-hidden group">
-                         {/* MIRROR BACKGROUND */}
-                         <div 
-                            className="absolute inset-0 bg-cover bg-center brightness-[0.35] saturate-[0.8] opacity-60 group-hover:opacity-100 transition-opacity duration-1000"
-                            style={{ backgroundImage: `url('${settings.projectorBg}')` }}
-                         />
-                         
+                         <div className="absolute inset-0 bg-cover bg-center brightness-[0.35] saturate-[0.8] opacity-60 group-hover:opacity-100 transition-opacity duration-1000" style={{ backgroundImage: `url('${settings.projectorBg}')` }} />
                          <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] font-bold tracking-widest text-red-500 bg-red-500/10 px-3 py-1 rounded-full z-10">
-                           <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                           LIVE ON SCREEN
+                           <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div> LIVE ON SCREEN
                          </div>
 
-                          {liveState.current_verse && displayVerseLive ? (
-                            <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
-                               <div className="text-center space-y-4">
-                                  <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase drop-shadow-glow">{displayVerseLive.reference}</h4>
-                                  <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
+                         {/* MEDIA CONTROL HUB */}
+                         {liveState.current_media && (
+                            <div className="absolute top-4 right-4 flex items-center gap-2 z-20 animate-in slide-in-from-top-2 duration-300">
+                               <div className="flex bg-black/60 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-2xl">
+                                  <button 
+                                    onClick={() => setLiveState(s => ({ ...s, media_playing: !s.media_playing }))}
+                                    className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors"
+                                  >
+                                    {liveState.media_playing ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                                  </button>
+                                  <div className="w-px h-4 bg-white/10 my-auto mx-1" />
+                                  <button 
+                                    onClick={() => setLiveState(s => ({ ...s, media_muted: !s.media_muted }))}
+                                    className={`p-2 hover:bg-white/10 rounded-lg transition-colors ${!liveState.media_muted ? 'text-emerald-400' : 'text-gray-400'}`}
+                                  >
+                                    {!liveState.media_muted ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                                  </button>
+                                  <div className="flex items-center px-2 group/vol">
+                                     <input 
+                                       type="range" 
+                                       min="0" 
+                                       max="1" 
+                                       step="0.1" 
+                                       value={liveState.media_volume || 1}
+                                       onChange={(e) => {
+                                          const val = parseFloat(e.target.value);
+                                          setLiveState(s => ({ ...s, media_volume: val }));
+                                       }}
+                                       className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400 transition-all"
+                                     />
+                                  </div>
                                </div>
                             </div>
-                          ) : airedLyric ? (
-                            <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
-                               <p className={`text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2`}>{airedLyric}</p>
-                               {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center h-full opacity-30 z-10">
-                               <Monitor size={48} className="text-gray-500 mb-3" />
-                               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Screen is Clear</p>
-                            </div>
-                          )}
+                         )}
 
-                          {/* MASTER OVERLAYS (BLANK / LOGO) */}
-                          {liveState.is_blank && (
-                            <div className="absolute inset-0 bg-black z-40 flex flex-col items-center justify-center animate-in fade-in transition-all">
-                               <div className="p-4 bg-red-600/20 border border-red-500/40 rounded-2xl flex flex-col items-center gap-2">
-                                  <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.8)]"></div>
-                                  <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.4em]">Projector Blanked</p>
-                               </div>
-                            </div>
-                          )}
-
-                          {liveState.is_logo && (
-                            <div className="absolute inset-0 bg-black z-40 flex flex-col items-center justify-center animate-in fade-in transition-all">
-                               {settings.churchLogo ? (
-                                 <img src={settings.churchLogo} alt="Church Logo" className="w-full h-full object-contain" />
+                         {liveState.current_media ? (
+                           <div className="w-full h-full p-2 z-10 animate-in zoom-in-95 duration-500">
+                             <div className="w-full h-full rounded-2xl overflow-hidden border border-red-500/30">
+                               {liveState.current_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.current_media.includes('#video') ? (
+                                  <video 
+                                    src={liveState.current_media} 
+                                    className="w-full h-full object-contain" 
+                                    autoPlay={liveState.media_playing}
+                                    loop 
+                                    muted={liveState.media_muted} 
+                                    playsInline 
+                                    ref={(el) => {
+                                      if (el) {
+                                        el.volume = liveState.media_volume || 1;
+                                        if (liveState.media_playing) el.play().catch(() => {});
+                                        else el.pause();
+                                      }
+                                    }}
+                                  />
                                ) : (
-                                 <LayoutGrid size={64} className="text-blue-500/20" />
+                                  <img src={liveState.current_media} className="w-full h-full object-contain" />
                                )}
-                               <div className="absolute top-4 right-4 bg-blue-600/20 px-3 py-1 rounded-full border border-blue-500/30">
-                                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Logo Mode</p>
-                               </div>
+                             </div>
+                           </div>
+                         ) : displayVerseLive ? (
+                           <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
+                              <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase">{displayVerseLive.reference}</h4>
+                              <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
+                           </div>
+                         ) : liveState.current_text ? (
+                            <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
+                               <p className="text-xl font-black text-emerald-400 tracking-tight drop-shadow-glow italic font-serif">"{liveState.current_text}"</p>
                             </div>
-                          )}
-
-                          {liveState.ticker_enabled && (liveState.ticker_items?.length ?? 0) > 0 && (
-                            <div className="absolute bottom-0 left-0 right-0 h-10 bg-red-600/40 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-10 transition-colors">
-                               <div className="animate-marquee h-full flex items-center">
-                                  <div className="flex shrink-0">
-                                     {(liveState.ticker_items || []).map((item, i) => (
-                                       <span key={i} className="px-10 text-[11px] font-black text-white/90 uppercase tracking-widest whitespace-nowrap">{item} <span className="text-red-500/50 mx-4">•</span></span>
-                                     ))}
-                                  </div>
-                                  <div className="flex shrink-0">
-                                     {(liveState.ticker_items || []).map((item, i) => (
-                                       <span key={`dup-${i}`} className="px-10 text-[11px] font-black text-white/90 uppercase tracking-widest whitespace-nowrap">{item} <span className="text-red-500/50 mx-4">•</span></span>
-                                     ))}
-                                  </div>
-                               </div>
-                            </div>
-                          )}
+                         ) : airedLyric ? (
+                           <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
+                              <p className="text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2">{airedLyric}</p>
+                              {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
+                           </div>
+                         ) : (<div className="opacity-30 z-10"><Monitor size={48} className="text-gray-500 mb-3" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Screen is Clear</p></div>)}
+                         
+                         {liveState.is_blank && (<div className="absolute inset-0 bg-black z-40 flex items-center justify-center animate-in fade-in">
+                           <div className="p-4 bg-red-600/20 border border-red-500/40 rounded-2xl flex flex-col items-center gap-2">
+                             <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.8)]"></div>
+                             <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.4em]">Projector Blanked</p>
+                           </div>
+                         </div>)}
                       </div>
-                    </div>
-                 </div>
-                {/* BOTTOM BLOCK: UNTOUCHED PLACEHOLDER */}
-                <div className="flex-1 bg-transparent border border-white/5 border-dashed rounded-3xl flex items-center justify-center relative group overflow-hidden">
-                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02),transparent)] opacity-20" />
-                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/10 select-none">Expansion Zone</p>
+                   </div>
                 </div>
-              </div>
 
-                {/* Bottom Lyric Dock */}
-                {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
-                  <div className="absolute bottom-6 left-10 right-10 glass-panel p-6 bg-[#161b22]/90 border border-white/5 flex flex-col gap-4 z-10" style={blurStyle}>
-                    <div className="flex items-center gap-3 text-gray-400 mb-2">
-                      <Music size={16} />
-                      <span className="text-xs uppercase tracking-wider font-semibold">
-                        {currentSong.title}
-                      </span>
-                      <div className="flex-1 h-0.5 bg-white/10 mx-4 rounded-full overflow-hidden">
-                        <div className={`h-full w-2/5 rounded-full bg-(--accent-color)`} />
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col gap-2 pl-8">
-                      <div className="relative">
-                        <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-[2px] rounded-r-md bg-(--accent-color)"></div>
-                        <KaraokeLine 
-                          lyric={mainLyric || '...'} 
-                          spokenText={fullTranscript} 
-                          colorClass="text-(--accent-color)" 
-                          animationClass={settings.highlightAnimation} 
-                          sizeClass="text-[26px]"
-                        />
-                      </div>
-                      {nextLyric && <p className="text-xl text-gray-400 italic font-serif opacity-80">{nextLyric}</p>}
-                    </div>
+                <div className="flex-1 bg-transparent border border-white/5 border-dashed rounded-3xl flex items-center justify-center relative"><p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/10 select-none">Expansion Zone</p></div>
+
+                {liveState.ticker_enabled && (liveState.ticker_items?.length ?? 0) > 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-10 bg-red-600/40 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-20">
+                     <div className="animate-marquee h-full flex items-center">
+                        <div className="flex shrink-0">{(liveState.ticker_items || []).map((item, i) => (<span key={i} className="px-10 text-[11px] font-black text-white/90 uppercase tracking-widest whitespace-nowrap">{item} <span className="text-red-500/50 mx-4">•</span></span>))}</div>
+                     </div>
                   </div>
                 )}
-              </>
+
+                {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
+                   <div className="absolute bottom-6 left-10 right-10 p-6 bg-[#161b22]/90 border border-white/5 flex flex-col gap-4 z-10 rounded-3xl backdrop-blur-xl">
+                      <div className="flex items-center gap-3 text-gray-400 mb-2">
+                         <Music size={16} /> <span className="text-xs uppercase tracking-wider font-semibold">{currentSong.title}</span>
+                         <div className="flex-1 h-0.5 bg-white/10 mx-4 rounded-full overflow-hidden"><div className={`h-full w-2/5 rounded-full bg-(--accent-color)`} /></div>
+                      </div>
+                      <div className="relative pl-8">
+                         <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-[2px] rounded-r-md bg-(--accent-color)"></div>
+                         <KaraokeLine lyric={mainLyric || '...'} spokenText={fullTranscript} colorClass="text-(--accent-color)" animationClass={settings.highlightAnimation} sizeClass="text-[26px]" />
+                         {nextLyric && <p className="text-xl text-gray-400 italic font-serif opacity-80 mt-2">{nextLyric}</p>}
+                      </div>
+                   </div>
+                )}
+              </div>
             ) : activeView === 'history' ? (
               <div className="flex-1 flex flex-col p-10 overflow-hidden bg-(--bg-primary) animate-in fade-in duration-500">
                 <div className="flex items-center justify-between mb-8">
-                   <div className="space-y-1">
-                      <h2 className="text-3xl text-white font-black uppercase tracking-widest">Aired History</h2>
-                      <p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Session Audit Log • {liveState.history.length} Events</p>
-                   </div>
-                   <button 
-                     onClick={() => setLiveState(prev => ({ ...prev, history: [] }))}
-                     className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                   >
-                     Clear History
-                   </button>
+                   <div className="space-y-1"><h2 className="text-3xl text-white font-black uppercase tracking-widest">Aired History</h2><p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Session Audit Log • {liveState.history.length} Events</p></div>
+                   <button onClick={() => setLiveState(prev => ({ ...prev, history: [] }))} className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest">Clear History</button>
                 </div>
-
-                <div className="flex-1 overflow-y-auto no-scrollbar pr-4 -mr-4 space-y-4">
-                   {liveState.history.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center opacity-20 py-20 grayscale border-2 border-dashed border-white/5 rounded-[48px]">
-                         <Activity size={64} className="mb-6" />
-                         <p className="text-sm font-black uppercase tracking-[0.5em]">No history recorded yet</p>
-                         <p className="text-[10px] mt-2 italic opacity-60">Items will appear here after you click "GO LIVE"</p>
-                      </div>
-                   ) : (
-                      [...liveState.history].reverse().map((item, idx) => (
-                         <div 
-                           key={item.id || idx} 
-                           className="group flex items-center gap-6 p-6 bg-white/3 hover:bg-white/5 border border-white/5 hover:border-emerald-500/30 rounded-[32px] transition-all relative overflow-hidden animate-in slide-in-from-right-4 duration-300"
-                           style={{ animationDelay: `${idx * 50}ms` }}
-                         >
-                            {/* Type Icon */}
-                            <div className={`p-4 rounded-2xl shrink-0 shadow-lg ${
-                               item.type === 'scripture' ? 'bg-emerald-500/20 text-emerald-500' :
-                               item.type === 'lyrics' ? 'bg-blue-500/20 text-blue-400' :
-                               'bg-amber-500/20 text-amber-500'
-                            }`}>
-                               {item.type === 'scripture' ? <BookOpen size={24} /> :
-                                item.type === 'lyrics' ? <Music size={24} /> :
-                                <FileText size={24} />}
-                            </div>
-
-                            {/* Content Info */}
-                            <div className="flex-1 min-w-0 pr-10">
-                               <div className="flex items-center gap-3 mb-2">
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">
-                                     {item.type}
-                                  </span>
-                                  <span className="w-1 h-1 rounded-full bg-white/10"></span>
-                                  <span className="text-[9px] font-mono text-gray-600 uppercase">
-                                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                  </span>
-                               </div>
-                               {item.reference && (
-                                  <h3 className="text-white font-black text-xl mb-1 tracking-tight drop-shadow-sm">{item.reference}</h3>
-                               )}
-                               <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-2 pr-4">{item.content || '(Content Captured)'}</p>
-                            </div>
-
-                            {/* Re-Air Button */}
-                            <button 
-                              onClick={() => {
-                                 if (item.type === 'scripture' && item.reference) {
-                                    // Parse reference to re-stage
-                                    const match = item.reference.match(/^(.+)\s+(\d+):(\d+)/);
-                                    if (match) {
-                                       setPreviewVerse({ book: match[1], chapter: parseInt(match[2]), verse_start: parseInt(match[3]), verse_end: parseInt(match[3]) });
-                                       setActiveView('live');
-                                       showToast(`Re-staged: ${item.reference}`);
-                                    }
-                                 } else if (item.content) {
-                                    setLiveState(prev => ({ ...prev, preview_text: item.content }));
-                                    setActiveView('live');
-                                    showToast("Re-staged Note");
-                                 }
-                              }}
-                              className="absolute right-6 opacity-0 group-hover:opacity-100 flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-full font-black text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95"
-                            >
-                               <Play size={12} fill="currentColor" /> RE-AIR
-                            </button>
+                <div className="flex-1 overflow-y-auto no-scrollbar space-y-4">
+                   {liveState.history.length === 0 ? (<div className="h-full flex flex-col items-center justify-center opacity-20"><Activity size={64} className="mb-6" /><p className="text-sm font-black uppercase tracking-[0.5em]">No history recorded</p></div>) : 
+                   ([...liveState.history].reverse().map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-6 p-6 bg-white/3 border border-white/5 rounded-[32px]">
+                         <div className={`p-4 rounded-2xl ${item.type === 'scripture' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-blue-500/20 text-blue-400'}`}>{item.type === 'scripture' ? <BookOpen size={24} /> : <Music size={24} />}</div>
+                         <div className="flex-1 min-w-0 pr-10">
+                            <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">{item.type} • {new Date(item.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</span>
+                            {item.reference && <h3 className="text-white font-black text-xl mb-1">{item.reference}</h3>}
+                            <p className="text-gray-400 text-sm italic line-clamp-2">{item.content}</p>
                          </div>
-                      ))
-                   )}
+                      </div>
+                   )))}
                 </div>
               </div>
             ) : activeView === 'documents' ? (
               <div className="flex-1 flex flex-col p-10 overflow-hidden bg-(--bg-primary) animate-in fade-in duration-500">
                 <div className="flex items-center justify-between mb-8">
-                   <div className="space-y-1">
-                      <h2 className="text-3xl text-white font-black uppercase tracking-widest">Sermon Resources</h2>
-                      <p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Ready-to-Air Assets • Mission & Multi-Media</p>
-                   </div>
+                   <div className="space-y-1"><h2 className="text-3xl text-white font-black uppercase tracking-widest">Resources</h2><p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Ready-to-Air Assets</p></div>
                    <div className="flex gap-3">
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleResourceUpload} 
-                        style={{ display: 'none' }} 
-                        accept="image/*,video/*"
-                      />
-                      <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                      >
-                        Upload Asset
-                      </button>
-                      <button 
-                        onClick={handleNewPoint}
-                        className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
-                      >
-                        New Point
-                      </button>
+                      <input type="file" ref={fileInputRef} onChange={handleResourceUpload} style={{ display: 'none' }} accept="image/*,video/*" />
+                      <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white/5 text-gray-300 border border-white/10 rounded-xl text-[10px] font-black uppercase">Upload Asset</button>
+                      <button onClick={handleNewPoint} className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest">New Point</button>
                    </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto no-scrollbar pb-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-y-auto no-scrollbar pb-10">
                    {resourceAssets.map((asset, idx) => (
-                      <div 
-                        key={asset.id} 
-                        className={`group p-8 bg-white/3 hover:bg-white/5 border border-white/5 rounded-[40px] transition-all relative overflow-hidden flex flex-col justify-between aspect-square animate-in slide-in-from-bottom-4 duration-500`}
-                        style={{ animationDelay: `${idx * 50}ms` }}
-                      >
-                         <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg 
-                                  ${asset.category === 'Mission' ? 'bg-emerald-500/20 text-emerald-500' : 
-                                    asset.category === 'Faith' ? 'bg-blue-500/20 text-blue-400' :
-                                    asset.category === 'Uploads' ? 'bg-red-500/20 text-red-500' :
-                                    'bg-amber-500/20 text-amber-500'}`}>
-                                  {asset.icon}
-                               </div>
-                               <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">{asset.category}</span>
-                            </div>
-                            
-                            <h3 className="text-xl font-bold text-white tracking-tight">{asset.title}</h3>
-                            
-                            {(asset.type === 'note' || asset.type === 'media') && (
-                              <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-3">
-                                {asset.content || `Media: ${asset.title}`}
-                              </p>
-                            )}
-
-                            {asset.type === 'scripture' && (
-                               <div className="p-4 bg-white/2 rounded-2xl border border-white/5 italic text-gray-400 text-sm">
-                                  {asset.reference}: {asset.detail}
-                               </div>
-                            )}
-
-                            {asset.type === 'media' && asset.url && (
-                               <div className="mt-2 w-full h-24 rounded-xl overflow-hidden border border-white/5 bg-black">
-                                  {asset.mediaType === 'video' ? (
-                                     <video src={asset.url} className="w-full h-full object-cover" />
-                                  ) : (
-                                     <img src={asset.url} className="w-full h-full object-cover" />
-                                  )}
-                               </div>
-                            )}
+                      <div key={asset.id} className="group p-4 bg-[#1a1a1c] border border-white/5 rounded-2xl flex flex-col gap-3 min-h-[210px] max-h-[210px]">
+                         <div className="flex items-center justify-between shrink-0"><div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-500/10 text-gray-400">{asset.icon}</div><button onClick={() => handleDeleteResource(asset.id)} className="p-1 text-gray-700 hover:text-red-500 transition-colors"><X size={12} /></button></div>
+                         <div className="flex-1 overflow-y-auto no-scrollbar pt-2">
+                           <h3 className="text-[11px] font-black text-gray-200 mb-2 uppercase tracking-wide">{asset.title}</h3>
+                           {asset.type === 'media' && asset.url ? (
+                              <div className="w-full aspect-video rounded-lg overflow-hidden bg-black border border-white/5 ring-1 ring-white/5 shadow-inner">
+                                {asset.url.includes('#video') || asset.url.match(/\.(mp4|webm|ogg)/i) ? 
+                                  <video src={asset.url} className="w-full h-full object-contain" muted /> : 
+                                  <img src={asset.url} className="w-full h-full object-contain" />
+                                }
+                              </div>
+                           ) : (
+                              <p className="text-gray-500 text-[10px] leading-snug italic line-clamp-3">{asset.content || asset.detail}</p>
+                           )}
+                           {asset.type === 'scripture' && <p className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-tighter">{asset.reference}</p>}
+                        </div>
+                         <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-white/5">
+                            <button onClick={() => { if (asset.type === 'media') setLiveState(prev => ({ ...prev, preview_media: asset.url })); else if (asset.type === 'scripture') { const pts = asset.reference?.match(/^(.+)\s+(\d+):(\d+)/); if (pts) setPreviewVerse({ book:pts[1], chapter:parseInt(pts[2]), verse_start:parseInt(pts[3]), verse_end:parseInt(pts[3]) }); } else setLiveState(prev => ({ ...prev, preview_text: asset.content })); setActiveView('live'); }} className="flex-1 py-2 bg-white/5 text-white rounded-lg text-[8px] font-bold uppercase">PREVIEW</button>
+                            <button onClick={() => { directAir({ type: (asset.type === 'media' ? 'lyrics' : asset.type) as any, content: asset.content || (asset.type === 'scripture' ? `${asset.reference}: ${asset.detail}` : ''), media: asset.type === 'media' ? asset.url : null, reference: asset.type === 'scripture' ? asset.reference : undefined }); setActiveView('live'); }} className="flex-1 py-2 bg-emerald-600 text-black rounded-lg text-[8px] font-bold uppercase">AIR NOW</button>
                          </div>
-
-                         <button 
-                           onClick={() => {
-                              if (asset.type === 'media') {
-                                 setLiveState(prev => ({ ...prev, preview_media: asset.url }));
-                                 showToast(`Staged Media: ${asset.title}`);
-                              } else if (asset.type === 'scripture') {
-                                 const parts = asset.reference.match(/^(.+)\s+(\d+):(\d+)/);
-                                 if (parts) setPreviewVerse({ book: parts[1], chapter: parseInt(parts[2]), verse_start: parseInt(parts[3]), verse_end: parseInt(parts[3]) });
-                              } else {
-                                 setLiveState(prev => ({ ...prev, preview_text: asset.content }));
-                              }
-                              setActiveView('live');
-                           }}
-                           className="w-full py-3.5 bg-white/5 group-hover:bg-(--accent-color) group-hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
-                         >
-                            STAGE FOR AIR
-                         </button>
                       </div>
                    ))}
                 </div>
               </div>
-            ) : activeView === 'settings' ? (
+            ) : (
               <div className="absolute inset-0 z-10 flex">
                  <SettingsView settings={draftSettings} onUpdate={updateDraftSetting} onSave={commitSettings} />
-              </div>
-            ) : (
-              // Placeholder for future views
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-(--bg-primary) animate-in fade-in duration-500">
-                 <div className="bg-[#1e1e1e] p-12 rounded-[48px] border border-white/5 shadow-2xl max-w-lg relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.02),transparent)] opacity-40"></div>
-                    <h2 className="text-3xl text-white font-black uppercase tracking-widest mb-4">Expansion Zone</h2>
-                    <p className="text-gray-400 text-lg leading-relaxed relative z-10">
-                      This area is reserved for future church administration modules. Return to the "Live Session" via the sidebar monitor icon to continue your broadcast.
-                    </p>
-                    <button 
-                      onClick={() => setActiveView('live')}
-                      className="mt-10 bg-emerald-500 hover:bg-emerald-600 px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase tracking-widest text-black transition-all shadow-lg hover:shadow-emerald-500/20 active:scale-95 relative z-10"
-                    >
-                      Return to Live
-                    </button>
-                 </div>
               </div>
             )}
           </div>
@@ -1846,18 +1722,22 @@ export default function App() {
                filter: 'blur(5px) contrast(1.1)' 
              }} 
           />
-          <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-black opacity-60" />
+          <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-black opacity-30"></div>
 
           {/* MEDIA OVERLAY (Offering Images, Slide Decks, Videos) */}
           {liveState.current_media && (
              <div className="absolute inset-0 z-50 flex items-center justify-center p-12 animate-in zoom-in-95 duration-1000 bg-black/40">
-                <div className="relative w-full h-full max-w-6xl max-h-[85vh] rounded-[48px] overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5">
-                   {liveState.current_media.match(/\.(mp4|webm|ogg)$/i) ? (
+                <div className="relative w-full h-full max-w-6xl max-h-[85vh] rounded-[48px] overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.9)] border border-white/10 ring-1 ring-white/10">
+                   {liveState.current_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.current_media.includes('#video') ? (
                       <video 
+                        key={liveState.current_media}
                         src={liveState.current_media} 
-                        autoPlay 
+                        autoPlay={liveState.media_playing}
                         loop 
+                        muted={liveState.media_muted}
+                        playsInline
                         className="w-full h-full object-contain"
+                        ref={projectorVideoRef}
                       />
                    ) : (
                       <img 
@@ -1867,8 +1747,26 @@ export default function App() {
                       />
                    )}
                    {/* Cinematic Gradient Overlays for Media */}
-                   <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-40"></div>
+                   <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-30"></div>
                 </div>
+
+                {/* AUDIO RESCUE OVERLAY (Only shows if browser blocks unmuted play) */}
+                {audioBlocked && !liveState.media_muted && (
+                   <div className="absolute inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
+                      <button 
+                        onClick={handleBroadcastActivation}
+                        className="group flex flex-col items-center gap-6 p-12 bg-emerald-500 hover:bg-emerald-400 text-black rounded-[48px] shadow-[0_30px_60px_rgba(16,185,129,0.3)] transition-all active:scale-95"
+                      >
+                         <div className="p-6 bg-black/10 rounded-full group-hover:scale-110 transition-transform">
+                            <Volume2 size={64} strokeWidth={2.5} />
+                         </div>
+                         <div className="text-center">
+                            <h3 className="text-4xl font-black uppercase tracking-[0.2em] mb-2">Enable Audio</h3>
+                            <p className="text-sm font-bold uppercase tracking-widest opacity-60">Tap to start congregation broadcast</p>
+                         </div>
+                      </button>
+                   </div>
+                )}
              </div>
           )}
 
@@ -1952,8 +1850,28 @@ export default function App() {
               </div>
             )}
 
+            {/* SERMON POINT OVERLAY (Aired Content Elevation) */}
+            {liveState.is_point && liveState.current_text && !displayVerseLive && (
+               <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-1000">
+                  <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border-2 border-amber-500/20 rounded-[64px] shadow-[0_40px_120px_rgba(0,0,0,0.8)] relative overflow-hidden group">
+                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.05),transparent)]" />
+                     <div className="relative space-y-10">
+                        <div className="flex flex-col items-center gap-4">
+                           <div className="px-6 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                              <h2 className="text-2xl text-amber-500 font-black tracking-[0.5em] uppercase">Sermon Point</h2>
+                           </div>
+                           <div className="h-1 w-32 rounded-full bg-amber-500/40"></div>
+                        </div>
+                        <p className="text-white text-7xl font-black tracking-tight max-w-5xl mx-auto leading-[1.1] drop-shadow-2xl font-serif italic text-center">
+                           "{liveState.current_text}"
+                        </p>
+                     </div>
+                  </div>
+               </div>
+            )}
+
             {/* FALLBACK: CONTINUOUS TRANSCRIPTION (Atmospheric) */}
-            {!displayVerseLive && (!mainLyric || !settings.showLyrics) && settings.showTranscript && (
+            {!liveState.is_point && !displayVerseLive && (!mainLyric || !settings.showLyrics) && settings.showTranscript && (
               <div className="px-12 animate-in fade-in duration-1000 max-w-7xl">
                 <blockquote className="text-white/90 text-[64px] leading-[1.15] font-medium italic tracking-tight drop-shadow-2xl font-serif">
                    {/* Ghost word fix: Show only stable final words in the big feed */}

@@ -39,5 +39,9 @@ export interface LiveState {
   ticker_enabled?: boolean;
   is_blank?: boolean;
   is_logo?: boolean;
+  is_point?: boolean;
+  media_muted?: boolean;
+  media_playing?: boolean;
+  media_volume?: number;
   updated_at: string;
 }
