@@ -95,4 +95,37 @@ electron_1.ipcMain.handle('db:get-live-state', async (event, sessionId) => {
 electron_1.ipcMain.handle('db:get-session', async (event, sessionId) => {
     return db.getSession(sessionId);
 });
+// Professional Projector Auto-Launch (Like EasyWorship/ProPresenter)
+electron_1.ipcMain.handle('app:open-projector', async () => {
+    const displays = electron_1.screen.getAllDisplays();
+    const externalDisplay = displays.find((display) => {
+        return display.bounds.x !== 0 || display.bounds.y !== 0;
+    });
+    // Default to primary if no external found, but on external monitor bounds if found
+    const bounds = externalDisplay ? externalDisplay.bounds : electron_1.screen.getPrimaryDisplay().bounds;
+    const projectorWin = new electron_1.BrowserWindow({
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        fullscreen: !!externalDisplay, // Fullscreen on the TV, normal window if only laptop
+        autoHideMenuBar: true,
+        backgroundColor: '#000000',
+        webPreferences: {
+            preload: path_1.default.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: false
+        }
+    });
+    const urlPath = isDev ? 'http://localhost:5173?projector' : `file://${path_1.default.join(__dirname, '../dist/index.html?projector')}`;
+    if (isDev) {
+        projectorWin.loadURL(urlPath);
+    }
+    else {
+        // In production, we need to handle the query param for a local file
+        projectorWin.loadFile(path_1.default.join(__dirname, '../dist/index.html'), { query: { projector: 'true' } });
+    }
+    return true;
+});
 // Placeholder: could forward system settings, persistence API, offline sync and audio device info.
