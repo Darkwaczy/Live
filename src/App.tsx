@@ -1048,19 +1048,7 @@ export default function App() {
                         <div className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse"></div>
                         PREVIEW
                       </div>
-                      {liveState.preview_lyric_line ? (
-                         <div className="w-full h-full flex flex-col justify-center p-4 gap-2">
-                           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/70 text-center">{currentSong?.title}</p>
-                           <p className="text-sm font-bold text-white text-center leading-relaxed font-serif italic">"{liveState.preview_lyric_line}"</p>
-                         </div>
-                       ) : displayVersePreview && settings.detectVerses ? (
-                        <div className="w-full h-full flex flex-col justify-center">
-                          <div className="text-center space-y-3">
-                             <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
-                             <p className="text-(--text-primary) text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
-                          </div>
-                        </div>
-                      ) : liveState.preview_media ? (
+                      {liveState.preview_media ? (
                          <>
                            <div className="w-full h-full flex items-center justify-center p-2">
                              <div className="w-full h-full rounded-2xl overflow-hidden border border-emerald-500/30 bg-black/40 relative group/preview">
@@ -1128,7 +1116,14 @@ export default function App() {
                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/70 text-center">{currentSong?.title}</p>
                            <p className="text-sm font-bold text-white text-center leading-relaxed font-serif italic">"{liveState.preview_lyric_line}"</p>
                          </div>
-                       ) : liveState.preview_text ? (
+                       ) : displayVersePreview && settings.detectVerses ? (
+                        <div className="w-full h-full flex flex-col justify-center">
+                          <div className="text-center space-y-3">
+                             <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
+                             <p className="text-(--text-primary) text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
+                          </div>
+                        </div>
+                      ) : liveState.preview_text ? (
                           <div className="w-full h-full flex flex-col justify-center p-4">
                              <p className="text-sm font-bold text-emerald-400 text-center leading-relaxed font-serif italic">"{liveState.preview_text}"</p>
                           </div>
