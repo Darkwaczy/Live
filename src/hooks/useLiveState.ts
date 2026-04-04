@@ -395,6 +395,7 @@ export function useLiveState(
         ...prev,
         current_text: prev.preview_lyric_line ? '' : (prev.preview_text || ''),
         current_verse: prev.preview_verse,
+        current_verse_text: prev.preview_verse_text, // PROMOTION: staged text → live text
         current_media: prev.preview_media,
         current_lyric_line: nextCurrentLyricLine,
         current_lyric_index: nextCurrentLyricIndex,
@@ -406,6 +407,7 @@ export function useLiveState(
         media_volume: prev.preview_media ? (prev.preview_media_volume ?? 1.0) : prev.media_volume,
         media_epoch: prev.preview_media ? Date.now() : prev.media_epoch,
         preview_verse: nextPreviewVerse,
+        preview_verse_text: null, // Clear staged text after air
         preview_text: '',
         preview_media: null,
         is_live_dirty: true,
@@ -430,6 +432,7 @@ export function useLiveState(
            ...prev,
            current_text: data.content || '',
            current_verse: data.type === 'scripture' && data.reference ? { book: data.reference.split(' ')[0], chapter: 1, verse_start: 1, verse_end: 1 } : null,
+           current_verse_text: data.type === 'scripture' ? (data.content || '') : null,
            current_media: data.media || null,
            is_point: data.type === 'note',
            media_muted: data.media ? false : prev.media_muted,
@@ -455,10 +458,19 @@ export function useLiveState(
     setLiveState(prev => ({
       ...prev,
       preview_verse: verse,
+      preview_verse_text: null, // Reset text when reference changes
       is_live_dirty: true,
       updated_at: new Date().toISOString()
     }));
     if (verse) setCurrentVerse(verse);
+  }, []);
+
+  const setPreviewVerseText = useCallback((text: string | null) => {
+    setLiveState(prev => ({
+      ...prev,
+      preview_verse_text: text,
+      updated_at: new Date().toISOString()
+    }));
   }, []);
 
   const clearPreview = useCallback(() => {
@@ -559,6 +571,7 @@ export function useLiveState(
     directAir,
     setPreviewVerse,
     setSecondaryVerse,
+    setPreviewVerseText,
     removeDetection,
     setBlank,
     setLogo,

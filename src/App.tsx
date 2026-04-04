@@ -74,10 +74,7 @@ const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass 
 
 export default function App() {
   // Check if we are in standalone projector mode
-  // Only enter projector mode if we are NOT in the windows app's main view
-  const isProjectorMode = typeof window !== 'undefined' && 
-                          window.location.search.includes('projector') && 
-                          !window.location.pathname.includes('index.html'); // Ensure main app stays main app
+  const isProjectorMode = typeof window !== 'undefined' && window.location.search.includes('projector');
 
   if (isProjectorMode) {
     return <ProjectorPage />;
@@ -183,7 +180,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, directAir, setPreviewVerse, setSecondaryVerse, removeDetection, setBlank, setLogo, loadSong, airLyricLine, setLiveState
+    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, directAir, setPreviewVerse, setSecondaryVerse, setPreviewVerseText, removeDetection, setBlank, setLogo, loadSong, airLyricLine, setLiveState
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -422,7 +419,10 @@ export default function App() {
         const apiData = await apiRes.json();
         if (apiData.text) {
           const result = { reference: apiData.reference || ref, text: apiData.text.replace(/\n/g, ' ').trim(), translation: version };
-          if (!isSecondary) setFetchedVerse(result);
+          if (!isSecondary) {
+            setFetchedVerse(result);
+            setPreviewVerseText(result.text); // Sync to TV
+          }
           else setSecondaryFetchedVerse(result);
           return true;
         }
@@ -439,7 +439,10 @@ export default function App() {
         if (book && book.chapters && book.chapters[verse.chapter - 1]) {
            const text = book.chapters[verse.chapter - 1][verse.verse_start - 1];
            const result = { reference: ref, text, translation: version };
-           if (!isSecondary) setFetchedVerse(result);
+           if (!isSecondary) {
+             setFetchedVerse(result);
+             setPreviewVerseText(result.text); // Sync to TV
+           }
            else setSecondaryFetchedVerse(result);
            return true;
         }

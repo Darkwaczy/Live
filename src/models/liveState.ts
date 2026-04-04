@@ -28,6 +28,8 @@ export interface LiveState {
   preview_lyric_index?: number;        // Index of preview lyric
   preview_text?: string;
   preview_verse?: BibleVerse | null;
+  preview_verse_text?: string | null;   // Staged verse text
+  current_verse_text?: string | null;   // Active verse text on TV
   preview_media?: string | null;  // URL for staged images/videos
   current_media?: string | null;  // URL for airing images/videos
   is_live_dirty: boolean;
