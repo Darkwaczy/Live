@@ -8,10 +8,11 @@ import {
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
-import { useSync } from './hooks/useSync';
 import { Session } from './models/session';
 import { Note } from './models/note';
 import { User } from './models/user';
+import { useBroadcastSync } from './hooks/useBroadcastSync';
+import ProjectorPage from './components/ProjectorPage';
 import { login, logout, getCurrentUser } from './services/authService';
 import { 
    getNotes, saveNote, getSession, saveSession, getLiveState, saveLiveState,
@@ -72,6 +73,13 @@ const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass 
 };
 
 export default function App() {
+  // Check if we are in standalone projector mode
+  const isProjectorMode = typeof window !== 'undefined' && window.location.search.includes('projector');
+
+  if (isProjectorMode) {
+    return <ProjectorPage />;
+  }
+
 
   const [session, setSession] = useState<Session>({
     id: SESSION_ID,
@@ -184,6 +192,10 @@ export default function App() {
     { enabled: settings.aiVerseDetection, endpointUrl: settings.aiEndpoint, apiKey: settings.aiApiKey, modelName: settings.aiModel }
   );
 
+  // Sync state between Operator and Projector windows via BroadcastChannel
+  // No internet required, same-origin only.
+  useBroadcastSync(liveState, applyLiveState, false);
+
   const [airedVerse, setAiredVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
   const [airedLyric, setAiredLyric] = useState<string | null>(null);
 
@@ -221,7 +233,7 @@ export default function App() {
 
   // Helpers for transcription column (Now using preview_text for permanence)
   const sentences = useMemo(() => (liveState?.preview_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.preview_text]);
-  const { connected } = useSync(session.id, liveState, applyLiveState);
+
 
   const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
   const bibleScrollRef = React.useRef<HTMLDivElement>(null);
