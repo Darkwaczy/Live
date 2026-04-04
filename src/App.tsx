@@ -306,6 +306,10 @@ export default function App() {
       try {
         const res = await fetch(`/bibles/${version}.json`);
         if (!res.ok) throw new Error(`Content not found: /bibles/${version}.json`);
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Not a JSON file or missing translation.');
+        }
         const data = await res.json();
         if (Array.isArray(data)) {
           setBibleData(data);
@@ -752,7 +756,13 @@ export default function App() {
             {activeView === 'documents' && <div className="absolute inset-y-0 left-[-12px] w-[3px] bg-emerald-500 rounded-r-lg"></div>}
             <FileText size={22} />
           </button>
-          <div className="flex-1" />
+          <button 
+            onClick={() => window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720')}
+            className="flex justify-center p-3 rounded-xl relative group transition-colors text-gray-500 hover:text-emerald-400 hover:bg-white/5" 
+            title="Launch Projector Window">
+            <Cast size={22} />
+          </button>
+          <div className="flex-1"></div>
           <button 
             onClick={() => setActiveView('settings')}
             className={`flex justify-center p-3 rounded-xl relative group transition-colors mt-auto ${activeView === 'settings' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`} 
@@ -963,7 +973,7 @@ export default function App() {
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-                   {liveState.detection_history.length === 0 ? (
+                   {(!liveState.detection_history || liveState.detection_history.length === 0) ? (
                       <p className="text-[9px] text-gray-700 italic text-center mt-4 uppercase tracking-widest opacity-30">Queue is empty</p>
                    ) : (
                       liveState.detection_history.map((det) => (
@@ -1038,16 +1048,16 @@ export default function App() {
                                         }
                                      }}
                                    />
-                                ) : liveState.preview_media.match(/\.(pdf|doc|docx|ppt|pptx)/i) || liveState.preview_media.includes('#doc') ? (
-                                   <iframe src={liveState.preview_media} className="w-full h-full border-0 bg-white" title="Preview Document" />
+                                ) : (liveState.preview_media || '').match(/\.(pdf|doc|docx|ppt|pptx)/i) || (liveState.preview_media || '').includes('#doc') ? (
+                                   <iframe src={liveState.preview_media || ''} className="w-full h-full border-0 bg-white" title="Preview Document" />
                                 ) : (
-                                   <img src={liveState.preview_media} className="w-full h-full object-contain" />
+                                   <img src={liveState.preview_media || ''} className="w-full h-full object-contain" />
                                 )}
                              </div>
                            </div>
                            
                            {/* PREVIEW CONTROL HUB */}
-                           {(liveState.preview_media.includes('#video') || liveState.preview_media.match(/\.(mp4|webm|ogg|blob)/i)) && (
+                           {liveState.preview_media && ((liveState.preview_media || '').includes('#video') || (liveState.preview_media || '').match(/\.(mp4|webm|ogg|blob)/i)) && (
                               <div className="absolute top-4 right-4 flex items-center gap-2 z-20 animate-in slide-in-from-top-2 duration-300">
                                  <div className="flex bg-black/60 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-2xl">
                                     <button 
@@ -1160,15 +1170,15 @@ export default function App() {
                                       }
                                     }}
                                   />
-                               ) : liveState.current_media.match(/\.(pdf|doc|docx|ppt|pptx)/i) || liveState.current_media.includes('#doc') ? (
+                               ) : (liveState.current_media || '').match(/\.(pdf|doc|docx|ppt|pptx)/i) || (liveState.current_media || '').includes('#doc') ? (
                                   <iframe 
-                                    src={liveState.current_media} 
+                                    src={liveState.current_media || ''} 
                                     className="w-full h-full border-0 bg-white" 
                                     title="Live Document"
                                   />
                                ) : (
-                                  <img src={liveState.current_media} className="w-full h-full object-contain" />
-                               )}
+                                  <img src={liveState.current_media || ''} className="w-full h-full object-contain" />
+                                )}
                              </div>
                            </div>
                          ) : displayVerseLive ? (

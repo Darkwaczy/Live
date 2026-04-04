@@ -272,18 +272,25 @@ export function useLiveState(
   }, []);
 
   const applyLiveState = useCallback((updatedState: LiveState) => {
-    setLiveState(updatedState);
-    if (updatedState.current_verse) {
-      setCurrentVerse(updatedState.current_verse);
+    // SANITATION: Ensure history fields are never undefined/null
+    const sanitizedState = {
+      ...updatedState,
+      detection_history: Array.isArray(updatedState.detection_history) ? updatedState.detection_history : [],
+      history: Array.isArray(updatedState.history) ? updatedState.history : []
+    };
+    
+    setLiveState(sanitizedState);
+    if (sanitizedState.current_verse) {
+      setCurrentVerse(sanitizedState.current_verse);
     }
-    if (updatedState.current_song) {
+    if (sanitizedState.current_song) {
       setCurrentSong({
-        id: `${sessionId}-${updatedState.current_song}`,
-        title: updatedState.current_song,
+        id: `${sessionId}-${sanitizedState.current_song}`,
+        title: sanitizedState.current_song,
         lyrics: []
       });
     }
-    setSongLineIndex(updatedState.current_line);
+    setSongLineIndex(sanitizedState.current_line);
   }, [sessionId]);
 
   const wordRate = useMemo(() => {

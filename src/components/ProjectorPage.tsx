@@ -156,7 +156,7 @@ export default function ProjectorPage() {
       )}
 
       {/* CONTENT AREA */}
-      <div className="w-full max-w-[85vw] relative mx-auto h-[80vh] flex flex-col items-center justify-center text-center z-10 p-12">
+      <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[65vh] mb-32' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 p-12 transition-all duration-700`}>
 
         {/* MANUAL LYRIC MODE */}
         {liveState.current_lyric_line && !liveState.current_media && (
