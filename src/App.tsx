@@ -528,16 +528,18 @@ export default function App() {
     if (!file) return;
 
     const isVideo = file.type.startsWith('video/');
+    const isDoc = file.type === 'application/pdf' || file.name.match(/\.(doc|docx|ppt|pptx)$/i);
+    
     // Append hash to blob URL for easy type detection in the UI
-    const url = URL.createObjectURL(file) + (isVideo ? '#video' : '#image');
+    const url = URL.createObjectURL(file) + (isVideo ? '#video' : isDoc ? '#doc' : '#image');
     
     const newAsset = {
       id: Math.random().toString(36).substring(7),
       type: 'media',
-      mediaType: isVideo ? 'video' : 'image',
+      mediaType: isVideo ? 'video' : isDoc ? 'document' : 'image',
       title: file.name.split('.')[0],
       url: url,
-      icon: isVideo ? <Play size={18} /> : <Search size={18} />,
+      icon: isVideo ? <Play size={18} /> : isDoc ? <FileText size={18} /> : <Search size={18} />,
       category: 'Uploads'
     };
     
@@ -985,15 +987,68 @@ export default function App() {
                           </div>
                         </div>
                       ) : liveState.preview_media ? (
-                         <div className="w-full h-full flex items-center justify-center p-2">
-                           <div className="w-full h-full rounded-2xl overflow-hidden border border-emerald-500/30 bg-black/40">
-                              {liveState.preview_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.preview_media.includes('#video') ? (
-                                 <video src={liveState.preview_media} className="w-full h-full object-contain" autoPlay loop muted playsInline />
-                              ) : (
-                                 <img src={liveState.preview_media} className="w-full h-full object-contain" />
-                              )}
+                         <>
+                           <div className="w-full h-full flex items-center justify-center p-2">
+                             <div className="w-full h-full rounded-2xl overflow-hidden border border-emerald-500/30 bg-black/40 relative group/preview">
+                                {liveState.preview_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.preview_media.includes('#video') ? (
+                                   <video 
+                                     src={liveState.preview_media} 
+                                     className="w-full h-full object-contain" 
+                                     autoPlay={liveState.preview_media_playing} 
+                                     loop 
+                                     playsInline 
+                                     ref={(el) => {
+                                        if (el) {
+                                          el.muted = liveState.preview_media_muted ?? true;
+                                          el.volume = liveState.preview_media_volume ?? 1.0;
+                                          if (liveState.preview_media_playing) el.play().catch(() => {});
+                                          else el.pause();
+                                        }
+                                     }}
+                                   />
+                                ) : liveState.preview_media.match(/\.(pdf|doc|docx|ppt|pptx)/i) || liveState.preview_media.includes('#doc') ? (
+                                   <iframe src={liveState.preview_media} className="w-full h-full border-0 bg-white" title="Preview Document" />
+                                ) : (
+                                   <img src={liveState.preview_media} className="w-full h-full object-contain" />
+                                )}
+                             </div>
                            </div>
-                         </div>
+                           
+                           {/* PREVIEW CONTROL HUB */}
+                           {(liveState.preview_media.includes('#video') || liveState.preview_media.match(/\.(mp4|webm|ogg|blob)/i)) && (
+                              <div className="absolute top-4 right-4 flex items-center gap-2 z-20 animate-in slide-in-from-top-2 duration-300">
+                                 <div className="flex bg-black/60 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-2xl">
+                                    <button 
+                                      onClick={() => setLiveState((s: any) => ({ ...s, preview_media_playing: !s.preview_media_playing }))}
+                                      className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors"
+                                    >
+                                      {liveState.preview_media_playing ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                                    </button>
+                                    <div className="w-px h-4 bg-white/10 my-auto mx-1" />
+                                    <button 
+                                      onClick={() => setLiveState((s: any) => ({ ...s, preview_media_muted: !s.preview_media_muted }))}
+                                      className={`p-2 hover:bg-white/10 rounded-lg transition-colors ${!liveState.preview_media_muted ? 'text-emerald-400' : 'text-gray-400'}`}
+                                    >
+                                      {!liveState.preview_media_muted ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                                    </button>
+                                    <div className="flex items-center px-2">
+                                       <input 
+                                         type="range" 
+                                         min="0" 
+                                         max="1" 
+                                         step="0.1" 
+                                         value={liveState.preview_media_volume ?? 1}
+                                         onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            setLiveState((s: any) => ({ ...s, preview_media_volume: val }));
+                                         }}
+                                         className="w-12 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500 transition-all"
+                                       />
+                                    </div>
+                                 </div>
+                              </div>
+                           )}
+                         </>
                       ) : liveState.preview_text ? (
                          <div className="w-full h-full flex flex-col justify-center p-4">
                             <p className="text-sm font-bold text-emerald-400 text-center leading-relaxed font-serif italic">"{liveState.preview_text}"</p>
@@ -1053,20 +1108,26 @@ export default function App() {
                              <div className="w-full h-full rounded-2xl overflow-hidden border border-red-500/30">
                                {liveState.current_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.current_media.includes('#video') ? (
                                   <video 
+                                    key={(liveState.current_media || '') + '-' + (liveState.media_epoch || 0)}
                                     src={liveState.current_media} 
                                     className="w-full h-full object-contain" 
                                     autoPlay={liveState.media_playing}
                                     loop 
                                     playsInline 
+                                    muted={true}
                                     ref={(el) => {
                                       if (el) {
-                                        // Mirror uses same sync logic as projector for volume/mute
-                                        el.muted = liveState.media_muted ?? true;
-                                        el.volume = liveState.media_volume ?? 1.0;
+                                        // The 'Silent Operator' rule: House Projector handles real volume.
                                         if (liveState.media_playing) el.play().catch(() => {});
                                         else el.pause();
                                       }
                                     }}
+                                  />
+                               ) : liveState.current_media.match(/\.(pdf|doc|docx|ppt|pptx)/i) || liveState.current_media.includes('#doc') ? (
+                                  <iframe 
+                                    src={liveState.current_media} 
+                                    className="w-full h-full border-0 bg-white" 
+                                    title="Live Document"
                                   />
                                ) : (
                                   <img src={liveState.current_media} className="w-full h-full object-contain" />
@@ -1148,7 +1209,7 @@ export default function App() {
                 <div className="flex items-center justify-between mb-8">
                    <div className="space-y-1"><h2 className="text-3xl text-white font-black uppercase tracking-widest">Resources</h2><p className="text-gray-500 text-xs font-medium uppercase tracking-[0.3em]">Ready-to-Air Assets</p></div>
                    <div className="flex gap-3">
-                      <input type="file" ref={fileInputRef} onChange={handleResourceUpload} style={{ display: 'none' }} accept="image/*,video/*" />
+                      <input type="file" ref={fileInputRef} onChange={handleResourceUpload} style={{ display: 'none' }} accept="image/*,video/*,application/pdf,.doc,.docx,.ppt,.pptx" />
                       <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white/5 text-gray-300 border border-white/10 rounded-xl text-[10px] font-black uppercase">Upload Asset</button>
                       <button onClick={handleNewPoint} className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-[10px] font-black uppercase tracking-widest">New Point</button>
                    </div>
@@ -1687,11 +1748,11 @@ export default function App() {
 
           {/* MEDIA OVERLAY (Offering Images, Slide Decks, Videos) */}
           {liveState.current_media && (
-             <div className="absolute inset-0 z-50 flex items-center justify-center p-12 animate-in zoom-in-95 duration-1000 bg-black/40">
-                <div className="relative w-full h-full max-w-6xl max-h-[85vh] rounded-[48px] overflow-hidden shadow-[0_50px_100px_rgba(0,0,0,0.9)] border border-white/10 ring-1 ring-white/10">
+             <div className="absolute inset-0 z-50 flex items-center justify-center animate-in zoom-in-95 duration-1000 bg-black">
+                <div className="relative w-full h-full overflow-hidden">
                    {liveState.current_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.current_media.includes('#video') ? (
                       <video 
-                        key={liveState.current_media}
+                        key={(liveState.current_media || '') + '-' + (liveState.media_epoch || 0)}
                         src={liveState.current_media} 
                         autoPlay={liveState.media_playing}
                         loop 
@@ -1705,6 +1766,12 @@ export default function App() {
                            el.muted = liveState.media_muted ?? true;
                            el.volume = liveState.media_volume ?? 1.0;
                         }}
+                      />
+                   ) : liveState.current_media.match(/\.(pdf|doc|docx|ppt|pptx)/i) || liveState.current_media.includes('#doc') ? (
+                      <iframe 
+                        src={liveState.current_media} 
+                        className="w-full h-full border-0 bg-white" 
+                        title="Broadcast Document"
                       />
                    ) : (
                       <img 

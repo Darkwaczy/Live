@@ -35,6 +35,10 @@ export function useLiveState(
     media_muted: true,
     media_playing: true,
     media_volume: 1.0,
+    media_epoch: Date.now(),
+    preview_media_muted: true,
+    preview_media_playing: true,
+    preview_media_volume: 1.0,
     detection_history: [],
     history: [],
     updated_at: new Date().toISOString()
@@ -353,12 +357,14 @@ export function useLiveState(
 
       return {
         ...prev,
+        current_text: prev.preview_text || '',
         current_verse: prev.preview_verse,
         current_media: prev.preview_media,
-        is_point: false, // Normal Go Live from transcription is NOT a "Point" by default
-        media_muted: prev.preview_media ? true : prev.media_muted,
-        media_playing: true,
-        media_volume: 1.0,
+        is_point: !!prev.preview_text, // Aired text from preview is a point
+        media_muted: prev.preview_media ? (prev.preview_media_muted ?? true) : prev.media_muted,
+        media_playing: prev.preview_media ? (prev.preview_media_playing ?? true) : prev.media_playing,
+        media_volume: prev.preview_media ? (prev.preview_media_volume ?? 1.0) : prev.media_volume,
+        media_epoch: prev.preview_media ? Date.now() : prev.media_epoch,
         preview_verse: nextPreviewVerse,
         preview_text: '',
         preview_media: null,
@@ -386,9 +392,10 @@ export function useLiveState(
            current_verse: data.type === 'scripture' && data.reference ? { book: data.reference.split(' ')[0], chapter: 1, verse_start: 1, verse_end: 1 } : null,
            current_media: data.media || null,
            is_point: data.type === 'note',
-           media_muted: data.media ? true : prev.media_muted,
+           media_muted: data.media ? false : prev.media_muted,
            media_playing: true,
            media_volume: 1.0,
+           media_epoch: data.media ? Date.now() : prev.media_epoch,
            is_live_dirty: true,
            history: newHistory.slice(-200),
            updated_at: new Date().toISOString()
