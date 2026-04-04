@@ -566,6 +566,48 @@ export default function App() {
      showToast("Resource removed from library");
   };
 
+  // RESILIENT AUDIO ENGINE SYNC
+  useEffect(() => {
+    const video = projectorVideoRef.current;
+    if (!video) return;
+
+    // Direct hardware override for volume and mute
+    const syncAudio = async () => {
+      try {
+        if (!video) return;
+        // IMPERATIVE OVERRIDE: Set hardware state directly on the element
+        video.muted = liveState.media_muted ?? true;
+        video.volume = liveState.media_volume ?? 1.0;
+        
+        if (liveState.current_media && !liveState.media_muted) {
+           const playPromise = video.play();
+           if (playPromise !== undefined) {
+             playPromise.catch((e) => {
+               console.warn("Audio Context Blocked:", e);
+               // If play fails when unmuted, show the rescue button
+               setAudioBlocked(true);
+             });
+           }
+        }
+      } catch (err) {
+        console.error("Critical Audio Engine Sync Error:", err);
+      }
+    };
+
+    syncAudio();
+  }, [liveState.media_muted, liveState.media_volume, liveState.current_media]);
+
+  const handleBroadcastActivation = () => {
+     setAudioBlocked(false);
+     // Force the state to unmuted and full volume
+     setLiveState(s => ({ ...s, media_muted: false, media_volume: 1.0 }));
+     if (projectorVideoRef.current) {
+        projectorVideoRef.current.muted = false;
+        projectorVideoRef.current.volume = 1.0;
+        projectorVideoRef.current.play().catch(e => console.error("Rescue Play Failed:", e));
+     }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -633,88 +675,6 @@ export default function App() {
   const projectorTextClass1 = settings.transcriptSize === 'small' ? 'text-4xl' : settings.transcriptSize === 'medium' ? 'text-5xl' : 'text-6xl';
   const projectorTextClass2 = settings.transcriptSize === 'small' ? 'text-3xl' : settings.transcriptSize === 'medium' ? 'text-4xl' : 'text-5xl';
   const projectorTextClass3 = settings.transcriptSize === 'small' ? 'text-2xl' : settings.transcriptSize === 'medium' ? 'text-3xl' : 'text-4xl';
-
-  if (isProjector) {
-    const minutes = Math.floor(timerSession.remaining / 60);
-    const seconds = timerSession.remaining % 60;
-    
-    return (
-      <div className="flex h-screen w-full bg-black text-white font-sans overflow-hidden select-none relative px-12 py-12">
-        <button onClick={() => setProjector(false)} className="absolute top-6 right-6 p-4 text-white/20 hover:text-white/80 transition-opacity z-50">
-           <X size={32} />
-        </button>
-
-        {/* Theme-Aware Background Filter */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center brightness-[0.2] saturate-[0.8] opacity-60 z-0 transition-opacity duration-1000"
-          style={{ backgroundImage: `url('${settings.projectorBg}')` }}
-        />
-        
-        {/* Color overlay based on theme */}
-        <div className="absolute inset-0 bg-(--bg-primary)/40 z-1 transition-colors" />
-
-        {/* Countdown Timer */}
-        {settings.autoShowTimer && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 px-8 py-4 glass-panel bg-red-600/20 border border-red-500/30 rounded-full z-50">
-            <span className="text-4xl font-mono font-bold text-red-400">
-              {minutes}:{seconds.toString().padStart(2, '0')}
-            </span>
-          </div>
-        )}
-
-        <div className="flex-1 flex flex-col justify-center items-center w-full max-w-6xl mx-auto space-y-12 z-10">
-           {settings.showVerse && displayVerseLive && settings.detectVerses && (
-              <div className="w-full max-w-4xl glass-panel p-10 shadow-2xl bg-(--bg-secondary)/90 border-(--border-color)" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
-                <div className="flex gap-10">
-                   <div className="flex-1">
-                     <h4 className="text-(--accent-color) font-medium pb-4 border-b border-(--border-color) mb-4 text-xl">{displayVerseLive.reference} <span className="text-(--text-secondary) font-normal">({settings.bibleVersion})</span></h4>
-                     <p className="text-(--text-primary) text-3xl leading-relaxed font-serif">{displayVerseLive.text}</p>
-                   </div>
-                   {secondaryFetchedVerse && (
-                     <div className="flex-1 border-l border-(--border-color) pl-10">
-                       <h4 className="text-(--accent-color) font-medium pb-4 border-b border-(--border-color) mb-4 text-xl">{secondaryFetchedVerse.reference} <span className="text-(--text-secondary) font-normal">({settings.secondaryBibleVersion})</span></h4>
-                       <p className="text-(--text-primary) text-3xl leading-relaxed font-serif italic">{secondaryFetchedVerse.text}</p>
-                     </div>
-                   )}
-                </div>
-              </div>
-           )}
-           {(!displayVerseLive || !settings.showVerse) && settings.showTranscript && settings.enableTranscription && (
-             <div className="w-full space-y-8 px-24 text-center z-0">
-                <p className={`${projectorTextClass1} text-white leading-normal font-medium tracking-tight whitespace-pre-wrap`}>
-                  {liveState.current_text.split(' ').slice(-30).join(' ') || (isListening ? 'Listening...' : 'Click Play to start the live transcription.')}
-                </p>
-             </div>
-           )}
-        </div>
-        {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
-           <div className="absolute bottom-12 left-12 right-12 glass-panel p-8 bg-(--bg-secondary)/90 border-(--border-color) text-center z-10" style={{ backdropFilter: `blur(${settings.transparency/5 + 5}px)` }}>
-              <p className="text-5xl font-bold text-(--accent-color) tracking-wide mb-4">
-                {mainLyric || '...'}
-              </p>
-              {nextLyric && <p className="text-3xl text-(--text-secondary) italic mt-4">{nextLyric}</p>}
-           </div>
-        )}
-        {/* MASTER OVERLAYS (BLANK / LOGO) */}
-        {liveState.is_blank && (
-          <div className="absolute inset-0 bg-black z-100 transition-opacity animate-in fade-in flex items-center justify-center cursor-none">
-             <div className="sr-only">Projector Blanked</div>
-          </div>
-        )}
-
-        {liveState.is_logo && (
-          <div className="absolute inset-0 bg-black z-100 transition-opacity animate-in fade-in flex items-center justify-center cursor-none">
-             {settings.churchLogo ? (
-               <img src={settings.churchLogo} alt="Church Logo" className="w-full h-full object-contain" />
-             ) : (
-               <LayoutGrid size={120} className="text-blue-500/10" />
-             )}
-          </div>
-        )}
-
-      </div>
-    );
-  }
 
 
   return (
@@ -1097,11 +1057,12 @@ export default function App() {
                                     className="w-full h-full object-contain" 
                                     autoPlay={liveState.media_playing}
                                     loop 
-                                    muted={liveState.media_muted} 
                                     playsInline 
                                     ref={(el) => {
                                       if (el) {
-                                        el.volume = liveState.media_volume || 1;
+                                        // Mirror uses same sync logic as projector for volume/mute
+                                        el.muted = liveState.media_muted ?? true;
+                                        el.volume = liveState.media_volume ?? 1.0;
                                         if (liveState.media_playing) el.play().catch(() => {});
                                         else el.pause();
                                       }
@@ -1734,10 +1695,16 @@ export default function App() {
                         src={liveState.current_media} 
                         autoPlay={liveState.media_playing}
                         loop 
-                        muted={liveState.media_muted}
                         playsInline
+                        crossOrigin="anonymous"
                         className="w-full h-full object-contain"
                         ref={projectorVideoRef}
+                        onLoadedMetadata={(e) => {
+                           // Heavy-handed re-sync once the file is loaded
+                           const el = e.currentTarget;
+                           el.muted = liveState.media_muted ?? true;
+                           el.volume = liveState.media_volume ?? 1.0;
+                        }}
                       />
                    ) : (
                       <img 
