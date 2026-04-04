@@ -89,7 +89,16 @@ export function useBroadcastSync(
     // Throttle: Max 10 updates per second (100ms)
     // Ensures final state always lands via trailing edge
     if (throttleTimeoutRef.current) clearTimeout(throttleTimeoutRef.current);
-    throttleTimeoutRef.current = setTimeout(publish, 100);
+    
+    // CRITICAL: Update the state reference immediately even if we throttle the signal
+    // This fixed the 'Blank Screen on Start' bug.
+    const currentKey = JSON.stringify(state);
+    if (!lastPublished.current && currentKey) {
+       // First run? Send immediately to allow TV to discover
+       publish();
+    } else {
+       throttleTimeoutRef.current = setTimeout(publish, 100);
+    }
 
     return () => {
       if (throttleTimeoutRef.current) clearTimeout(throttleTimeoutRef.current);

@@ -899,11 +899,16 @@ export default function App() {
               </button>
               
               <button 
-                onClick={() => {
-                  if ((window as any).sermonSync?.openProjector) {
-                    (window as any).sermonSync.openProjector();
-                  } else {
-                    window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720');
+                onClick={async () => {
+                  try {
+                    if ((window as any).sermonSync?.openProjector) {
+                      const isActive = await (window as any).sermonSync.openProjector();
+                      setIsProjectorActive(isActive);
+                    } else {
+                      window.open(window.location.origin + window.location.pathname + '?projector', 'ProjectorWindow', 'width=1280,height=720');
+                    }
+                  } catch (err) {
+                    console.error('Projector Launch Failed:', err);
                   }
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all active:scale-95 group ${isProjectorActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/5'}`} 

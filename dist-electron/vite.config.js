@@ -19,6 +19,7 @@ exports.default = (0, vite_1.defineConfig)({
     },
     build: {
         outDir: 'dist',
-        emptyOutDir: true
+        emptyOutDir: true,
+        chunkSizeWarningLimit: 2000
     }
 });

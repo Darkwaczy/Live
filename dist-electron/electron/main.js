@@ -40,8 +40,10 @@ const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const db = __importStar(require("./db.js"));
 const isDev = process.env.NODE_ENV !== 'production';
+let mainWindow = null;
+let projectorWindow = null;
 function createWindow() {
-    const win = new electron_1.BrowserWindow({
+    mainWindow = new electron_1.BrowserWindow({
         width: 1400,
         height: 920,
         minWidth: 1024,
@@ -54,15 +56,18 @@ function createWindow() {
         }
     });
     if (isDev) {
-        win.loadURL('http://localhost:5173');
-        win.webContents.openDevTools();
+        mainWindow.loadURL('http://localhost:5173');
+        mainWindow.webContents.openDevTools();
     }
     else {
         // In production, the executable is inside dist-electron/electron,
         // so we need to go up two levels to reach the root dist folder.
-        win.loadFile(path_1.default.join(__dirname, '../../dist/index.html'));
+        mainWindow.loadFile(path_1.default.join(__dirname, '../../dist/index.html'));
     }
-    return win;
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+    });
+    return mainWindow;
 }
 electron_1.app.on('ready', () => {
     createWindow();
@@ -99,13 +104,18 @@ electron_1.ipcMain.handle('db:get-session', async (event, sessionId) => {
 });
 // Professional Projector Auto-Launch (Like EasyWorship/ProPresenter)
 electron_1.ipcMain.handle('app:open-projector', async () => {
+    // Toggle Off: If it's already open, close it.
+    if (projectorWindow) {
+        projectorWindow.close();
+        return false;
+    }
     const displays = electron_1.screen.getAllDisplays();
     const externalDisplay = displays.find((display) => {
         return display.bounds.x !== 0 || display.bounds.y !== 0;
     });
     // Default to primary if no external found, but on external monitor bounds if found
     const bounds = externalDisplay ? externalDisplay.bounds : electron_1.screen.getPrimaryDisplay().bounds;
-    const projectorWin = new electron_1.BrowserWindow({
+    projectorWindow = new electron_1.BrowserWindow({
         x: bounds.x,
         y: bounds.y,
         width: bounds.width,
@@ -122,13 +132,27 @@ electron_1.ipcMain.handle('app:open-projector', async () => {
     });
     const urlPath = isDev ? 'http://localhost:5173?projector' : `file://${path_1.default.join(__dirname, '../dist/index.html?projector')}`;
     if (isDev) {
-        projectorWin.loadURL(urlPath);
+        projectorWindow.loadURL(urlPath);
     }
     else {
         // In production, the executable is inside dist-electron/electron,
         // so we need to go up two levels to reach the root dist folder.
-        projectorWin.loadFile(path_1.default.join(__dirname, '../../dist/index.html'), { query: { projector: 'true' } });
+        projectorWindow.loadFile(path_1.default.join(__dirname, '../../dist/index.html'), { query: { projector: 'true' } });
     }
+    // Notify the renderer that the projector is open
+    if (mainWindow) {
+        mainWindow.webContents.send('projector-status-changed', true);
+    }
+    projectorWindow.on('closed', () => {
+        projectorWindow = null;
+        // Notify the renderer that the projector is closed
+        if (mainWindow) {
+            mainWindow.webContents.send('projector-status-changed', false);
+        }
+    });
     return true;
+});
+electron_1.ipcMain.handle('app:get-projector-status', async () => {
+    return !!projectorWindow;
 });
 // Placeholder: could forward system settings, persistence API, offline sync and audio device info.

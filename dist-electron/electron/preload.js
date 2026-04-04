@@ -4,6 +4,10 @@ const electron_1 = require("electron");
 electron_1.contextBridge.exposeInMainWorld('sermonSync', {
     getAppVersion: () => electron_1.ipcRenderer.invoke('app:get-version'),
     openProjector: () => electron_1.ipcRenderer.invoke('app:open-projector'),
+    getProjectorStatus: () => electron_1.ipcRenderer.invoke('app:get-projector-status'),
+    onProjectorStatus: (callback) => {
+        electron_1.ipcRenderer.on('projector-status-changed', (_event, isActive) => callback(isActive));
+    },
     send: (channel, data) => {
         const validChannels = ['transcription:start', 'notes:save', 'sync:status'];
         if (validChannels.includes(channel)) {
