@@ -393,7 +393,9 @@ export function useLiveState(
 
       return {
         ...prev,
-        current_text: prev.preview_lyric_line ? '' : (prev.preview_text || ''),
+        // PRIVACY FIX: Raw transcription (preview_text) stays laptop-only. 
+        // It should never be promoted to the TV during goLive.
+        current_text: prev.is_point ? prev.preview_text : '', 
         current_verse: prev.preview_verse,
         current_verse_text: prev.preview_verse_text, // PROMOTION: staged text → live text
         current_media: prev.preview_media,

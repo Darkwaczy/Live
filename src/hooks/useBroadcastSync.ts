@@ -70,6 +70,8 @@ export function useBroadcastSync(
 
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const prevMediaRef = useRef({ playing: state.media_playing, volume: state.media_volume });
+
   // Operator: publish every time state changes
   useEffect(() => {
     if (isProjectorMode) return; // Projector only listens, never publishes
@@ -84,6 +86,8 @@ export function useBroadcastSync(
       
       // Backup sync: LocalStorage (extremely reliable for same-machine windows)
       localStorage.setItem('ca_live_sync_v1', currentKey);
+      
+      prevMediaRef.current = { playing: state.media_playing, volume: state.media_volume };
     };
 
     // Throttle: Max 10 updates per second (100ms)
@@ -91,10 +95,14 @@ export function useBroadcastSync(
     if (throttleTimeoutRef.current) clearTimeout(throttleTimeoutRef.current);
     
     // CRITICAL: Update the state reference immediately even if we throttle the signal
-    // This fixed the 'Blank Screen on Start' bug.
     const currentKey = JSON.stringify(state);
-    if (!lastPublished.current && currentKey) {
-       // First run? Send immediately to allow TV to discover
+    
+    // FAST TRACK: If it's a media update (Volume/Play/Pause), bypass the throttle!
+    const mediaChanged = prevMediaRef.current.playing !== state.media_playing || 
+                         prevMediaRef.current.volume !== state.media_volume;
+
+    if ((!lastPublished.current && currentKey) || mediaChanged) {
+       // First run OR Volume Change? Send immediately!
        publish();
     } else {
        throttleTimeoutRef.current = setTimeout(publish, 100);

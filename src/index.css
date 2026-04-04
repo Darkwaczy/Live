@@ -71,6 +71,19 @@
     font-family: 'Inter', 'SF Pro Display', system-ui, sans-serif;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
+
+  /* Global Interactivity */
+  button, 
+  [role="button"], 
+  input[type="button"], 
+  input[type="submit"], 
+  input[type="range"],
+  .clickable,
+  .cursor-pointer,
+  svg[onclick],
+  .icon-clickable {
+    cursor: pointer !important;
+  }
 }
 
 @layer utilities {
