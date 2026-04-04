@@ -306,6 +306,8 @@ export function useLiveState(
 
   const clearText = useCallback(() => {
     setInterimText('');
+    setCurrentSong(null);
+    setSongLineIndex(undefined);
     setLiveState(prev => ({ 
       ...prev, 
       current_text: '', 
@@ -313,6 +315,10 @@ export function useLiveState(
       current_song_id: null,
       current_media: null,
       media_playing: false,
+      current_lyric_line: null,
+      current_lyric_index: undefined,
+      preview_lyric_line: null,
+      preview_lyric_index: undefined,
       is_live_dirty: !!(prev.preview_text || prev.preview_verse), 
       is_blank: false,
       is_logo: false,
@@ -339,6 +345,13 @@ export function useLiveState(
             content: 'Multimedia: ' + (prev.preview_media.split('/').pop() || 'Asset'),
             timestamp: new Date().toISOString()
          });
+      } else if (prev.preview_lyric_line) {
+        newHistory.push({
+          id: Math.random().toString(36).substring(2, 9),
+          type: 'lyrics',
+          content: prev.preview_lyric_line,
+          timestamp: new Date().toISOString()
+        });
       } else if (prev.preview_text && prev.preview_text !== prev.current_text) {
         newHistory.push({
           id: Math.random().toString(36).substring(2, 9),
@@ -357,12 +370,30 @@ export function useLiveState(
          };
       }
 
+      // LYRIC PROMOTION: preview_lyric → current_lyric, next line → preview_lyric
+      let nextPreviewLyricLine = prev.preview_lyric_line;
+      let nextPreviewLyricIndex = prev.preview_lyric_index;
+      let nextCurrentLyricLine = prev.current_lyric_line;
+      let nextCurrentLyricIndex = prev.current_lyric_index;
+      // We'll handle the actual next-line lookup in App.tsx via a useEffect watching current_lyric_index
+      if (prev.preview_lyric_line !== undefined) {
+        nextCurrentLyricLine = prev.preview_lyric_line;
+        nextCurrentLyricIndex = prev.preview_lyric_index;
+        // Signal that preview lyric needs to advance (App.tsx useEffect will fill it in)
+        nextPreviewLyricLine = null;
+        nextPreviewLyricIndex = (prev.preview_lyric_index ?? 0) + 1; // temp marker — App.tsx fills actual text
+      }
+
       return {
         ...prev,
-        current_text: prev.preview_text || '',
+        current_text: prev.preview_lyric_line ? '' : (prev.preview_text || ''),
         current_verse: prev.preview_verse,
         current_media: prev.preview_media,
-        is_point: !!prev.preview_text, // Aired text from preview is a point
+        current_lyric_line: nextCurrentLyricLine,
+        current_lyric_index: nextCurrentLyricIndex,
+        preview_lyric_line: nextPreviewLyricLine,
+        preview_lyric_index: nextPreviewLyricIndex,
+        is_point: !prev.preview_lyric_line && !!prev.preview_text,
         media_muted: prev.preview_media ? (prev.preview_media_muted ?? true) : prev.media_muted,
         media_playing: prev.preview_media ? (prev.preview_media_playing ?? true) : prev.media_playing,
         media_volume: prev.preview_media ? (prev.preview_media_volume ?? 1.0) : prev.media_volume,
@@ -460,6 +491,51 @@ export function useLiveState(
     }));
   }, []);
 
+  const loadSong = useCallback((song: Song | null) => {
+    setCurrentSong(song);
+    setSongLineIndex(song ? 0 : undefined);
+    if (!song) {
+      setLiveState(prev => ({
+        ...prev,
+        current_song_id: null,
+        preview_lyric_line: null,
+        preview_lyric_index: undefined,
+        current_lyric_line: null,
+        current_lyric_index: undefined,
+        updated_at: new Date().toISOString()
+      }));
+      return;
+    }
+    const firstLine = song.lyrics?.[0]?.line || '';
+    setLiveState(prev => ({
+      ...prev,
+      current_song_id: song.id,
+      preview_lyric_line: firstLine,
+      preview_lyric_index: 0,
+      current_lyric_line: null,
+      current_lyric_index: undefined,
+      is_live_dirty: true,
+      updated_at: new Date().toISOString()
+    }));
+  }, []);
+
+  // AIR a specific lyric line directly to Live On Screen; auto-stage next line to Preview
+  const airLyricLine = useCallback((song: Song, lineIndex: number) => {
+    const lines = song.lyrics || [];
+    const liveText = lines[lineIndex]?.line || '';
+    const nextLine = lines[lineIndex + 1]?.line || null;
+    const nextIndex = lineIndex + 1 < lines.length ? lineIndex + 1 : undefined;
+    setLiveState(prev => ({
+      ...prev,
+      current_lyric_line: liveText,
+      current_lyric_index: lineIndex,
+      preview_lyric_line: nextLine,
+      preview_lyric_index: nextIndex,
+      is_live_dirty: true,
+      updated_at: new Date().toISOString()
+    }));
+  }, []);
+
   return {
     liveState,
     interimText,
@@ -479,6 +555,8 @@ export function useLiveState(
     removeDetection,
     setBlank,
     setLogo,
+    loadSong,
+    airLyricLine,
     setLiveState,
     speechStats,
     wordRate,

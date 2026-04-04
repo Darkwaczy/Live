@@ -19,7 +19,13 @@ export interface LiveState {
   current_verse?: BibleVerse | null;
   secondary_verse?: string | null; // For parallel view
   current_song?: string;
+  current_song_id?: string | null;  // ID of active song
   current_line?: number;
+  // --- LYRIC BROADCAST STATE (independent of Sermon Point) ---
+  current_lyric_line?: string | null;  // Line currently on Live On Screen
+  current_lyric_index?: number;        // Index of current live lyric
+  preview_lyric_line?: string | null;  // Line staged in Preview
+  preview_lyric_index?: number;        // Index of preview lyric
   preview_text?: string;
   preview_verse?: BibleVerse | null;
   preview_media?: string | null;  // URL for staged images/videos

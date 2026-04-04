@@ -172,7 +172,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, directAir, setPreviewVerse, setSecondaryVerse, removeDetection, setBlank, setLogo, setLiveState
+    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, directAir, setPreviewVerse, setSecondaryVerse, removeDetection, setBlank, setLogo, loadSong, airLyricLine, setLiveState
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -204,6 +204,20 @@ export default function App() {
     setAiredLyric(null);
     originalClearText();
   };
+
+  // AUTO-ADVANCE PREVIEW LYRIC: When goLive promotes preview→current, fill in the next line text.
+  useEffect(() => {
+    const idx = liveState.preview_lyric_index;
+    if (idx === undefined || liveState.preview_lyric_line !== null) return;
+    // preview_lyric_line is null but index was set — fill it from song
+    if (currentSong && currentSong.lyrics && idx < currentSong.lyrics.length) {
+      const nextText = currentSong.lyrics[idx]?.line || null;
+      setLiveState((s: any) => ({ ...s, preview_lyric_line: nextText }));
+    } else if (currentSong && idx >= (currentSong.lyrics?.length || 0)) {
+      // End of song — no more lines
+      setLiveState((s: any) => ({ ...s, preview_lyric_line: null, preview_lyric_index: undefined }));
+    }
+  }, [liveState.preview_lyric_index, liveState.preview_lyric_line, currentSong]);
 
   // Helpers for transcription column (Now using preview_text for permanence)
   const sentences = useMemo(() => (liveState?.preview_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.preview_text]);
@@ -1055,16 +1069,21 @@ export default function App() {
                               </div>
                            )}
                          </>
-                      ) : liveState.preview_text ? (
-                         <div className="w-full h-full flex flex-col justify-center p-4">
-                            <p className="text-sm font-bold text-emerald-400 text-center leading-relaxed font-serif italic">"{liveState.preview_text}"</p>
+                      ) : liveState.preview_lyric_line ? (
+                         <div className="w-full h-full flex flex-col justify-center p-4 gap-2">
+                           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/70 text-center">{currentSong?.title}</p>
+                           <p className="text-sm font-bold text-white text-center leading-relaxed font-serif italic">"{liveState.preview_lyric_line}"</p>
                          </div>
-                      ) : (
-                        <div className="w-full text-center opacity-30 group-hover:opacity-50 transition-opacity">
-                          <FileText size={48} className="mx-auto text-gray-400 mb-4" />
-                          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-300">Ready to Stage</p>
-                        </div>
-                      )}
+                       ) : liveState.preview_text ? (
+                          <div className="w-full h-full flex flex-col justify-center p-4">
+                             <p className="text-sm font-bold text-emerald-400 text-center leading-relaxed font-serif italic">"{liveState.preview_text}"</p>
+                          </div>
+                       ) : (
+                         <div className="w-full text-center opacity-30 group-hover:opacity-50 transition-opacity">
+                           <FileText size={48} className="mx-auto text-gray-400 mb-4" />
+                           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-300">Ready to Stage</p>
+                         </div>
+                       )}
                    </div>
 
                    <div className="flex-1 flex flex-col gap-3 min-w-0 h-full">
@@ -1141,20 +1160,26 @@ export default function App() {
                              </div>
                            </div>
                          ) : displayVerseLive ? (
-                           <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
-                              <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase">{displayVerseLive.reference}</h4>
-                              <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
-                           </div>
-                         ) : liveState.current_text ? (
                             <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
-                               <p className="text-xl font-black text-emerald-400 tracking-tight drop-shadow-glow italic font-serif">"{liveState.current_text}"</p>
+                               <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase">{displayVerseLive.reference}</h4>
+                               <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
                             </div>
-                         ) : airedLyric ? (
-                           <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
-                              <p className="text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2">{airedLyric}</p>
-                              {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
-                           </div>
-                         ) : (<div className="opacity-30 z-10"><Monitor size={48} className="text-gray-500 mb-3" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Screen is Clear</p></div>)}
+                          ) : liveState.current_lyric_line ? (
+                            <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
+                               <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/70 mb-2">{currentSong?.title}</p>
+                               <p className="text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight drop-shadow-glow font-serif italic">"{liveState.current_lyric_line}"</p>
+                               {liveState.preview_lyric_line && <p className="text-white/30 text-sm italic mt-2">{liveState.preview_lyric_line}</p>}
+                            </div>
+                          ) : liveState.current_text ? (
+                             <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
+                                <p className="text-xl font-black text-emerald-400 tracking-tight drop-shadow-glow italic font-serif">"{liveState.current_text}"</p>
+                             </div>
+                          ) : airedLyric ? (
+                            <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">
+                               <p className="text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2">{airedLyric}</p>
+                               {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
+                            </div>
+                          ) : (<div className="opacity-30 z-10"><Monitor size={48} className="text-gray-500 mb-3" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Screen is Clear</p></div>)}
                          
                          {liveState.is_logo && (
                            <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-35 flex items-center justify-center animate-in fade-in">
@@ -1675,7 +1700,7 @@ export default function App() {
                                <button 
                                  key={song.id}
                                  onClick={() => {
-                                   setLiveState((s: any) => ({ ...s, current_song_id: song.id, is_live_dirty: true }));
+                                   loadSong(song);
                                    showToast(`Loaded: ${song.title}`);
                                  }}
                                  className="flex flex-col items-start p-4 bg-white/3 hover:bg-white/8 border border-white/5 rounded-xl transition-all group relative overflow-hidden text-left"
@@ -1706,25 +1731,45 @@ export default function App() {
                         <div className="flex items-center justify-between px-1 mb-2">
                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Now Active</p>
                            <button 
-                             onClick={() => setLiveState((s: any) => ({ ...s, current_song_id: null }))}
+                             onClick={() => loadSong(null)}
                              className="text-[10px] font-black uppercase text-red-500 hover:text-red-400"
                            >
                              Close Song
                            </button>
                         </div>
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1 pb-10">
-                          {currentSong?.lyrics?.map((lyricLine) => (
-                            <div 
-                               key={lyricLine.order} 
-                               onClick={() => setManualLineOffset(lyricLine.order - (currentLine ?? 0))}
-                               className={`p-4 rounded-xl border shadow-sm text-gray-300 cursor-pointer hover:border-(--accent-color)/50 transition-all duration-300 ${lyricLine.order === actualLineIndex ? `bg-(--bg-secondary) border-(--accent-color) shadow-lg scale-[1.02] text-white` : 'bg-transparent border-(--border-color) opacity-60'}`}>
-                              <div className="flex items-center gap-3">
-                                 <span className={`text-[10px] font-bold ${lyricLine.order === actualLineIndex ? 'text-(--accent-color)' : 'text-gray-600'}`}>{lyricLine.order + 1}</span>
-                                 <span className="text-sm font-medium">{lyricLine.line}</span>
-                              </div>
-                              {lyricLine.order === actualLineIndex && <div className="h-0.5 w-full mt-3 rounded-full bg-(--accent-color) animate-pulse"></div>}
-                            </div>
-                          ))}
+                         {currentSong?.lyrics?.map((lyricLine) => {
+                            const isLive = lyricLine.order === liveState.current_lyric_index;
+                            const isPreview = lyricLine.order === liveState.preview_lyric_index;
+                            return (
+                             <div 
+                                key={lyricLine.order}
+                                className={`p-3 rounded-xl border transition-all duration-300 flex items-center justify-between gap-3 group
+                                  ${isLive ? 'bg-(--bg-secondary) border-(--accent-color) shadow-lg' 
+                                  : isPreview ? 'bg-emerald-500/5 border-emerald-500/30' 
+                                  : 'bg-transparent border-(--border-color) opacity-60 hover:opacity-100 hover:border-white/20'}`}
+                             >
+                               <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <span className={`text-[10px] font-bold shrink-0 w-5 text-right
+                                    ${isLive ? 'text-(--accent-color)' : isPreview ? 'text-emerald-400/70' : 'text-gray-600'}`}>
+                                    {lyricLine.order + 1}
+                                  </span>
+                                  <span className={`text-sm font-medium truncate ${isLive ? 'text-white font-bold' : isPreview ? 'text-gray-200' : 'text-gray-400'}`}>
+                                    {lyricLine.line}
+                                  </span>
+                               </div>
+                               <button
+                                  onClick={() => airLyricLine(currentSong, lyricLine.order)}
+                                  className={`shrink-0 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all
+                                    ${isLive 
+                                      ? 'bg-(--accent-color) text-black shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
+                                      : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black border border-emerald-500/20'}`}
+                               >
+                                 {isLive ? '● Live' : 'AIR'}
+                               </button>
+                             </div>
+                            );
+                         })}
                         </div>
                       </div>
                     )}
@@ -1849,8 +1894,8 @@ export default function App() {
           
           <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[70vh] mb-24' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 transition-all duration-700 p-12`}>
             
-            {/* LYRICS OVERLAY (Karaoke Mode) */}
-            {settings.showLyrics && settings.detectSongs && mainLyric && (
+            {/* LYRICS OVERLAY (Auto Karaoke Mode — only when no song manually loaded) */}
+            {settings.showLyrics && settings.detectSongs && mainLyric && !liveState.current_song_id && (
               <div className="w-full absolute bottom-12 flex flex-col items-center animate-in slide-in-from-bottom-8 duration-500">
                 <KaraokeLine 
                   lyric={mainLyric} 
@@ -1902,8 +1947,21 @@ export default function App() {
               </div>
             )}
 
+            {/* MANUAL LYRIC OVERLAY (when a song is loaded and a line is aired via AIR button) */}
+            {liveState.current_lyric_line && !displayVerseLive && (
+               <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
+                  <p className="text-[14px] text-emerald-400/60 font-black tracking-[0.4em] uppercase mb-6">{currentSong?.title}</p>
+                  <p className={`text-white ${projectionRole === 'stage' ? 'text-6xl' : 'text-7xl'} leading-[1.1] font-serif font-bold tracking-tight max-w-5xl mx-auto drop-shadow-2xl text-center`}>
+                     "{liveState.current_lyric_line}"
+                  </p>
+                  {liveState.preview_lyric_line && (
+                     <p className="text-white/30 text-3xl font-serif italic mt-8 tracking-wide">{liveState.preview_lyric_line}</p>
+                  )}
+               </div>
+            )}
+
             {/* SERMON POINT OVERLAY (Aired Content Elevation) */}
-            {liveState.is_point && liveState.current_text && !displayVerseLive && (
+            {liveState.is_point && liveState.current_text && !displayVerseLive && !liveState.current_lyric_line && (
                <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-1000">
                   <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border-2 border-amber-500/20 rounded-[64px] shadow-[0_40px_120px_rgba(0,0,0,0.8)] relative overflow-hidden group">
                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.05),transparent)]" />
@@ -1923,7 +1981,7 @@ export default function App() {
             )}
 
             {/* FALLBACK: CONTINUOUS TRANSCRIPTION (Atmospheric) */}
-            {!liveState.is_point && !displayVerseLive && (!mainLyric || !settings.showLyrics) && settings.showTranscript && (
+            {!liveState.is_point && !displayVerseLive && !liveState.current_lyric_line && (!mainLyric || !settings.showLyrics || liveState.current_song_id) && settings.showTranscript && (
               <div className="px-12 animate-in fade-in duration-1000 max-w-7xl">
                 <blockquote className="text-white/90 text-[64px] leading-[1.15] font-medium italic tracking-tight drop-shadow-2xl font-serif">
                    {/* Ghost word fix: Show only stable final words in the big feed */}
