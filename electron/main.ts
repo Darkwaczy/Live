@@ -25,7 +25,7 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
   } else {
     // In production, the executable is inside dist-electron/electron,
     // so we need to go up two levels to reach the root dist folder.
