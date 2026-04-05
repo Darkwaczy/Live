@@ -126,10 +126,11 @@ export default function App() {
     detectVerses: true,
     verseSensitivity: 60,
     bibleVersion: 'KJV',
-    aiVerseDetection: true,
-    aiEndpoint: 'https://api.openai.com/v1/chat/completions',
-    aiApiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
-    aiModel: 'gpt-4o-mini',
+    aiVerseDetection: false,
+    aiEndpoint: 'http://localhost:11434/api/generate',
+    aiModel: 'llama2',
+    aiApiKey: '',
+    uiScale: 100,
     detectSongs: true,
     lyricsSource: 'local',
     autoSyncLyrics: true,
@@ -768,7 +769,10 @@ export default function App() {
   return (
     <div 
       className={`flex h-screen w-full font-sans overflow-hidden select-none theme-${settings.theme} bg-(--bg-primary) text-(--text-primary) transition-colors duration-300`}
-      style={{ '--highlight-override': highlightHex } as React.CSSProperties}
+      style={{ 
+        '--highlight-override': highlightHex,
+        zoom: (settings.uiScale || 100) / 100
+      } as React.CSSProperties}
     >
       
       {/* Toast Notification */}
@@ -959,7 +963,7 @@ export default function App() {
         <div className="flex-1 flex overflow-hidden bg-black/20">
           
           {/* COLUMN 1: INTEGRATED FEED (LEFT) */}
-          <section className="w-[280px] flex flex-col bg-(--bg-secondary) border-r border-(--border-color) shrink-0 animate-in slide-in-from-left-8 duration-500 overflow-hidden transition-colors">
+          <section className="w-72 max-w-[20%] min-w-[240px] flex flex-col bg-(--bg-secondary) border-r border-(--border-color) shrink animate-in slide-in-from-left-8 duration-500 overflow-hidden transition-colors">
              
              {/* TOP: LIVE TRANSCRIPTION */}
              <div className="flex-[0.6] flex flex-col min-h-0 border-b border-(--border-color)">
@@ -1404,7 +1408,7 @@ export default function App() {
 
           {/* Right Panel */}
           {isRightPanelOpen && (
-            <aside className="w-[340px] bg-[#161616] border-l border-white/5 flex flex-col shadow-2xl shrink-0 z-20 animate-in slide-in-from-right-8 duration-300">
+            <aside className="w-80 max-w-[25%] min-w-[280px] bg-[#161616] border-l border-white/5 flex flex-col shadow-2xl shrink z-20 animate-in slide-in-from-right-8 duration-300">
               <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/5 font-medium text-sm text-gray-300">
                 <button 
                   onClick={() => setIsRightPanelOpen(false)}

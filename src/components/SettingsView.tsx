@@ -324,17 +324,34 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
 
                 <hr className="border-white/5" />
 
-                {/* Typography */}
+                {/* Typography & Scaling */}
                 <div>
-                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Typography Scaling</h4>
-                  <div className="space-y-4">
+                  <h4 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-4">Typography & Interface Scaling</h4>
+                  <div className="space-y-6">
                      <div>
-                        <label className="block text-sm text-gray-300 mb-2">Base Text Size</label>
-                        <select value={settings.transcriptSize} onChange={e => onUpdate('transcriptSize', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white">
+                        <label className="block text-sm text-gray-300 mb-2">Base Text Size (Transcripts)</label>
+                        <select value={settings.transcriptSize} onChange={e => onUpdate('transcriptSize', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white outline-none">
                           <option value="small">Small (Standard Density)</option>
                           <option value="medium">Medium (Ideal for Tablets)</option>
                           <option value="large">Large (High Legibility)</option>
                         </select>
+                     </div>
+                     
+                     <div className="space-y-4 pt-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300 font-medium">Global Dashboard Scale (Zoom)</span>
+                          <span className="text-emerald-400 font-bold">{settings.uiScale || 100}%</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="70" 
+                          max="110" 
+                          step="5" 
+                          value={settings.uiScale || 100} 
+                          onChange={e => onUpdate('uiScale', Number(e.target.value))} 
+                          className="w-full accent-emerald-500 cursor-pointer" 
+                        />
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest italic">Note: Use this to match layouts across different monitors.</p>
                      </div>
                   </div>
                 </div>
