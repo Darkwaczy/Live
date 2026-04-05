@@ -979,60 +979,40 @@ export default function App() {
                    {isListening && <span className="text-[8px] font-bold text-(--accent-color)/60 uppercase tracking-widest">Live</span>}
                 </div>
                 
-                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar bg-(--bg-primary)/50">
-                {sentences.length === 0 && !interimText ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
-                     <FileText size={24} className="mb-2" />
-                     <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>
-                  </div>
-                ) : (
-                  sentences.map((line, i) => {
-                    const isTopic = /topic[:\-]/i.test(line);
-                    const isPoint = /^(?:point|number|no\.?)\s*\d+[:\-]?/i.test(line.trim());
-                    
-                    return (
-                      <div key={i} className={`flex flex-col gap-1.5 group animate-in slide-in-from-bottom-1 duration-300 ${isTopic ? 'mt-6 mb-2' : isPoint ? 'mt-4' : ''}`}>
-                         <div className="flex items-center justify-between opacity-30">
-                            <span className={`text-[8px] font-black uppercase tracking-widest ${isTopic ? 'text-blue-400' : isPoint ? 'text-amber-400' : 'text-emerald-500/60'}`}>
-                               {isTopic ? 'New Segment' : isPoint ? 'Structural Point' : 'Live Feed'}
-                            </span>
-                            <span className="text-[8px] font-mono text-gray-600">[{new Date(Date.now() - (sentences.length - i) * 2000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' })}]</span>
+                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 no-scrollbar bg-(--bg-primary)/50">
+
+                   {/* LIVE INTERIM — prominent, sticky at top as words come in */}
+                   {interimText && (
+                     <div className="sticky top-0 z-10 mb-1 px-3 py-2.5 rounded-xl bg-(--accent-color)/10 border border-(--accent-color)/30 shadow-lg backdrop-blur-sm">
+                       <div className="flex items-center gap-1.5 mb-1">
+                         <span className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse inline-block" />
+                         <span className="text-[8px] font-black text-(--accent-color) uppercase tracking-widest">Speaking now</span>
+                       </div>
+                       <p className="text-sm font-semibold text-white leading-snug">{interimText}</p>
+                     </div>
+                   )}
+
+                   {/* CONFIRMED sentences — stacked below */}
+                   {sentences.length === 0 && !interimText ? (
+                     <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
+                        <FileText size={24} className="mb-2" />
+                        <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>
+                     </div>
+                   ) : (
+                     sentences.map((line: string, i: number) => {
+                       const isRecent = i >= sentences.length - 3;
+                       return (
+                         <div key={i} className="animate-in slide-in-from-bottom-1 duration-200">
+                           <p className={`text-xs leading-relaxed transition-all ${
+                             isRecent ? 'text-gray-200 font-medium' : 'text-gray-500 font-normal'
+                           }`}>
+                             {line.trim()}{line.endsWith('.') ? '' : '.'}
+                           </p>
                          </div>
-                         <p className={`leading-relaxed transition-all ${
-                            isTopic 
-                              ? 'text-lg font-black text-white py-2 border-b-2 border-blue-500/30 tracking-tight' 
-                              : isPoint 
-                                ? 'text-sm font-bold text-amber-200 border-l-2 border-amber-500/40 pl-3 italic'
-                                : line.toLowerCase().includes(selectedBook.toLowerCase()) 
-                                  ? 'text-xs text-emerald-400 font-bold border-l-2 border-emerald-500/40 pl-3 shadow-glow' 
-                                  : 'text-xs text-gray-400 group-hover:text-gray-200 font-medium'
-                         }`}>
-                            {displayVerseLive && line.split(' ').some(w => displayVerseLive.text.toLowerCase().includes(w.toLowerCase())) ? (
-                                <KaraokeLine 
-                                   lyric={line.trim() + (line.endsWith('.') ? '' : '.')}
-                                   spokenText={displayVerseLive.text}
-                                   colorClass="text-(--accent-color)"
-                                   animationClass="glow"
-                                   sizeClass="text-xs"
-                                />
-                             ) : (
-                                <span>{line.trim()}{line.endsWith('.') ? '' : '.'}</span>
-                             )}
-                         </p>
-                      </div>
-                    );
-                  })
-                )}
-                {interimText && (
-                  <div className="flex flex-col gap-1 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between opacity-30">
-                       <span className="text-[8px] font-black text-blue-400 uppercase">Live Interim</span>
-                       <span className="text-[8px] font-mono text-gray-600">Now</span>
-                    </div>
-                    <p className="text-xs text-white/80 leading-relaxed font-medium underline decoration-blue-500/30 underline-offset-4">{interimText}...</p>
-                  </div>
-                )}
-             </div>
+                       );
+                     })
+                   )}
+                 </div>
              </div>
 
              {/* BOTTOM: QUEUE */}
