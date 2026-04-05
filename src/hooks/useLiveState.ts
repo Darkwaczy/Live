@@ -103,16 +103,16 @@ export function useLiveState(
             return prev;
           }
 
-          // Append with proper punctuation spacing
-          const updatedText = prev.preview_text ? `${prev.preview_text.trim()} ${cleanChunk}` : cleanChunk;
+          // Append with proper punctuation spacing (using a local buffer for detection)
+          const updatedTranscription = prev.current_text ? `${prev.current_text.trim()} ${cleanChunk}` : cleanChunk;
           
           // Use a larger window for semantic context
-          const rollingWindow = updatedText.split(' ').slice(-60).join(' ');
+          const rollingWindow = updatedTranscription.split(' ').slice(-60).join(' ');
           const verse = detectBibleVerse(rollingWindow);
           const song = findSongByWords(cleanChunk);
           const contentClassification = classifyContent(cleanChunk);
 
-          const newLine = song ? locateCurrentLine(song, updatedText) : prev.current_line;
+          const newLine = song ? locateCurrentLine(song, updatedTranscription) : prev.current_line;
           const currentAi = aiConfigRef.current;
           let newDetections = [...prev.detection_history];
 
@@ -148,7 +148,6 @@ export function useLiveState(
 
           let nextState = {
             ...prev,
-            preview_text: updatedText,
             updated_at: new Date().toISOString(),
             detection_history: newDetections
           };
@@ -247,14 +246,15 @@ export function useLiveState(
     };
   }, [sessionId, provider, whisperConfig.audioInput, whisperConfig.apiKey, whisperConfig.endpoint]);
 
-  // Feed context back to AudioService for Whisper "Memory"
+  // Feed context back to AudioService for Whisper "Memory" (using history for context)
   useEffect(() => {
-    if (audioServiceRef.current && liveState.preview_text) {
-      // Send the last 500 characters as context to prime the next chunk
-      const context = liveState.preview_text.slice(-500);
+    if (audioServiceRef.current && liveState.history?.length > 0) {
+      // Send the last few notes as context to prime the next chunk
+      const fullHistory = liveState.history.map((h: any) => h.content).join(' ');
+      const context = fullHistory.slice(-500);
       audioServiceRef.current.setConfig({ previousContext: context });
     }
-  }, [liveState.preview_text]);
+  }, [liveState.history]);
 
   const start = async () => {
     setError(null);
