@@ -27,6 +27,7 @@ export interface LiveState {
   preview_lyric_line?: string | null;  // Line staged in Preview
   preview_lyric_index?: number;        // Index of preview lyric
   preview_text?: string;
+  transcription_text?: string;
   preview_verse?: BibleVerse | null;
   preview_verse_text?: string | null;   // Staged verse text
   current_verse_text?: string | null;   // Active verse text on TV

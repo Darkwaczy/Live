@@ -301,8 +301,13 @@ export default function App() {
     }
   }, [liveState.preview_lyric_index, liveState.preview_lyric_line, currentSong]);
 
-  // Helpers for transcription column (Now using preview_text for permanence)
-  const sentences = useMemo(() => (liveState?.preview_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.preview_text]);
+  // Helpers for transcription column
+  const sentences = useMemo(() => {
+    const text = (liveState.transcription_text || liveState.current_text || '');
+    return text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  }, [liveState.transcription_text, liveState.current_text]);
+
+  const fullTranscript = (liveState.transcription_text || liveState.current_text || '') + (interimText ? ' ' + interimText : '');
 
   const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
   const bibleScrollRef = React.useRef<HTMLDivElement>(null);
@@ -719,7 +724,7 @@ export default function App() {
   };
 
   const handleSnapshotToNotes = () => {
-    const fullBuffer = liveState.current_text + (interimText ? ' ' + interimText : '');
+    const fullBuffer = (liveState.transcription_text || liveState.current_text || '') + (interimText ? ' ' + interimText : '');
     if (!fullBuffer.trim()) {
        showToast('No active text to save!');
        return;
@@ -746,7 +751,6 @@ export default function App() {
     } catch (e) {}
   };
 
-  const fullTranscript = (liveState.current_text + ' ' + (interimText || '')).trim();
 
   const handleNext = () => setManualLineOffset(prev => prev + 1);
   const handlePrev = () => setManualLineOffset(prev => prev - 1);

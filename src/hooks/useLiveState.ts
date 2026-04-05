@@ -24,6 +24,7 @@ export function useLiveState(
     current_song: undefined,
     current_line: undefined,
     preview_text: '',
+    transcription_text: '',
     preview_verse: null,
     is_live_dirty: false,
     is_analyzing: false,
@@ -226,6 +227,7 @@ export function useLiveState(
                }
             ].slice(-200), // keep the last 200 notes to prevent memory bloat
             session_id: sessionId,
+            transcription_text: updatedTranscription,
             content_type: contentClassification.type,
             updated_at: new Date(timestamp).toISOString()
           } as any;
