@@ -303,82 +303,75 @@ function getLevenshteinDistance(a: string, b: string): number {
 }
 
 export async function detectBibleVerseAI(
-  text: string, 
-  endpoint: string, 
+  text: string,
+  endpoint: string,
   apiKey: string,
-  model: string = 'mistral'
+  model: string = 'llama-3.3-70b-versatile'
 ): Promise<BibleVerse | null> {
-  const prompt = `Analyze the following spoken sermon transcript from a Nigerian church.
-  
-  CONTEXT:
-  - The speaker may use Standard English, Nigerian Pidgin (e.g., "wetin", "una", "dia"), or local languages (Yoruba, Igbo, Hausa).
-  
-  TASK:
-  1. Identify any EXPLICIT Bible references (e.g., "John 3:16").
-  2. Identify any SEMANTIC/PARAPHRASED quotes, STORIES, PARABLES, or MIRACLES.
-  3. If the speaker is describing a story (e.g., "Man that had two sons", "Jesus walking on water"), IDENTIFY the most likely Bible location.
-  4. IMPORTANT: If the user is speaking Pidgin or a local language, TRANSLATE it into Standard English in your mind first to find the matching verse in your database.
-  5. Resolve phonetic mishearings (e.g., "Genests" -> "Genesis").
+  // Always use Groq if we have a key — it's ultra-fast (~300ms)
+  // Falls back to any OpenAI-compatible endpoint if no key is provided.
+  const groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+  const resolvedEndpoint = apiKey ? groqEndpoint : endpoint;
+  const resolvedModel = apiKey ? model : (model || 'llama-3.3-70b-versatile');
 
-  REQUIREMENTS:
-  - Respond ONLY with a valid JSON object.
-  - If scripture is found, return: {"book": "BookName", "chapter": X, "verse_start": Y, "verse_end": Z}.
-  - If no scripture is found, return: {"book": null}.
+  const prompt = `You are a Bible reference expert for a live church broadcast system.
+Analyze this sermon transcript and identify the most likely Bible verse being referenced.
 
-  TEXT TO ANALYZE: "${text}"`;
+RULES:
+- The speaker may quote verbatim, paraphrase, tell a Bible story/parable, or reference a miracle.
+- The speaker may use Nigerian Pidgin (e.g. "wetin", "una", "e don do"), Yoruba, or Igbo phrases — interpret them in context.
+- Respond ONLY with a single JSON object, no explanation.
+- If a scripture is found: {"book": "BookName", "chapter": 3, "verse_start": 16, "verse_end": 16}
+- If no scripture is found: {"book": null}
+- Use the exact canonical book name (e.g. "1 Corinthians", "Psalms", "Revelation").
+
+SERMON TEXT:
+"${text.slice(-400)}"`;
 
   try {
-    const res = await fetch(endpoint, {
-      method: "POST",
+    const res = await fetch(resolvedEndpoint, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        ...(apiKey ? { "Authorization": `Bearer ${apiKey}` } : {})
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-         model: model,
-         messages: [ { role: "user", content: prompt } ],
-         temperature: 0.1,
-         stream: false
+        model: resolvedModel,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 80,
+        stream: false
       })
     });
-    
+
     if (!res.ok) {
-       console.error("AI Verse Inference Failed", await res.text());
-       return null;
+      console.warn('[AI Verse] Request failed:', res.status, await res.text());
+      return null;
     }
-    
+
     const data = await res.json();
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-       if (data.response) {
-          // Fallback for native Ollama /api/generate endpoints which return { response: "" }
-          const parsed = JSON.parse(data.response.match(/\{[\s\S]*\}/)?.[0] || '{}');
-          const resolved = resolveBookName(parsed.book);
-          if (parsed.book) {
-             return { book: resolved || parsed.book, chapter: Number(parsed.chapter), verse_start: Number(parsed.verse_start), verse_end: Number(parsed.verse_start) };
-          }
-       }
-       return null;
-    }
-    
-    // Fallback for OpenAI / v1/chat/completions endpoints
-    const content = data.choices[0].message.content;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const content = data?.choices?.[0]?.message?.content || data?.response || '';
+    const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) return null;
-    
+
     const parsed = JSON.parse(jsonMatch[0]);
-    if (parsed && parsed.book && parsed.chapter && parsed.verse_start) {
-       const resolved = resolveBookName(parsed.book);
-       return {
-          book: resolved || parsed.book,
-          chapter: Number(parsed.chapter),
-          verse_start: Number(parsed.verse_start),
-          verse_end: parsed.verse_end ? Number(parsed.verse_end) : Number(parsed.verse_start)
-       };
-    }
+    if (!parsed?.book || parsed.book === 'null' || parsed.book === null) return null;
+
+    const resolved = resolveBookName(parsed.book);
+    const finalBook = resolved || parsed.book;
+    const chapter = Number(parsed.chapter);
+    const verse_start = Number(parsed.verse_start);
+    const verse_end = parsed.verse_end ? Number(parsed.verse_end) : verse_start;
+
+    if (!finalBook || !chapter || !verse_start) return null;
+
+    console.log(`[AI Verse] ✅ Groq detected: ${finalBook} ${chapter}:${verse_start}`);
+    return { book: finalBook, chapter, verse_start, verse_end };
+
   } catch (err) {
-    console.error("AI Verse Inference Exception:", err);
+    console.warn('[AI Verse] Exception:', err);
+    return null;
   }
-  return null;
 }
 
 export function crossReference(verse: BibleVerse): BibleVerse[] {

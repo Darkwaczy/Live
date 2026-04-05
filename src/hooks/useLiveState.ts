@@ -169,47 +169,43 @@ export function useLiveState(
               nextState = { ...nextState, preview_verse: verse, is_live_dirty: true, detection_history: newDetections };
             }
           } else {
-             const isBibleStoryCandidate = (text: string) => {
-                const keywords = ['jesus', 'god', 'lord', 'spirit', 'bible', 'scripture', 'verse', 'man', 'son', 'father', 'king'];
-                const low = text.toLowerCase();
-                return keywords.some(k => low.includes(k)) && text.split(' ').length > 6;
-             };
-
-             if (currentAi.enabled && isBibleStoryCandidate(cleanChunk) && !prev.is_analyzing) {
-                // AI trigger (async)
-                setTimeout(() => {
-                   setLiveState(s => ({ ...s, is_analyzing: true }));
-                   detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName).then((aiVerse: BibleVerse | null) => {
-                      if (aiVerse) {
-                         setLiveState(s => {
-                            const alreadyExists = s.detection_history.some(d => 
-                               d.verse.book === aiVerse.book && 
-                               d.verse.chapter === aiVerse.chapter && 
-                               d.verse.verse_start === aiVerse.verse_start && 
-                               ((Date.now() - new Date(d.timestamp).getTime()) < 30_000)
-                            );
-                            if (alreadyExists) return { ...s, is_analyzing: false };
-
-                            setCurrentVerse(aiVerse);
-                            return { 
-                               ...s, 
-                               preview_verse: aiVerse, 
-                               is_live_dirty: true, 
-                               is_analyzing: false,
-                               detection_history: [{
-                                  id: `det-${Date.now()}`,
-                                  verse: aiVerse,
-                                  timestamp: new Date().toISOString(),
-                                  is_paraphrase: true
-                               }, ...s.detection_history].slice(0, 50)
-                            };
-                         });
-                      } else {
-                         setLiveState(s => ({ ...s, is_analyzing: false }));
-                      }
-                   }).catch(() => setLiveState(s => ({ ...s, is_analyzing: false })));
-                }, 0);
-             }
+            // GROQ AI DETECTION: Fires on every paragraph that pattern matching missed.
+            // No keyword gate — Groq is fast enough to handle every chunk (~300ms).
+            if (currentAi.enabled && !prev.is_analyzing && cleanChunk.split(' ').length >= 5) {
+              setTimeout(() => {
+                setLiveState(s => ({ ...s, is_analyzing: true }));
+                detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
+                  .then((aiVerse: BibleVerse | null) => {
+                    if (aiVerse) {
+                      setLiveState(s => {
+                        const alreadyExists = s.detection_history.some(d =>
+                          d.verse.book === aiVerse.book &&
+                          d.verse.chapter === aiVerse.chapter &&
+                          d.verse.verse_start === aiVerse.verse_start &&
+                          (Date.now() - new Date(d.timestamp).getTime()) < 30_000
+                        );
+                        if (alreadyExists) return { ...s, is_analyzing: false };
+                        setCurrentVerse(aiVerse);
+                        return {
+                          ...s,
+                          preview_verse: aiVerse,
+                          is_live_dirty: true,
+                          is_analyzing: false,
+                          detection_history: [{
+                            id: `det-${Date.now()}`,
+                            verse: aiVerse,
+                            timestamp: new Date().toISOString(),
+                            is_paraphrase: true
+                          }, ...s.detection_history].slice(0, 50)
+                        };
+                      });
+                    } else {
+                      setLiveState(s => ({ ...s, is_analyzing: false }));
+                    }
+                  })
+                  .catch(() => setLiveState(s => ({ ...s, is_analyzing: false })));
+              }, 0);
+            }
           }
 
           if (song) {
