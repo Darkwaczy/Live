@@ -104,11 +104,15 @@ export function useLiveState(
             return prev;
           }
 
-          // Append with proper punctuation spacing (using a local buffer for detection)
-          const updatedTranscription = prev.current_text ? `${prev.current_text.trim()} ${cleanChunk}` : cleanChunk;
-          
-          // Use a larger window for semantic context
-          const rollingWindow = updatedTranscription.split(' ').slice(-60).join(' ');
+          // Build the growing transcription buffer for context
+          // Use transcription_text (the dedicated private feed) so the rolling window
+          // always has the last 60+ words of everything spoken — crucial for detection.
+          const updatedTranscription = prev.transcription_text
+            ? `${prev.transcription_text.trim()} ${cleanChunk}`
+            : cleanChunk;
+
+          // Rolling window: last 80 words gives much richer context for verse patterns
+          const rollingWindow = updatedTranscription.split(' ').slice(-80).join(' ');
           const verse = detectBibleVerse(rollingWindow);
           const song = findSongByWords(cleanChunk);
           const contentClassification = classifyContent(cleanChunk);
@@ -117,31 +121,36 @@ export function useLiveState(
           const currentAi = aiConfigRef.current;
           let newDetections = [...prev.detection_history];
 
-          // Utility to prevent duplicates in history (within last 30 seconds or matching verse)
+          // LOCKOUT: 30 seconds for the exact same verse (was 3 minutes — too long).
+          // This allows the pastor to re-reference a verse later in the same sermon.
+          const LOCKOUT_MS = 30_000;
+
           const isDuplicate = (v: BibleVerse) => {
-            return newDetections.some(d => 
-              d.verse.book === v.book && 
-              d.verse.chapter === v.chapter && 
+            return newDetections.some(d =>
+              d.verse.book === v.book &&
+              d.verse.chapter === v.chapter &&
               d.verse.verse_start === v.verse_start &&
-              (Date.now() - new Date(d.timestamp).getTime() < 180000) // 3-minute lockout for exact same verse
+              (Date.now() - new Date(d.timestamp).getTime() < LOCKOUT_MS)
             );
           };
 
+          // Only block it if that exact verse is CURRENTLY staged in preview
           const isCurrentlyShowing = (v: BibleVerse) => {
-            return prev.preview_verse && 
-                   prev.preview_verse.book === v.book && 
-                   prev.preview_verse.chapter === v.chapter && 
+            return prev.preview_verse &&
+                   prev.preview_verse.book === v.book &&
+                   prev.preview_verse.chapter === v.chapter &&
                    prev.preview_verse.verse_start === v.verse_start;
           };
 
           const addDetection = (v: BibleVerse, isPara = false) => {
             if (!isDuplicate(v) && !isCurrentlyShowing(v)) {
+              // Cap at 50 — enough history for a full sermon without blocking detection
               newDetections = [{
                 id: `det-${Date.now()}`,
                 verse: v,
                 timestamp: new Date().toISOString(),
                 is_paraphrase: isPara
-              }, ...newDetections].slice(0, 15);
+              }, ...newDetections].slice(0, 50);
               return true;
             }
             return false;
@@ -177,7 +186,7 @@ export function useLiveState(
                                d.verse.book === aiVerse.book && 
                                d.verse.chapter === aiVerse.chapter && 
                                d.verse.verse_start === aiVerse.verse_start && 
-                               ((Date.now() - new Date(d.timestamp).getTime()) < 180000)
+                               ((Date.now() - new Date(d.timestamp).getTime()) < 30_000)
                             );
                             if (alreadyExists) return { ...s, is_analyzing: false };
 
@@ -192,7 +201,7 @@ export function useLiveState(
                                   verse: aiVerse,
                                   timestamp: new Date().toISOString(),
                                   is_paraphrase: true
-                               }, ...s.detection_history].slice(0, 15)
+                               }, ...s.detection_history].slice(0, 50)
                             };
                          });
                       } else {
