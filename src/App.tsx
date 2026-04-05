@@ -1001,8 +1001,16 @@ export default function App() {
                    ) : (
                      sentences.map((line: string, i: number) => {
                        const isRecent = i >= sentences.length - 3;
+                       const approxTime = new Date(Date.now() - (sentences.length - i) * 2000)
+                         .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                        return (
                          <div key={i} className="animate-in slide-in-from-bottom-1 duration-200">
+                           <div className="flex items-center justify-between mb-0.5">
+                             <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500/40">
+                               Live Feed
+                             </span>
+                             <span className="text-[8px] font-mono text-gray-600">[{approxTime}]</span>
+                           </div>
                            <p className={`text-xs leading-relaxed transition-all ${
                              isRecent ? 'text-gray-200 font-medium' : 'text-gray-500 font-normal'
                            }`}>

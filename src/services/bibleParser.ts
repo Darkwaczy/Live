@@ -314,16 +314,17 @@ export async function detectBibleVerseAI(
   const resolvedEndpoint = apiKey ? groqEndpoint : endpoint;
   const resolvedModel = apiKey ? model : (model || 'llama-3.3-70b-versatile');
 
-  const prompt = `You are a Bible reference expert for a live church broadcast system.
-Analyze this sermon transcript and identify the most likely Bible verse being referenced.
+  const prompt = `You are a strict Bible reference identifier for a live church broadcast system.
+Your job is to identify SPECIFIC Bible verses from sermon speech — but ONLY when you are genuinely certain.
 
-RULES:
-- The speaker may quote verbatim, paraphrase, tell a Bible story/parable, or reference a miracle.
-- The speaker may use Nigerian Pidgin (e.g. "wetin", "una", "e don do"), Yoruba, or Igbo phrases — interpret them in context.
-- Respond ONLY with a single JSON object, no explanation.
-- If a scripture is found: {"book": "BookName", "chapter": 3, "verse_start": 16, "verse_end": 16}
-- If no scripture is found: {"book": null}
-- Use the exact canonical book name (e.g. "1 Corinthians", "Psalms", "Revelation").
+CRITICAL RULES:
+1. DO NOT guess. If you are not at least 85% confident, return {"book": null}.
+2. DO NOT default to famous verses (like John 3:16, Luke 15:11, Matthew 4:19) just because the topic is vaguely related. The TEXT must clearly match that specific passage.
+3. A general mention of "God loves us" is NOT John 3:16. Only match if the actual words or story are clearly from that passage.
+4. The speaker may use Nigerian Pidgin, Yoruba, or Igbo phrases — translate mentally before matching.
+5. Respond ONLY with a JSON object — no other text:
+   If certain: {"book": "Luke", "chapter": 15, "verse_start": 11, "verse_end": 11, "confidence": 0.92, "reason": "Speaker described son leaving with inheritance and returning to father"}
+   If not certain: {"book": null}
 
 SERMON TEXT:
 "${text.slice(-400)}"`;
@@ -339,7 +340,7 @@ SERMON TEXT:
         model: resolvedModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: 80,
+        max_tokens: 120,
         stream: false
       })
     });
@@ -355,7 +356,16 @@ SERMON TEXT:
     if (!jsonMatch) return null;
 
     const parsed = JSON.parse(jsonMatch[0]);
+
+    // Hard reject: no book
     if (!parsed?.book || parsed.book === 'null' || parsed.book === null) return null;
+
+    // Hard reject: confidence below 85% — kills hallucinated guesses
+    const confidence = Number(parsed.confidence ?? 0);
+    if (confidence < 0.85) {
+      console.log(`[AI Verse] ❌ Low-confidence rejected: ${parsed.book} (${(confidence * 100).toFixed(0)}%) — "${parsed.reason}"`);
+      return null;
+    }
 
     const resolved = resolveBookName(parsed.book);
     const finalBook = resolved || parsed.book;
@@ -365,7 +375,7 @@ SERMON TEXT:
 
     if (!finalBook || !chapter || !verse_start) return null;
 
-    console.log(`[AI Verse] ✅ Groq detected: ${finalBook} ${chapter}:${verse_start}`);
+    console.log(`[AI Verse] ✅ ${finalBook} ${chapter}:${verse_start} — ${(confidence * 100).toFixed(0)}% — "${parsed.reason}"`);
     return { book: finalBook, chapter, verse_start, verse_end };
 
   } catch (err) {
@@ -373,6 +383,7 @@ SERMON TEXT:
     return null;
   }
 }
+
 
 export function crossReference(verse: BibleVerse): BibleVerse[] {
   const references: BibleVerse[] = [];
