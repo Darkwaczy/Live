@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { 
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
@@ -182,6 +182,17 @@ export default function App() {
     setDraftSettings(prev => ({ ...prev, [key as keyof typeof settings]: value }));
   };
 
+  // Bible & Lyrics Browser States
+  const [bibleData, setBibleData] = useState<any[]>([]);
+
+  const [selectedBook, setSelectedBook] = useState<string>('John');
+  const [selectedChapter, setSelectedChapter] = useState<number>(3);
+  const [chapterVerses, setChapterVerses] = useState<any[]>([]);
+  const [isBibleLoading, setIsBibleLoading] = useState(false);
+  const [apiBibleCache, setApiBibleCache] = useState<Record<string, any[]>>({});
+  const [lyricSearchResults, setLyricSearchResults] = useState<Song[]>([]);
+  const [lyricSearchQuery, setLyricSearchQuery] = useState('');
+
   const commitSettings = () => {
     setSettings(draftSettings);
     showToast('Settings saved successfully!');
@@ -203,17 +214,53 @@ export default function App() {
 
   // Sync state between Operator and Projector windows via BroadcastChannel
   // No internet required, same-origin only.
-  useBroadcastSync(liveState, applyLiveState, isProjectorMode);
+  useBroadcastSync(liveState, applyLiveState, isProjectorMode, useCallback(() => {
+    // Provide 'Now' state for the handshake (initial TV open)
+    const videoEl = document.getElementById('live-video-element') as HTMLVideoElement;
+    return {
+      media_currentTime: videoEl ? videoEl.currentTime : 0
+    };
+  }, []));
 
   const [airedVerse, setAiredVerse] = useState<{ reference: string; text: string; translation?: string } | null>(null);
   const [airedLyric, setAiredLyric] = useState<string | null>(null);
+
+  // DASHBOARD DISPLAY LOGIC: Calculate human-readable verses and lyrics
+  const displayVersePreview = useMemo(() => {
+    if (!liveState.preview_verse) return null;
+    const { book, chapter, verse_start, verse_end } = liveState.preview_verse;
+    const v = (chapterVerses || []).find((v: any) => v.verse === verse_start);
+    if (!v) return null;
+    return {
+      reference: `${book} ${chapter}:${verse_start}${verse_end ? '-' + verse_end : ''}`,
+      text: v.text,
+      translation: settings.bibleVersion
+    };
+  }, [liveState.preview_verse, chapterVerses, settings.bibleVersion]);
+
+  const displayVerseLive = useMemo(() => {
+    if (!liveState.current_verse) return null;
+    const { book, chapter, verse_start, verse_end } = liveState.current_verse;
+    const v = (chapterVerses || []).find((v: any) => v.verse === verse_start);
+    if (!v) return null;
+    return {
+      reference: `${book} ${chapter}:${verse_start}${verse_end ? '-' + verse_end : ''}`,
+      text: v.text,
+      translation: settings.bibleVersion
+    };
+  }, [liveState.current_verse, chapterVerses, settings.bibleVersion]);
+
+  const actualLineIndex = liveState.current_lyric_index;
+  const nextLineIndex = liveState.preview_lyric_index;
+  const mainLyric = currentSong?.lyrics?.find((l: any) => l.order === actualLineIndex)?.line || '';
+  const nextLyric = nextLineIndex !== undefined ? currentSong?.lyrics?.[nextLineIndex]?.line : null;
 
   const goLive = () => {
     // Snapshot the current preview content for the dashboard mirror
     if (displayVersePreview) setAiredVerse(displayVersePreview);
     else setAiredVerse(null);
 
-    const mainLyric = currentSong?.lyrics?.find(l => l.order === actualLineIndex)?.line || '';
+    const mainLyric = currentSong?.lyrics?.find((l: any) => l.order === actualLineIndex)?.line || '';
     if (mainLyric) setAiredLyric(mainLyric);
     else setAiredLyric(null);
 
@@ -225,6 +272,19 @@ export default function App() {
     setAiredLyric(null);
     originalClearText();
   };
+
+  // NUCLEAR SILENCE GUARD: Enforce dashboard silence every 500ms for non-preview videos.
+  useEffect(() => {
+    if (isProjectorMode) return;
+    const interval = setInterval(() => {
+      const liveVideo = document.getElementById('live-video-element') as HTMLVideoElement;
+      if (liveVideo) {
+        liveVideo.muted = true;
+        liveVideo.volume = 0;
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isProjectorMode]);
 
   // AUTO-ADVANCE PREVIEW LYRIC: When goLive promotes preview→current, fill in the next line text.
   useEffect(() => {
@@ -242,7 +302,6 @@ export default function App() {
 
   // Helpers for transcription column (Now using preview_text for permanence)
   const sentences = useMemo(() => (liveState?.preview_text || '').split('. ').filter(s => s.trim().length > 0), [liveState?.preview_text]);
-
 
   const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
   const bibleScrollRef = React.useRef<HTMLDivElement>(null);
@@ -283,15 +342,7 @@ export default function App() {
   }, [timerSession.isRunning, timerSession.remaining]);
 
   const bibleVersions = ['KJV', 'NIV', 'NLT', 'TPT'];
-  const [bibleData, setBibleData] = useState<any[]>([]);
-  const [selectedBook, setSelectedBook] = useState('Genesis');
-  const [selectedChapter, setSelectedChapter] = useState(1);
-  const [chapterVerses, setChapterVerses] = useState<{ verse: number; text: string }[]>([]);
-  const [lyricSearchQuery, setLyricSearchQuery] = useState('');
-  const [lyricSearchResults, setLyricSearchResults] = useState<Song[]>([]);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
-  const [apiBibleCache, setApiBibleCache] = useState<Record<string, { verse: number; text: string }[]>>({});
-  const [isBibleLoading, setIsBibleLoading] = useState(false);
   const [selectedLyricCategory, setSelectedLyricCategory] = useState('All');
 
   const bibleBooks = [
@@ -694,23 +745,7 @@ export default function App() {
     } catch (e) {}
   };
 
-  const displayVersePreview = liveState.preview_verse 
-    ? fetchedVerse 
-      ? fetchedVerse
-      : { reference: `${liveState.preview_verse.book} ${liveState.preview_verse.chapter}:${liveState.preview_verse.verse_start}${liveState.preview_verse.verse_end && liveState.preview_verse.verse_end > liveState.preview_verse.verse_start ? `-${liveState.preview_verse.verse_end}` : ''}`, text: 'Retrieving passage...', translation: settings.bibleVersion } 
-    : null;
-
-  const displayVerseLive = liveState.current_verse
-    ? airedVerse || { reference: `${liveState.current_verse.book} ${liveState.current_verse.chapter}:${liveState.current_verse.verse_start}${liveState.current_verse.verse_end && liveState.current_verse.verse_end > liveState.current_verse.verse_start ? `-${liveState.current_verse.verse_end}` : ''}`, text: 'Live on Screen', translation: settings.bibleVersion }
-    : null;
-
   const fullTranscript = (liveState.current_text + ' ' + (interimText || '')).trim();
-
-  // Calculate actual line of song
-  const baseLineIndex = settings.autoSyncLyrics ? (currentLine ?? 0) : 0;
-  const actualLineIndex = Math.max(0, baseLineIndex + manualLineOffset);
-  const mainLyric = currentSong?.lyrics?.find(l => l.order === actualLineIndex)?.line || '';
-  const nextLyric = currentSong?.lyrics?.find(l => l.order === actualLineIndex + 1)?.line || '';
 
   const handleNext = () => setManualLineOffset(prev => prev + 1);
   const handlePrev = () => setManualLineOffset(prev => prev - 1);
@@ -1059,9 +1094,11 @@ export default function App() {
                                      autoPlay={liveState.preview_media_playing} 
                                      loop 
                                      playsInline 
+                                     id="preview-video-element"
+                                     muted={liveState.preview_media_muted ?? false}
                                      ref={(el) => {
                                         if (el) {
-                                          el.muted = liveState.preview_media_muted ?? true;
+                                          el.muted = liveState.preview_media_muted ?? false;
                                           el.volume = liveState.preview_media_volume ?? 1.0;
                                           if (liveState.preview_media_playing) el.play().catch(() => {});
                                           else el.pause();
@@ -1077,39 +1114,37 @@ export default function App() {
                            </div>
                            
                            {/* PREVIEW CONTROL HUB */}
-                           {liveState.preview_media && ((liveState.preview_media || '').includes('#video') || (liveState.preview_media || '').match(/\.(mp4|webm|ogg|blob)/i)) && (
-                              <div className="absolute top-4 right-4 flex items-center gap-2 z-20 animate-in slide-in-from-top-2 duration-300">
-                                 <div className="flex bg-black/60 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-2xl">
-                                    <button 
-                                      onClick={() => setLiveState((s: any) => ({ ...s, preview_media_playing: !s.preview_media_playing }))}
-                                      className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors"
-                                    >
-                                      {liveState.preview_media_playing ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-                                    </button>
-                                    <div className="w-px h-4 bg-white/10 my-auto mx-1" />
-                                    <button 
-                                      onClick={() => setLiveState((s: any) => ({ ...s, preview_media_muted: !s.preview_media_muted }))}
-                                      className={`p-2 hover:bg-white/10 rounded-lg transition-colors ${!liveState.preview_media_muted ? 'text-emerald-400' : 'text-gray-400'}`}
-                                    >
-                                      {!liveState.preview_media_muted ? <Volume2 size={12} /> : <VolumeX size={12} />}
-                                    </button>
-                                    <div className="flex items-center px-2">
-                                       <input 
-                                         type="range" 
-                                         min="0" 
-                                         max="1" 
-                                         step="0.1" 
-                                         value={liveState.preview_media_volume ?? 1}
-                                         onChange={(e) => {
-                                            const val = parseFloat(e.target.value);
-                                            setLiveState((s: any) => ({ ...s, preview_media_volume: val }));
-                                         }}
-                                         className="w-12 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500 transition-all"
-                                       />
-                                    </div>
+                           <div className="absolute top-4 right-4 flex items-center gap-2 z-20 animate-in slide-in-from-top-2 duration-300">
+                              <div className="flex bg-black/60 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-2xl">
+                                 <button 
+                                   onClick={() => setLiveState((s: any) => ({ ...s, preview_media_playing: !s.preview_media_playing }))}
+                                   className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors"
+                                 >
+                                   {liveState.preview_media_playing ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                                 </button>
+                                 <div className="w-px h-4 bg-white/10 my-auto mx-1" />
+                                 <button 
+                                   onClick={() => setLiveState((s: any) => ({ ...s, preview_media_muted: !s.preview_media_muted }))}
+                                   className={`p-2 hover:bg-white/10 rounded-lg transition-colors ${!liveState.preview_media_muted ? 'text-emerald-400' : 'text-gray-400'}`}
+                                 >
+                                   {!liveState.preview_media_muted ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                                 </button>
+                                 <div className="flex items-center px-2">
+                                    <input 
+                                      type="range" 
+                                      min="0" 
+                                      max="1" 
+                                      step="0.1" 
+                                      value={liveState.preview_media_volume ?? 1}
+                                      onChange={(e) => {
+                                         const val = parseFloat(e.target.value);
+                                         setLiveState((s: any) => ({ ...s, preview_media_volume: val }));
+                                      }}
+                                      className="w-12 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500 transition-all"
+                                    />
                                  </div>
                               </div>
-                           )}
+                           </div>
                          </>
                       ) : liveState.preview_lyric_line ? (
                          <div className="w-full h-full flex flex-col justify-center p-4 gap-2">
@@ -1147,7 +1182,15 @@ export default function App() {
                             <div className="absolute top-4 right-4 flex items-center gap-2 z-20 animate-in slide-in-from-top-2 duration-300">
                                <div className="flex bg-black/60 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-2xl">
                                   <button 
-                                    onClick={() => setLiveState(s => ({ ...s, media_playing: !s.media_playing }))}
+                                    onClick={() => {
+                                       const videoEl = document.getElementById('live-video-element') as HTMLVideoElement;
+                                       const currentTime = videoEl ? videoEl.currentTime : 0;
+                                       setLiveState(s => ({ 
+                                          ...s, 
+                                          media_playing: !s.media_playing,
+                                          media_currentTime: s.media_playing ? currentTime : s.media_currentTime
+                                       }));
+                                    }}
                                     className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors"
                                   >
                                     {liveState.media_playing ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
@@ -1182,21 +1225,33 @@ export default function App() {
                              <div className="w-full h-full rounded-2xl overflow-hidden border border-red-500/30">
                                {liveState.current_media.match(/\.(mp4|webm|ogg|blob)/i) || liveState.current_media.includes('#video') ? (
                                   <video 
-                                    key={(liveState.current_media || '') + '-' + (liveState.media_epoch || 0)}
-                                    src={liveState.current_media} 
-                                    className="w-full h-full object-contain" 
-                                    autoPlay={liveState.media_playing}
-                                    loop 
-                                    playsInline 
-                                    muted={true}
-                                    ref={(el) => {
-                                      if (el) {
-                                        // The 'Silent Operator' rule: House Projector handles real volume.
-                                        if (liveState.media_playing) el.play().catch(() => {});
-                                        else el.pause();
-                                      }
-                                    }}
-                                  />
+                                     key={(liveState.current_media || '') + '-' + (liveState.media_epoch || 0)}
+                                     src={liveState.current_media} 
+                                     className="w-full h-full object-contain" 
+                                     autoPlay={liveState.media_playing}
+                                     loop 
+                                     playsInline 
+                                     muted
+                                     onPlay={(e) => { e.currentTarget.muted = true; e.currentTarget.volume = 0; }}
+                                     onVolumeChange={(e) => { e.currentTarget.muted = true; e.currentTarget.volume = 0; }}
+                                     id="live-video-element"
+                                     ref={(el) => {
+                                       if (el) {
+                                         // THE UNBREAKABLE SILENCE RULE: 
+                                         // Dashboard MUST be silent to prevent echo.
+                                         el.muted = true;
+                                         el.volume = 0;
+                                         if (liveState.media_playing) {
+                                           el.play().catch(() => {});
+                                         } else {
+                                            el.pause();
+                                            if (liveState.media_currentTime !== undefined) {
+                                               el.currentTime = liveState.media_currentTime;
+                                            }
+                                         }
+                                       }
+                                     }}
+                                   />
                                ) : (liveState.current_media || '').match(/\.(pdf|doc|docx|ppt|pptx)/i) || (liveState.current_media || '').includes('#doc') ? (
                                   <iframe 
                                     src={liveState.current_media || ''} 
@@ -1228,7 +1283,12 @@ export default function App() {
                                <p className="text-2xl lg:text-3xl font-black text-(--accent-color) tracking-tight leading-none drop-shadow-glow mb-2">{airedLyric}</p>
                                {nextLyric && <p className="text-white/40 text-sm italic">{nextLyric}</p>}
                             </div>
-                          ) : (<div className="opacity-30 z-10"><Monitor size={48} className="text-gray-500 mb-3" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Screen is Clear</p></div>)}
+                          ) : (
+                            <div className="opacity-10 flex flex-col items-center">
+                               <Monitor size={80} className="text-white mb-6" />
+                               <p className="text-[12px] font-black uppercase tracking-[0.5em] text-white">Awaiting Broadcast</p>
+                            </div>
+                          )}
                          
                          {liveState.is_logo && (
                            <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-35 flex items-center justify-center animate-in fade-in">

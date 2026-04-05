@@ -12,12 +12,15 @@ const CHANNEL_NAME = 'church-assistant-live-v1';
 export function useBroadcastSync(
   state: LiveState,
   onRemoteUpdate: (state: LiveState) => void,
-  isProjectorMode: boolean
+  isProjectorMode: boolean,
+  onSyncRequest?: () => Partial<LiveState> // Operator provides 'Now' data (like currentTime)
 ) {
   const channelRef = useRef<BroadcastChannel | null>(null);
   const lastPublished = useRef<string>('');
   const onRemoteUpdateRef = useRef(onRemoteUpdate);
   onRemoteUpdateRef.current = onRemoteUpdate;
+  const onSyncRequestRef = useRef(onSyncRequest);
+  onSyncRequestRef.current = onSyncRequest;
 
   // Open channel once
   useEffect(() => {
@@ -30,7 +33,11 @@ export function useBroadcastSync(
       }
       // Projector pinging for latest state
       if (event.data?.type === 'REQUEST_STATE' && !isProjectorMode) {
-        channel.postMessage({ type: 'LIVE_STATE', state: JSON.parse(lastPublished.current || '{}') });
+        const nowState = onSyncRequestRef.current ? onSyncRequestRef.current() : {};
+        channel.postMessage({ 
+           type: 'LIVE_STATE', 
+           state: { ...state, ...nowState } 
+        });
       }
     };
 

@@ -70,8 +70,21 @@ export default function ProjectorPage() {
     } catch {}
   }, []);
 
+  // Sync Handshake: Seek to operator's time only once on load
+  const hasInitialSynced = useRef(false);
+  const handleRemoteUpdateWithSeek = useCallback((newState: LiveState) => {
+     handleRemoteUpdate(newState);
+     // If this is the initial load and we have an incoming timestamp, seek to it.
+     if (!hasInitialSynced.current && newState.current_media && (newState.media_currentTime || 0) > 0) {
+        if (videoRef.current) {
+           videoRef.current.currentTime = newState.media_currentTime!;
+           hasInitialSynced.current = true;
+        }
+     }
+  }, [handleRemoteUpdate]);
+
   // BroadcastChannel sync — projector only listens
-  useBroadcastSync(liveState, handleRemoteUpdate, true);
+  useBroadcastSync(liveState, handleRemoteUpdateWithSeek, true);
 
   // Hardware video sync
   useEffect(() => {
@@ -79,12 +92,17 @@ export default function ProjectorPage() {
     if (!video) return;
     video.muted = liveState.media_muted ?? false;
     video.volume = liveState.media_volume ?? 1.0;
+    
     if (liveState.media_playing) {
       video.play().catch(() => setAudioBlocked(true));
     } else {
       video.pause();
+      // SYNC ON PAUSE: Ensure TV matches the operator's frame
+      if (liveState.media_currentTime !== undefined) {
+        video.currentTime = liveState.media_currentTime;
+      }
     }
-  }, [liveState.media_playing, liveState.media_muted, liveState.media_volume]);
+  }, [liveState.media_playing, liveState.media_muted, liveState.media_volume, liveState.media_currentTime]);
 
   const handleActivateAudio = () => {
     videoRef.current?.play().catch(() => {});

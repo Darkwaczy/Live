@@ -52,6 +52,7 @@ export interface LiveState {
   media_playing?: boolean;
   media_volume?: number;
   media_epoch?: number;
+  media_currentTime?: number;
   preview_media_muted?: boolean;
   preview_media_playing?: boolean;
   preview_media_volume?: number;
