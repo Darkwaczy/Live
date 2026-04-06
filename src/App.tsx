@@ -246,26 +246,22 @@ export default function App() {
   const displayVersePreview = useMemo(() => {
     if (!liveState.preview_verse) return null;
     const { book, chapter, verse_start, verse_end } = liveState.preview_verse;
-    const v = (chapterVerses || []).find((v: any) => v.verse === verse_start);
-    if (!v) return null;
     return {
-      reference: `${book} ${chapter}:${verse_start}${verse_end ? '-' + verse_end : ''}`,
-      text: v.text,
+      reference: `${book} ${chapter}:${verse_start}${verse_end && verse_end !== verse_start ? '-' + verse_end : ''}`,
+      text: liveState.preview_verse_text || '(Loading...)',
       translation: settings.bibleVersion
     };
-  }, [liveState.preview_verse, chapterVerses, settings.bibleVersion]);
+  }, [liveState.preview_verse, liveState.preview_verse_text, settings.bibleVersion]);
 
   const displayVerseLive = useMemo(() => {
     if (!liveState.current_verse) return null;
     const { book, chapter, verse_start, verse_end } = liveState.current_verse;
-    const v = (chapterVerses || []).find((v: any) => v.verse === verse_start);
-    if (!v) return null;
     return {
-      reference: `${book} ${chapter}:${verse_start}${verse_end ? '-' + verse_end : ''}`,
-      text: v.text,
+      reference: `${book} ${chapter}:${verse_start}${verse_end && verse_end !== verse_start ? '-' + verse_end : ''}`,
+      text: liveState.current_verse_text || '',
       translation: settings.bibleVersion
     };
-  }, [liveState.current_verse, chapterVerses, settings.bibleVersion]);
+  }, [liveState.current_verse, liveState.current_verse_text, settings.bibleVersion]);
 
   const actualLineIndex = liveState.current_lyric_index;
   const nextLineIndex = liveState.preview_lyric_index;
@@ -332,7 +328,7 @@ export default function App() {
      if (transcriptScrollRef.current) {
         transcriptScrollRef.current.scrollTo({ top: transcriptScrollRef.current.scrollHeight, behavior: 'smooth' });
      }
-  }, [liveState.preview_text, interimText]);
+  }, [liveState.transcription_text, liveState.current_text, interimText]);
 
   // Auto-scroll Bible Sidebar to active verse
   useEffect(() => {
@@ -547,12 +543,11 @@ export default function App() {
     }
   }, [liveState.preview_verse, settings.bibleVersion, settings.secondaryBibleVersion]);
 
-  // Hook into auto-air logic
+  // Hook into auto-air logic (DISABLED BY DEFAULT TO PREVENT UNWANTED INTERRUPTIONS)
+  // The system will only put detected content into the Preview/Queue. The operator MUST manually air it.
   useEffect(() => {
-    if (settings.autoAirVerses && liveState.preview_verse && liveState.preview_verse !== liveState.current_verse) {
-      goLive();
-    }
-  }, [liveState.preview_verse, settings.autoAirVerses, goLive, liveState.current_verse]);
+     // Intentionally left blank. Nothing goes live without a physical click.
+  }, []);
 
   // Sequential Advance: When a verse goes live, stage the next one automatically
   useEffect(() => {
@@ -1069,14 +1064,26 @@ export default function App() {
                                   </button>
                                </div>
                             </div>
-                            <div className="flex items-end justify-between" onClick={() => setPreviewVerse(det.verse)}>
+                            <div className="flex items-end justify-between" onClick={() => {
+                               setPreviewVerse(det.verse);
+                               setSelectedBook(det.verse.book);
+                               setSelectedChapter(det.verse.chapter);
+                            }}>
                                <div>
                                   <p className="text-[11px] font-bold text-(--text-primary) mb-0.5">{det.verse.book} {det.verse.chapter}:{det.verse.verse_start}</p>
                                   <p className="text-[8px] font-mono text-(--text-secondary) tracking-tighter uppercase">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</p>
                                </div>
-                               <div className="p-1.5 bg-(--accent-color)/10 rounded-lg text-(--accent-color) group-hover:bg-(--accent-color) group-hover:text-black transition-all">
+                               <button 
+                                 onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewVerse(det.verse);
+                                    // Give it a split-second to fetch the text before broadcasting
+                                    setTimeout(() => goLive(), 400);
+                                 }}
+                                 className="p-1.5 bg-(--accent-color)/10 rounded-lg text-(--accent-color) hover:bg-(--accent-color) hover:text-black transition-all"
+                               >
                                   <Play size={10} fill="currentColor" />
-                               </div>
+                               </button>
                             </div>
                          </div>
                       ))
