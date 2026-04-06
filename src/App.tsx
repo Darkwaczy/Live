@@ -1507,18 +1507,14 @@ export default function App() {
                 {/* Scriptures Tab */}
                 {rightPanelTab === 'scriptures' && (
                   <div className="flex flex-col h-full overflow-hidden space-y-4">
-                    {/* QUICK-FIRE LAUNCHER */}
-                    <div className="shrink-0 mt-1">
-                       <label className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
-                           <Activity size={12} className="text-emerald-500 animate-pulse" />
-                           Quick-Fire Search
-                       </label>
-                       <div className="relative group">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500/50 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                    {/* TOP CONTROLS: QUICK-FIRE & FILTERS */}
+                    <div className="shrink-0 flex flex-col gap-2 mt-1">
+                       <div className="relative group flex items-center">
+                          <Activity size={12} className="absolute left-2 text-emerald-500 animate-pulse" />
                           <input 
                             type="text"
-                            placeholder="e.g. Gen 10:3, 1 John 3:16"
-                            className="w-full bg-[#1c1c1f] border border-emerald-500/30 rounded-xl pl-10 pr-4 py-3.5 text-sm text-white focus:border-emerald-500 outline-none transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)] focus:shadow-[0_0_25px_rgba(16,185,129,0.2)] font-mono font-bold"
+                            placeholder="Quick e.g. Gen 10:3, 1 John 3:16"
+                            className="w-full bg-[#1c1c1f] border border-emerald-500/20 rounded-md pl-7 pr-12 py-1.5 text-xs text-white focus:border-emerald-500 outline-none transition-all font-mono font-medium"
                             onKeyDown={(e) => {
                                if (e.key === 'Enter') {
                                   const val = (e.target as HTMLInputElement).value.trim();
@@ -1528,16 +1524,13 @@ export default function App() {
                                      const chapter = parseInt(match[2], 10);
                                      const verseNum = parseInt(match[3], 10);
                                      
-                                     // Smart prefix matching (e.g. "1joh" -> "1 John", "gen" -> "Genesis")
                                      const matchedBook = bibleBooks.find(b => b.toLowerCase().replace(/\s/g, '').startsWith(rawBook));
                                      if (matchedBook) {
                                         setSelectedBook(matchedBook);
                                         setSelectedChapter(chapter);
                                         
-                                        // Wait slightly for local chapter refetch, then queue preview
                                         setTimeout(() => {
                                            setPreviewVerse({ book: matchedBook, chapter: chapter, verse_start: verseNum, verse_end: verseNum });
-                                           // Clear input on success
                                            (e.target as HTMLInputElement).value = '';
                                         }, 400);
                                      }
@@ -1545,78 +1538,54 @@ export default function App() {
                                }
                             }}
                           />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-500 uppercase tracking-widest bg-white/5 px-2 py-1 rounded">ENTER</div>
+                          <div className="absolute right-1 text-[8px] font-bold text-gray-500 uppercase tracking-widest bg-white/5 px-1 py-0.5 rounded">ENTER</div>
                        </div>
-                    </div>
 
-                    <div className="shrink-0 grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Bible Translation</label>
-                        <select
-                          value={settings.bibleVersion}
-                          onChange={(e) => setSettings(prev => ({ ...prev, bibleVersion: e.target.value }))}
-                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                        >
-                          {bibleVersions.map(v => <option key={v} value={v}>{v}</option>)}
-                        </select>
-                      </div>
+                       <div className="flex items-center gap-1.5">
+                          <select
+                            value={settings.bibleVersion}
+                            onChange={(e) => setSettings(prev => ({ ...prev, bibleVersion: e.target.value }))}
+                            className="w-14 bg-[#1e1e1e] border border-white/10 rounded px-1 shrink-0 py-1 text-[10px] text-gray-300 outline-none cursor-pointer"
+                          >
+                            {bibleVersions.map(v => <option key={v} value={v}>{v}</option>)}
+                          </select>
 
-                      <div>
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Selected Book</label>
-                        <select
-                          value={selectedBook}
-                          onChange={(e) => { setSelectedBook(e.target.value); setSelectedChapter(1); }}
-                          className="w-full mt-1 bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                        >
-                          {bibleBooks.map((book) => <option key={book} value={book}>{book}</option>)}
-                        </select>
-                      </div>
-                    </div>
+                          <select
+                            value={selectedBook}
+                            onChange={(e) => { setSelectedBook(e.target.value); setSelectedChapter(1); }}
+                            className="flex-1 min-w-0 bg-[#1e1e1e] border border-white/10 rounded px-1 py-1 text-[10px] text-white font-bold tracking-wide outline-none cursor-pointer"
+                          >
+                            {bibleBooks.map((book) => <option key={book} value={book}>{book}</option>)}
+                          </select>
 
-                    <div className="shrink-0 grid grid-cols-2 gap-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 px-1">Chapter</label>
-                          <div className="flex items-center gap-1 mt-1 bg-white/5 border border-white/5 rounded-xl px-1">
-                            <button 
-                              onClick={handlePrevChapter}
-                              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-                            >
-                              <ChevronLeft size={16} />
-                            </button>
+                          <div className="flex items-center bg-white/5 border border-white/5 rounded px-0.5 shrink-0">
+                            <button onClick={handlePrevChapter} className="p-1 hover:text-white text-gray-500 transition-colors"><ChevronLeft size={10} /></button>
                             <input
                               type="number"
                               min={1}
                               value={selectedChapter}
                               onChange={(e) => setSelectedChapter(Math.max(1, Math.min(150, Number(e.target.value) || 1)))}
-                              className="w-12 bg-transparent text-center py-2 text-sm text-white focus:outline-none"
+                              className="w-6 bg-transparent text-center py-1 text-[10px] text-white focus:outline-none font-bold placeholder-gray-600"
                             />
-                            <button 
-                              onClick={handleNextChapter}
-                              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-                            >
-                              <ChevronRight size={16} />
-                            </button>
+                            <button onClick={handleNextChapter} className="p-1 hover:text-white text-gray-500 transition-colors"><ChevronRight size={10} /></button>
                           </div>
-                        </div>
-                      </div>
-                      <div className="flex items-end justify-end">
-                        <button
-                          onClick={() => {
-                            if (bibleData.length > 0) {
-                              const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
-                              if (book && book.chapters) {
-                                setSelectedChapter(Math.max(1, Math.min(Number(selectedChapter), book.chapters.length)));
-                                return;
+
+                          <button
+                            onClick={() => {
+                              if (bibleData.length > 0) {
+                                const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+                                if (book && book.chapters) {
+                                  setSelectedChapter(Math.max(1, Math.min(Number(selectedChapter), book.chapters.length)));
+                                  return;
+                                }
                               }
-                            }
-                            setSelectedChapter(Number(selectedChapter));
-                          }}
-                          className="px-6 py-2.5 bg-emerald-500 text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-95"
-                        >
-                          Fetch
-                        </button>
-                      </div>
+                              setSelectedChapter(Number(selectedChapter));
+                            }}
+                            className="px-2 shrink-0 py-1 bg-emerald-500 text-black rounded font-black text-[9px] uppercase tracking-widest hover:bg-emerald-400 transition-all active:scale-95"
+                          >
+                            Fetch
+                          </button>
+                       </div>
                     </div>
 
                     <div className="flex-1 flex flex-col min-h-0 space-y-3">
@@ -1666,16 +1635,16 @@ export default function App() {
                                      goLive();
                                   }
                                 }}
-                                className={`w-full text-left p-3 rounded-xl border transition-all duration-300 group
+                                className={`w-full text-left px-2 py-1.5 rounded-sm border-l-2 transition-all duration-75 min-h-[40px] group
                                   ${isLive 
-                                    ? 'bg-(--accent-color)/10 border-(--accent-color) shadow-lg' 
+                                    ? 'bg-(--accent-color)/15 border-(--accent-color)' 
                                     : isPreview 
                                       ? 'bg-white/5 border-(--accent-color)/40' 
-                                      : 'bg-transparent border-white/5 hover:border-white/20'}`}
+                                      : 'bg-transparent border-transparent hover:bg-white/5'}`}
                               >
-                                <div className="flex gap-3">
-                                   <span className={`text-[10px] font-black italic shrink-0 mt-0.5 ${isLive ? 'text-(--accent-color)' : 'text-gray-600'}`}>{v.verse}</span>
-                                   <p className={`text-[13px] leading-relaxed transition-colors ${isLive ? 'text-white' : 'text-gray-400 group-hover:text-gray-200'}`}>{v.text}</p>
+                                <div className="flex items-start gap-2">
+                                   <span className={`text-[9px] font-black italic shrink-0 mt-px w-3 text-right ${isLive ? 'text-(--accent-color)' : 'text-gray-500'}`}>{v.verse}</span>
+                                   <p className={`text-[12px] leading-tight transition-colors ${isLive ? 'text-white font-medium' : 'text-gray-400 group-hover:text-gray-200'}`}>{v.text}</p>
                                 </div>
                               </button>
                             );
@@ -1689,17 +1658,19 @@ export default function App() {
                       </div>
                     </div>
                     {displayVersePreview && settings.detectVerses ? (
-                      <div className="shrink-0 bg-(--bg-secondary) p-5 rounded-xl border border-(--accent-color)/30 shadow-sm animate-in fade-in transition-colors mb-2">
-                        <div className="flex items-start justify-between mb-3">
-                            <h3 className="text-(--accent-color) font-semibold text-lg tracking-tight">{displayVersePreview.reference} <span className="text-gray-500 font-normal text-xs ml-1">({displayVersePreview.translation || settings.bibleVersion})</span></h3>
-                             <button 
-                               onClick={goLive}
-                               className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_rgba(16,185,129,0.6)] active:scale-95"
-                             >
-                               AIR
-                             </button>
-                        </div>
-                        <p className="text-gray-300 font-serif leading-relaxed text-[15px]">{displayVersePreview.text}</p>
+                      <div className="shrink-0 bg-[#121212] px-3 py-2 border-t border-(--border-color) shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 absolute bottom-0 left-0 right-0 z-20">
+                         <div className="flex-1 min-w-0 pr-2">
+                            <h3 className="text-(--accent-color) font-bold text-[11px] tracking-wide whitespace-nowrap overflow-hidden text-ellipsis mb-0.5">
+                               {displayVersePreview.reference} <span className="text-gray-500 font-normal text-[9px] ml-1">({displayVersePreview.translation || settings.bibleVersion})</span>
+                            </h3>
+                            <p className="text-gray-300 font-serif text-[11px] whitespace-nowrap overflow-hidden text-ellipsis leading-none">{displayVersePreview.text}</p>
+                         </div>
+                         <button 
+                           onClick={goLive}
+                           className="px-4 py-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] shadow-[0_0_10px_rgba(16,185,129,0.3)] uppercase tracking-widest rounded transition-all active:scale-95"
+                         >
+                           AIR
+                         </button>
                       </div>
                     ) : (
                       <>
