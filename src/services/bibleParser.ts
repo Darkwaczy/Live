@@ -314,20 +314,25 @@ export async function detectBibleVerseAI(
   const resolvedEndpoint = apiKey ? groqEndpoint : endpoint;
   const resolvedModel = apiKey ? model : (model || 'llama-3.3-70b-versatile');
 
-  const prompt = `You are a strict Bible reference identifier for a live church broadcast system.
-Your job is to identify SPECIFIC Bible verses from sermon speech — but ONLY when you are genuinely certain.
+  const prompt = `You are a precise Bible reference identifier for a live church broadcast.\nYour task has TWO STEPS — follow them exactly:
 
-CRITICAL RULES:
-1. DO NOT guess. If you are not at least 85% confident, return {"book": null}.
-2. DO NOT default to famous verses (like John 3:16, Luke 15:11, Matthew 4:19) just because the topic is vaguely related. The TEXT must clearly match that specific passage.
-3. A general mention of "God loves us" is NOT John 3:16. Only match if the actual words or story are clearly from that passage.
-4. The speaker may use Nigerian Pidgin, Yoruba, or Igbo phrases — translate mentally before matching.
-5. Respond ONLY with a JSON object — no other text:
-   If certain: {"book": "Luke", "chapter": 15, "verse_start": 11, "verse_end": 11, "confidence": 0.92, "reason": "Speaker described son leaving with inheritance and returning to father"}
-   If not certain: {"book": null}
+STEP 1 — STORY CHECK:
+Read the text below. Ask yourself: "Is the speaker clearly telling or quoting a SPECIFIC, RECOGNIZABLE Bible story, miracle, parable, or verbatim verse?"
+- General preaching ("God is good", "trust in the Lord", "we need faith") → NOT a specific story → return {"book": null}
+- Vague references ("like Jesus said", "the Bible tells us") with no specific content → return {"book": null}
+- Only proceed to Step 2 if the text clearly describes a specific event, character interaction, or direct quote with enough detail to pinpoint a verse.
+
+STEP 2 — VERSE IDENTIFICATION (only if Step 1 is YES):
+Identify the exact Bible reference. You must be at least 90% confident.
+- DO NOT default to famous verses (John 3:16, Luke 15:11, Matthew 4:19, Romans 8:28) unless the TEXT specifically describes THAT story.
+- If two verses could match, pick neither — return {"book": null}.
+
+RESPONSE FORMAT (JSON only, no other text):
+If identified with 90%+ confidence: {"book": "Luke", "chapter": 15, "verse_start": 11, "confidence": 0.93, "reason": "Speaker described a son who took his inheritance, left home, and returned to his father"}
+If not certain: {"book": null}
 
 SERMON TEXT:
-"${text.slice(-400)}"`;
+"${text.slice(-350)}"`;
 
   try {
     const res = await fetch(resolvedEndpoint, {
@@ -360,9 +365,9 @@ SERMON TEXT:
     // Hard reject: no book
     if (!parsed?.book || parsed.book === 'null' || parsed.book === null) return null;
 
-    // Hard reject: confidence below 85% — kills hallucinated guesses
+    // Hard reject: confidence below 90% — kills hallucinated guesses
     const confidence = Number(parsed.confidence ?? 0);
-    if (confidence < 0.85) {
+    if (confidence < 0.90) {
       console.log(`[AI Verse] ❌ Low-confidence rejected: ${parsed.book} (${(confidence * 100).toFixed(0)}%) — "${parsed.reason}"`);
       return null;
     }

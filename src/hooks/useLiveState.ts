@@ -169,12 +169,18 @@ export function useLiveState(
               nextState = { ...nextState, preview_verse: verse, is_live_dirty: true, detection_history: newDetections };
             }
           } else {
-            // GROQ AI DETECTION: Fires on every paragraph that pattern matching missed.
-            // No keyword gate — Groq is fast enough to handle every chunk (~300ms).
-            if (currentAi.enabled && !prev.is_analyzing && cleanChunk.split(' ').length >= 5) {
+            // GROQ AI STORY DETECTION
+            // Use a FOCUSED window (last 35 words) — not the full 80-word rolling buffer.
+            // Sending too much context causes the model to mix multiple topics and guess wrong.
+            // Minimum 10 words in the current chunk required — short phrases like "God is good"
+            // should NOT trigger story detection.
+            const storyContext = updatedTranscription.split(' ').slice(-35).join(' ');
+            const chunkWordCount = cleanChunk.split(' ').length;
+
+            if (currentAi.enabled && !prev.is_analyzing && chunkWordCount >= 10) {
               setTimeout(() => {
                 setLiveState(s => ({ ...s, is_analyzing: true }));
-                detectBibleVerseAI(rollingWindow, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
+                detectBibleVerseAI(storyContext, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
                   .then((aiVerse: BibleVerse | null) => {
                     if (aiVerse) {
                       setLiveState(s => {
@@ -207,6 +213,7 @@ export function useLiveState(
               }, 0);
             }
           }
+
 
           if (song) {
             setCurrentSong(song);
