@@ -126,16 +126,27 @@ function normalizePhoneticNumbers(text: string): string {
   return result.join(' ');
 }
 
-export function detectBibleVerse(text: string): BibleVerse | null {
-  // Clean transcription artifacts like #, /, \, |, _, , 
+export function detectBibleVerse(text: string): BibleVerse[] {
+  const results: BibleVerse[] = [];
+  const foundRefs = new Set<string>(); // Used to prevent duplicate pushing of the exact same verse in one pass
+
+  const addResult = (book: string, chapter: number, verse_start: number, verse_end: number) => {
+    const ref = `${book} ${chapter}:${verse_start}`;
+    if (!foundRefs.has(ref)) {
+      foundRefs.add(ref);
+      results.push({ book, chapter, verse_start, verse_end });
+    }
+  };
+
+  // Clean transcription artifacts
   const sanitizedText = text
-    .replace(/[#\\|_]/g, ' ') // Strip weird prefix symbols
-    .replace(/(\d+)\s*[\/,]\s*(\d+)/g, '$1:$2') // "3/16" or "3, 16" -> "3:16"
-    .replace(/(\D),\s*(\d)/g, '$1 $2') // "John, 316" -> "John 316"
+    .replace(/[#\\|_]/g, ' ') 
+    .replace(/(\d+)\s*[\/,]\s*(\d+)/g, '$1:$2') 
+    .replace(/(\D),\s*(\d)/g, '$1 $2') 
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Hard fix for common phrases (Local Fast-Track Cache)
+  // Hard fix for common phrases
   const SEMANTIC_HOTKEYS: Record<string, BibleVerse> = {
     'fishers of men': { book: 'Matthew', chapter: 4, verse_start: 19, verse_end: 19 },
     'john 3 16': { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 },
@@ -146,117 +157,71 @@ export function detectBibleVerse(text: string): BibleVerse | null {
 
   for (const [phrase, verse] of Object.entries(SEMANTIC_HOTKEYS)) {
     if (sanitizedText.toLowerCase().includes(phrase)) {
-      return verse;
+      addResult(verse.book, verse.chapter, verse.verse_start, verse.verse_end || verse.verse_start);
     }
   }
-  
-  console.log(`🔍 [detectBibleVerse] Input: "${text}" (Sanitized: "${sanitizedText}")`);
   
   // Normalize spoken structures from speech-to-text engines
   let normalizedText = normalizePhoneticNumbers(sanitizedText)
     .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
     .replace(/\b(\d+)\s+verses?\s+(\d+)/gi, '$1:$2') 
-    .replace(/\b(\d+)\s+and\s+(\d+)\b/gi, '$1:$2') // "one and one" -> "1 and 1" -> "1:1"
-    .replace(/\b(\d+)\s*(?::)\s*(\d+)\s*(?:to|through|until|-|–|—)\s*(\d+)\b/gi, '$1:$2-$3') // "15:1 to 5"
+    .replace(/\b(\d+)\s+and\s+(\d+)\b/gi, '$1:$2') 
+    .replace(/\b(\d+)\s*(?::)\s*(\d+)\s*(?:to|through|until|-|–|—)\s*(\d+)\b/gi, '$1:$2-$3')
     .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') 
-    // Join book name + number sequence: e.g., "Genesis 5 18" -> "Genesis 5:18"
     .replace(new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3})\\s+(\\d{1,3})\\b`, 'gi'), '$1 $2:$3')
     .replace(/verses?\s+(\d+)/gi, ':$1')
     .replace(/\s+/g, ' '); 
 
-  console.log(`  → Normalized: "${normalizedText}"`);
-
-  // First try: Standard pattern with colon
-  let match = biblePattern.exec(normalizedText);
-  if (match) {
-    console.log(`  ✅ Matched colon pattern: ${match[1]} ${match[2]}:${match[3]}`);
-  } else {
-    // Second try: Generic fallback for accents/mishearings
-    match = genericBiblePattern.exec(normalizedText);
-    if (match) {
-      const resolved = resolveBookName(match[1]);
-      if (resolved) {
-        console.log(`  ✅ Matched generic pattern: ${match[1]} -> ${resolved}`);
-        // Re-inject for standard processing
-        const chapter = match[2];
-        const verse = match[3];
-        const constructed = `${resolved} ${chapter}:${verse}`;
-        match = biblePattern.exec(constructed);
-      } else {
-        match = null;
-      }
+  // 1. Standard pattern with colon (multiple matching)
+  const globalBiblePattern = new RegExp(biblePattern.source, 'gi');
+  for (const match of normalizedText.matchAll(globalBiblePattern)) {
+    const resolved = resolveBookName(match[1]);
+    if (resolved) {
+      addResult(resolved, parseInt(match[2], 10), parseInt(match[3], 10), match[4] ? parseInt(match[4], 10) : parseInt(match[3], 10));
     }
   }
 
-  if (!match) {
-    // Third try: Handle "john 316" format
-    const noColonMatch = biblePatternNoColon.exec(normalizedText);
-    if (noColonMatch) {
-      const book = noColonMatch[1];
-      const combinedDigits = noColonMatch[2];
-      
-      // Try splitting: last 2 digits as verse, rest as chapter
-      // E.g., "316" → chapter="3", verse="16"; "2310" → chapter="23", verse="10"
-      let chapter: number;
-      let verse: number;
-      
-      if (combinedDigits.length === 2) {
-        // If only 2 digits, treat as chapter 1, verse XX OR chapter X, verse Y (if book has many chapters)
-        // For safety in speech-to-text, usually single digit chapter + single digit verse
-        if (combinedDigits[0] !== '0') {
-           chapter = parseInt(combinedDigits[0], 10);
-           verse = parseInt(combinedDigits[1], 10);
-        } else {
-           chapter = 1;
-           verse = parseInt(combinedDigits, 10);
-        }
-      } else if (combinedDigits.length === 3) {
-        // If 3 digits, likely: single digit chapter + 2 digit verse (e.g., 316)
-        // OR 2 digit chapter + 1 digit verse
-        chapter = parseInt(combinedDigits.slice(0, -2) || combinedDigits[0], 10);
-        verse = parseInt(combinedDigits.slice(-2), 10);
-      } else {
-        // If 4+ digits, chapter is first digits, last 2 are verse
-        chapter = parseInt(combinedDigits.slice(0, -2), 10);
-        verse = parseInt(combinedDigits.slice(-2), 10);
-      }
-      
-      const fixedRef = `${book} ${chapter}:${verse}`;
-      console.log(`  🔧 Fixed no-colon format "${noColonMatch[0]}" → "${fixedRef}" (split: ch=${chapter}, v=${verse})`);
-      match = biblePattern.exec(fixedRef);
-      if (match) {
-        const resolved = resolveBookName(match[1]);
-        return {
-          book: resolved || match[1], // Fallback to raw if logic requires
-          chapter: parseInt(match[2], 10),
-          verse_start: parseInt(match[3], 10),
-          verse_end: match[4] ? parseInt(match[4], 10) : parseInt(match[3], 10)
-        };
-      }
+  // 2. Generic fallback for accents/mishearings
+  const globalGenericPattern = new RegExp(genericBiblePattern.source, 'gi');
+  for (const match of normalizedText.matchAll(globalGenericPattern)) {
+    const resolved = resolveBookName(match[1]);
+    if (resolved) {
+      addResult(resolved, parseInt(match[2], 10), parseInt(match[3], 10), match[4] ? parseInt(match[4], 10) : parseInt(match[3], 10));
     }
   }
 
-  if (!match) {
-    console.log(`  ❌ No Bible verse detected in text`);
-    return null;
+  // 3. Handle "john 316" format
+  const globalNoColonPattern = new RegExp(biblePatternNoColon.source, 'gi');
+  for (const match of normalizedText.matchAll(globalNoColonPattern)) {
+    const book = match[1];
+    const combinedDigits = match[2];
+    
+    let chapter: number;
+    let verse: number;
+    
+    if (combinedDigits.length === 2) {
+      if (combinedDigits[0] !== '0') {
+         chapter = parseInt(combinedDigits[0], 10);
+         verse = parseInt(combinedDigits[1], 10);
+      } else {
+         chapter = 1;
+         verse = parseInt(combinedDigits, 10);
+      }
+    } else if (combinedDigits.length === 3) {
+      chapter = parseInt(combinedDigits.slice(0, -2) || combinedDigits[0], 10);
+      verse = parseInt(combinedDigits.slice(-2), 10);
+    } else {
+      chapter = parseInt(combinedDigits.slice(0, -2), 10);
+      verse = parseInt(combinedDigits.slice(-2), 10);
+    }
+    
+    const resolved = resolveBookName(book);
+    if (resolved) {
+       addResult(resolved, chapter, verse, verse);
+    }
   }
 
-  const rawBook = match[1];
-  const chapter = parseInt(match[2], 10);
-  const verse_start = parseInt(match[3], 10);
-  const verse_end = match[4] ? parseInt(match[4], 10) : verse_start;
-
-  const normalizedBook = resolveBookName(rawBook);
-  if (!normalizedBook) return null; // Safety check
-
-  console.log(`✅ Bible verse detected: ${normalizedBook} ${chapter}:${verse_start}${verse_end > verse_start ? `-${verse_end}` : ''}`);
-
-  return {
-    book: normalizedBook,
-    chapter,
-    verse_start,
-    verse_end
-  };
+  return results;
 }
 
 function resolveBookName(rawBook: string): string | null {
@@ -307,29 +272,28 @@ export async function detectBibleVerseAI(
   endpoint: string,
   apiKey: string,
   model: string = 'llama-3.3-70b-versatile'
-): Promise<BibleVerse | null> {
-  // Always use Groq if we have a key — it's ultra-fast (~300ms)
-  // Falls back to any OpenAI-compatible endpoint if no key is provided.
-  const groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
-  const resolvedEndpoint = apiKey ? groqEndpoint : endpoint;
+): Promise<BibleVerse[]> {
+  const resolvedEndpoint = apiKey ? 'https://api.groq.com/openai/v1/chat/completions' : endpoint;
   const resolvedModel = apiKey ? model : (model || 'llama-3.3-70b-versatile');
 
-  const prompt = `You are a precise Bible reference identifier for a live church broadcast.\nYour task has TWO STEPS — follow them exactly:
+  const prompt = `You are a precise Bible reference identifier for a live church broadcast.
+Your task is to identify ANY and ALL Bible verses spoken, read, or explicitly mentioned in the text.
+Extract ALL of them as a JSON array of objects.
 
-STEP 1 — STORY CHECK:
-Read the text below. Ask yourself: "Is the speaker clearly telling or quoting a SPECIFIC, RECOGNIZABLE Bible story, miracle, parable, or verbatim verse?"
-- General preaching ("God is good", "trust in the Lord", "we need faith") → NOT a specific story → return {"book": null}
-- Vague references ("like Jesus said", "the Bible tells us") with no specific content → return {"book": null}
-- Only proceed to Step 2 if the text clearly describes a specific event, character interaction, or direct quote with enough detail to pinpoint a verse.
+RESPONSE FORMAT (JSON ARRAY ONLY, NO OTHER TEXT):
+If one or more verses are identified, return an array like this:
+[
+  {"book": "Luke", "chapter": 15, "verse_start": 11, "confidence": 0.93, "reason": "speaker describes prodigal son"},
+  {"book": "John", "chapter": 3, "verse_start": 16, "confidence": 0.95, "reason": "direct quote or explicit call out"}
+]
 
-STEP 2 — VERSE IDENTIFICATION (only if Step 1 is YES):
-Identify the exact Bible reference. You must be at least 90% confident.
-- DO NOT default to famous verses (John 3:16, Luke 15:11, Matthew 4:19, Romans 8:28) unless the TEXT specifically describes THAT story.
-- If two verses could match, pick neither — return {"book": null}.
+If NO verses or specific stories are found, return exactly this:
+[]
 
-RESPONSE FORMAT (JSON only, no other text):
-If identified with 90%+ confidence: {"book": "Luke", "chapter": 15, "verse_start": 11, "confidence": 0.93, "reason": "Speaker described a son who took his inheritance, left home, and returned to his father"}
-If not certain: {"book": null}
+RULES:
+- General preaching ("God is good") without a specific story/quote = []
+- DO NOT default to famous verses unless the text specifically describes them.
+- Return ONLY the raw JSON array.
 
 SERMON TEXT:
 "${text.slice(-350)}"`;
@@ -345,47 +309,51 @@ SERMON TEXT:
         model: resolvedModel,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: 120,
+        max_tokens: 300,
         stream: false
       })
     });
 
     if (!res.ok) {
       console.warn('[AI Verse] Request failed:', res.status, await res.text());
-      return null;
+      return [];
     }
 
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content || data?.response || '';
-    const jsonMatch = content.match(/\{[\s\S]*?\}/);
-    if (!jsonMatch) return null;
+    const jsonMatch = content.match(/\[\s*\{[\s\S]*\}\s*\]|\[\s*\]/);
+    if (!jsonMatch) return [];
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsedArray = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsedArray)) return [];
 
-    // Hard reject: no book
-    if (!parsed?.book || parsed.book === 'null' || parsed.book === null) return null;
+    const validResults: BibleVerse[] = [];
 
-    // Hard reject: confidence below 90% — kills hallucinated guesses
-    const confidence = Number(parsed.confidence ?? 0);
-    if (confidence < 0.90) {
-      console.log(`[AI Verse] ❌ Low-confidence rejected: ${parsed.book} (${(confidence * 100).toFixed(0)}%) — "${parsed.reason}"`);
-      return null;
+    for (const parsed of parsedArray) {
+      if (!parsed?.book || parsed.book === 'null') continue;
+      
+      const confidence = Number(parsed.confidence ?? 0);
+      if (confidence < 0.90) {
+        console.log(`[AI Verse] ❌ Rejected: ${parsed.book} (${(confidence * 100).toFixed(0)}%) - "${parsed.reason}"`);
+        continue;
+      }
+
+      const finalBook = resolveBookName(parsed.book) || parsed.book;
+      const chapter = Number(parsed.chapter);
+      const verse_start = Number(parsed.verse_start);
+      const verse_end = parsed.verse_end ? Number(parsed.verse_end) : verse_start;
+
+      if (finalBook && chapter && verse_start) {
+         console.log(`[AI Verse] ✅ Found: ${finalBook} ${chapter}:${verse_start} (${(confidence * 100).toFixed(0)}%)`);
+         validResults.push({ book: finalBook, chapter, verse_start, verse_end });
+      }
     }
 
-    const resolved = resolveBookName(parsed.book);
-    const finalBook = resolved || parsed.book;
-    const chapter = Number(parsed.chapter);
-    const verse_start = Number(parsed.verse_start);
-    const verse_end = parsed.verse_end ? Number(parsed.verse_end) : verse_start;
-
-    if (!finalBook || !chapter || !verse_start) return null;
-
-    console.log(`[AI Verse] ✅ ${finalBook} ${chapter}:${verse_start} — ${(confidence * 100).toFixed(0)}% — "${parsed.reason}"`);
-    return { book: finalBook, chapter, verse_start, verse_end };
+    return validResults;
 
   } catch (err) {
     console.warn('[AI Verse] Exception:', err);
-    return null;
+    return [];
   }
 }
 
