@@ -993,18 +993,21 @@ export default function App() {
                 <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 no-scrollbar bg-(--bg-primary)/50">
 
                    {/* LIVE INTERIM — prominent, sticky at top as words come in */}
-                   {interimText && (
+                   {(interimText || isListening) && (
                      <div className="sticky top-0 z-10 mb-1 px-3 py-2.5 rounded-xl bg-(--accent-color)/10 border border-(--accent-color)/30 shadow-lg backdrop-blur-sm">
                        <div className="flex items-center gap-1.5 mb-1">
                          <span className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse inline-block" />
-                         <span className="text-[8px] font-black text-(--accent-color) uppercase tracking-widest">Speaking now</span>
+                         <span className="text-[8px] font-black text-(--accent-color) uppercase tracking-widest">{interimText ? 'Speaking now' : 'Listening...'}</span>
                        </div>
-                       <p className="text-sm font-semibold text-white leading-snug">{interimText}</p>
+                       <p className="text-sm font-semibold text-white leading-snug min-h-[1.5em] flex items-end flex-wrap gap-x-1">
+                          <span>{interimText}</span>
+                          <span className="inline-block w-[4px] h-[1em] bg-(--accent-color) animate-pulse relative top-[-2px] ml-[2px]" />
+                       </p>
                      </div>
                    )}
 
                    {/* CONFIRMED sentences — stacked below */}
-                   {sentences.length === 0 && !interimText ? (
+                   {sentences.length === 0 && !interimText && !isListening ? (
                      <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
                         <FileText size={24} className="mb-2" />
                         <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>

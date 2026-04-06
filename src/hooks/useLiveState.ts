@@ -56,6 +56,10 @@ export function useLiveState(
   const lastPhraseRef = useRef<string>('');
 
   const aiConfigRef = useRef(aiConfig);
+  const isListeningRef = useRef(false);
+  const hasStartedHardwareRef = useRef(false);
+  const preRollBufferRef = useRef<{chunk: string, timestamp: number}[]>([]);
+
   useEffect(() => {
     aiConfigRef.current = aiConfig;
   }, [aiConfig]);
@@ -67,6 +71,16 @@ export function useLiveState(
       audioInput: whisperConfig.audioInput,
       apiKey: whisperConfig.apiKey,
       onTranscript: (chunk, isFinal, timestamp, confidence) => {
+        if (!isListeningRef.current) {
+          if (isFinal) {
+             const now = Date.now();
+             preRollBufferRef.current.push({ chunk, timestamp: now });
+             // Keep only the last 3000ms in the hot standby buffer so we don't leak memory or pull too much context
+             preRollBufferRef.current = preRollBufferRef.current.filter(b => now - b.timestamp <= 3000);
+          }
+          return;
+        }
+
         if (!isFinal) {
           // INTERIM: Update immediate UI
           setInterimText(chunk);
@@ -284,6 +298,8 @@ export function useLiveState(
         setError(err.message || 'Speech recognition error');
         setInterimText('');
         setIsListening(false);
+        isListeningRef.current = false;
+        hasStartedHardwareRef.current = false;
       }
     });
 
@@ -306,17 +322,34 @@ export function useLiveState(
 
   const start = async () => {
     setError(null);
-    if (audioServiceRef.current) {
+    if (!hasStartedHardwareRef.current && audioServiceRef.current) {
       await audioServiceRef.current.start();
-      setIsListening(true);
+      hasStartedHardwareRef.current = true;
+    }
+    setIsListening(true);
+    isListeningRef.current = true;
+    
+    // Inject pre-roll buffer when starting to catch the very first syllable
+    if (preRollBufferRef.current.length > 0) {
+      const combinedChunks = preRollBufferRef.current.map(b => b.chunk).join(' ');
+      setLiveState(prev => {
+         const updatedTranscription = prev.transcription_text 
+            ? `${prev.transcription_text.trim()} ${combinedChunks}`
+            : combinedChunks;
+         return {
+            ...prev,
+            transcription_text: updatedTranscription,
+         } as any;
+      });
+      preRollBufferRef.current = [];
     }
   };
 
   const stop = useCallback(() => {
-    if (audioServiceRef.current) {
-      audioServiceRef.current.stop();
-      setIsListening(false);
-    }
+    setIsListening(false);
+    isListeningRef.current = false;
+    // HOT STANDBY: We intentionally do NOT call audioServiceRef.current.stop() here.
+    // The microphone hardware stays alive in the background feeding the preRollBufferRef silently.
   }, []);
 
   const applyLiveState = useCallback((updatedState: LiveState) => {
