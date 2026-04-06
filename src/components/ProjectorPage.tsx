@@ -174,7 +174,7 @@ export default function ProjectorPage() {
       )}
 
       {/* CONTENT AREA */}
-      <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[65vh] mb-32' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 p-12 transition-all duration-300`}>
+      <div className={`w-full max-w-[96vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[65vh] mb-32' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 p-4 transition-all duration-300`}>
 
         {/* MANUAL LYRIC MODE */}
         {liveState.current_lyric_line && !liveState.current_media && (
@@ -186,7 +186,7 @@ export default function ProjectorPage() {
 
         {/* SCRIPTURE OVERLAY */}
         {liveState.current_verse && (liveState.current_verse_text || liveState.current_text) && !liveState.current_lyric_line && !liveState.current_media && (
-          <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
+          <div className="w-full max-w-[95%] mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
             <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden">
               <div className="absolute inset-0 bg-linear-to-br from-white/10 via-transparent to-transparent opacity-30" />
               <div className="relative space-y-12">
@@ -196,7 +196,7 @@ export default function ProjectorPage() {
                   </h2>
                   <div className="h-1.5 w-24 rounded-full bg-emerald-400 opacity-60" />
                 </div>
-                <p className="text-white text-6xl leading-[1.1] font-serif font-bold tracking-tight max-w-5xl mx-auto drop-shadow-2xl">
+                <p className="text-white text-6xl leading-[1.1] font-serif font-bold tracking-tight mx-auto drop-shadow-2xl w-full">
                   "{liveState.current_verse_text || liveState.current_text}"
                 </p>
               </div>
@@ -206,7 +206,7 @@ export default function ProjectorPage() {
 
         {/* SERMON POINT */}
         {liveState.is_point && liveState.current_text && !liveState.current_verse && !liveState.current_lyric_line && !liveState.current_media && (
-          <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-400">
+          <div className="w-full max-w-[95%] mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-400">
             <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border-2 border-amber-500/20 rounded-[64px] shadow-[0_40px_120px_rgba(0,0,0,0.8)] relative overflow-hidden">
               <div className="relative space-y-10">
                 <div className="flex flex-col items-center gap-4">
@@ -215,7 +215,7 @@ export default function ProjectorPage() {
                   </div>
                   <div className="h-1 w-32 rounded-full bg-amber-500/40" />
                 </div>
-                <p className="text-white text-7xl font-black tracking-tight max-w-5xl mx-auto leading-[1.1] drop-shadow-2xl font-serif italic text-center">
+                <p className="text-white text-7xl font-black tracking-tight mx-auto leading-[1.1] drop-shadow-2xl font-serif italic text-center w-full">
                   "{liveState.current_text}"
                 </p>
               </div>
@@ -239,15 +239,15 @@ export default function ProjectorPage() {
 
       {/* THEME OVERLAY */}
       {liveState.is_logo && (
-        <div className="absolute inset-0 z-200 flex animate-in fade-in flex-col items-center justify-center bg-black/60 backdrop-blur-xl">
-          {churchLogo && churchLogo !== '/logo-placeholder.png' ? (
-            <img src={churchLogo} alt="Theme" className="max-h-screen max-w-full object-contain" />
+        <div className="absolute inset-0 z-1000 flex animate-in fade-in flex-col items-center justify-center bg-black">
+          {churchLogo ? (
+            <img src={churchLogo} alt="Theme" className="w-full h-full object-contain" />
           ) : (
             <div className="relative">
               <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full scale-150" />
               <div className="text-white/80 p-16 bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center">
                 <Monitor size={100} className="mb-8 text-emerald-500/70" />
-                <h2 className="text-4xl font-black tracking-[0.4em] uppercase text-white/50">Worship Live</h2>
+                <h2 className="text-4xl font-black tracking-[0.4em] uppercase text-white/50 text-center">Worship Live</h2>
               </div>
             </div>
           )}

@@ -148,10 +148,24 @@ export default function App() {
     secondaryBibleVersion: '',
     timerDuration: 45,
     autoShowTimer: false,
-    projectorBg: '/worship-bg.png', // obsidian/emerald
-    churchLogo: '/logo-placeholder.png', // Default church logo
+    projectorBg: '/worship-bg.png',
+    churchLogo: '', // Start empty to allow detection of personal brand
     theme: 'obsidian',
   });
+
+  // Load Persisted Settings on Init
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ca_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSettings(prev => ({ ...prev, ...parsed }));
+        setDraftSettings(prev => ({ ...prev, ...parsed }));
+      }
+    } catch (e) {
+      console.error("Failed to load settings", e);
+    }
+  }, []);
 
   const [draftSettings, setDraftSettings] = useState<typeof settings>(settings);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -196,6 +210,8 @@ export default function App() {
 
   const commitSettings = () => {
     setSettings(draftSettings);
+    // Persist to disk/storage immediately
+    localStorage.setItem('ca_settings', JSON.stringify(draftSettings));
     showToast('Settings saved successfully!');
   };
 
@@ -2002,7 +2018,7 @@ export default function App() {
             </button>
           </div>
           
-          <div className={`w-full max-w-[85vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[70vh] mb-24' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 transition-all duration-700 p-12`}>
+          <div className={`w-full max-w-[96vw] relative mx-auto ${liveState.ticker_enabled ? 'h-[70vh] mb-24' : 'h-[80vh]'} flex flex-col items-center justify-center text-center z-10 transition-all duration-700 p-8`}>
             
             {/* LYRICS OVERLAY (Auto Karaoke Mode — only when no song manually loaded) */}
             {settings.showLyrics && settings.detectSongs && mainLyric && !liveState.current_song_id && (
@@ -2020,10 +2036,9 @@ export default function App() {
 
             {/* SCRIPTURE OVERLAY (Floating High-Contrast Card) */}
             {settings.showVerse && settings.detectVerses && displayVerseLive && (!mainLyric || !settings.showLyrics) && (
-              <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
-                
-                {/* PRIMARY BIBLE CARD */}
-                <div className={`glass-panel w-full ${projectionRole === 'stage' ? 'p-12' : 'p-16'} bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden group`}>
+              <div className="w-full max-w-[95%] mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
+                 {/* PRIMARY BIBLE CARD */}
+                 <div className={`glass-panel w-full ${projectionRole === 'stage' ? 'p-10' : 'p-16'} bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden group w-full`}>
                    <div className="absolute inset-0 bg-linear-to-br from-white/10 via-transparent to-transparent opacity-30" />
                    
                    <div className={`relative ${projectionRole === 'stage' ? 'space-y-8' : 'space-y-12'}`}>
@@ -2035,7 +2050,7 @@ export default function App() {
                          <div className="h-1.5 w-24 rounded-full bg-(--accent-color) opacity-60"></div>
                       </div>
 
-                      <p className={`text-white ${projectionRole === 'stage' ? 'text-5xl' : 'text-6xl'} leading-[1.1] font-serif font-bold tracking-tight max-w-5xl mx-auto drop-shadow-2xl selection:bg-emerald-500/30 overflow-y-auto max-h-[60vh] no-scrollbar`}>
+                      <p className={`text-white ${projectionRole === 'stage' ? 'text-5xl' : 'text-6xl'} leading-[1.1] font-serif font-bold tracking-tight mx-auto drop-shadow-2xl selection:bg-emerald-500/30 overflow-y-auto max-h-[60vh] no-scrollbar w-full`}>
                          "{displayVerseLive.text}"
                       </p>
 
@@ -2061,7 +2076,7 @@ export default function App() {
             {liveState.current_lyric_line && !displayVerseLive && (
                <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-700">
                   <p className="text-[14px] text-emerald-400/60 font-black tracking-[0.4em] uppercase mb-6">{currentSong?.title}</p>
-                  <p className={`text-white ${projectionRole === 'stage' ? 'text-6xl' : 'text-7xl'} leading-[1.1] font-serif font-bold tracking-tight max-w-5xl mx-auto drop-shadow-2xl text-center`}>
+                  <p className={`text-white ${projectionRole === 'stage' ? 'text-6xl max-w-5xl' : 'text-7xl max-w-7xl'} leading-[1.1] font-serif font-bold tracking-tight mx-auto drop-shadow-2xl text-center`}>
                      "{liveState.current_lyric_line}"
                   </p>
                   {liveState.preview_lyric_line && (
@@ -2072,7 +2087,7 @@ export default function App() {
 
             {/* SERMON POINT OVERLAY (Aired Content Elevation) */}
             {liveState.is_point && liveState.current_text && !displayVerseLive && !liveState.current_lyric_line && (
-               <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-1000">
+               <div className="w-full max-w-[95%] mx-auto flex flex-col items-center justify-center animate-in slide-in-from-bottom-12 duration-1000">
                   <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border-2 border-amber-500/20 rounded-[64px] shadow-[0_40px_120px_rgba(0,0,0,0.8)] relative overflow-hidden group">
                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.05),transparent)]" />
                      <div className="relative space-y-10">
@@ -2082,7 +2097,7 @@ export default function App() {
                            </div>
                            <div className="h-1 w-32 rounded-full bg-amber-500/40"></div>
                         </div>
-                        <p className="text-white text-7xl font-black tracking-tight max-w-5xl mx-auto leading-[1.1] drop-shadow-2xl font-serif italic text-center">
+                        <p className="text-white text-7xl font-black tracking-tight mx-auto leading-[1.1] drop-shadow-2xl font-serif italic text-center w-full">
                            "{liveState.current_text}"
                         </p>
                      </div>
@@ -2133,23 +2148,25 @@ export default function App() {
           </div>
           
           {/* THEME OVERLAY (Hides text/media, shows atmospheric logo state) */}
-          {liveState.is_logo && (
-             <div className="absolute inset-0 z-200 flex animate-in fade-in flex-col items-center justify-center bg-black/60 backdrop-blur-xl">
-                {settings.churchLogo && settings.churchLogo !== '/logo-placeholder.png' ? (
-                   <img src={settings.churchLogo} alt="Theme" className="max-h-screen max-w-full object-contain" />
-                ) : (
-                   <div className="relative">
-                      <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full scale-150"></div>
-                      <div className="text-white/80 p-16 bg-black/40 backdrop-blur-md shadow-[0_0_100px_rgba(0,0,0,0.5)] rounded-full border border-white/10 flex flex-col items-center">
-                         <Monitor size={100} className="mb-8 text-emerald-500/70" />
-                         <h2 className="text-4xl font-black tracking-[0.4em] uppercase text-white/50 text-center">
-                            Worship Live
-                         </h2>
-                      </div>
-                   </div>
-                )}
-             </div>
+
+           {liveState.is_logo && (
+              <div className="absolute inset-0 z-1000 flex animate-in fade-in flex-col items-center justify-center bg-black">
+                 {settings.churchLogo ? (
+                    <img src={settings.churchLogo} alt="Theme" className="w-full h-full object-contain" />
+                 ) : (
+                    <div className="relative flex flex-col items-center justify-center">
+                       <div className="absolute inset-0 bg-emerald-500/20 blur-3xl rounded-full scale-150"></div>
+                       <div className="text-white/80 p-16 bg-black/40 backdrop-blur-md shadow-[0_0_100px_rgba(0,0,0,0.5)] rounded-full border border-white/10 flex flex-col items-center">
+                          <Monitor size={100} className="mb-8 text-emerald-500/70" />
+                          <h2 className="text-4xl font-black tracking-[0.4em] uppercase text-white/50 text-center">
+                             Worship Live
+                          </h2>
+                       </div>
+                    </div>
+                 )}
+              </div>
           )}
+
 
           {/* BLANK OVERLAY (Absolute Blackout) */}
           {liveState.is_blank && (
