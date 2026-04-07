@@ -18,7 +18,11 @@ const download = (url) => {
       res.on('data', (chunk) => rawData += chunk);
       res.on('end', () => {
         try {
-          resolve(JSON.parse(rawData));
+          let cleanData = rawData;
+          if (cleanData.charCodeAt(0) === 0xFEFF) {
+             cleanData = cleanData.slice(1);
+          }
+          resolve(JSON.parse(cleanData));
         } catch (e) {
           reject(e);
         }
