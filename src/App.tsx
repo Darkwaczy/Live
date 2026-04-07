@@ -4,7 +4,10 @@ import {
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
   Activity, Radio, Search, Heart,
-  ChevronLeft, RefreshCw, Volume2, VolumeX
+  ChevronLeft, RefreshCw, Volume2, VolumeX, ListOrdered, FastForward, ArrowUp, ArrowDown, Plus,
+  Check,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
@@ -25,7 +28,7 @@ import SettingsView from './components/SettingsView';
 const SESSION_ID = 'service-001';
 
 type ViewMode = 'live' | 'history' | 'documents' | 'settings';
-type RightPanelTab = 'scriptures' | 'lyrics' | 'notes' | 'broadcast';
+type RightPanelTab = 'schedule' | 'scriptures' | 'lyrics' | 'notes' | 'broadcast';
 const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass }: { lyric: string, spokenText: string, colorClass: string, animationClass: string, sizeClass: string }) => {
   const words = lyric.split(' ');
   const recentSpoken = spokenText.toLowerCase().replace(/[^a-z0-9 \']/g, '').split(' ').filter(w => w.length > 0).slice(-20);
@@ -195,6 +198,53 @@ export default function App() {
 
   const updateDraftSetting = (key: string, value: any) => {
     setDraftSettings(prev => ({ ...prev, [key as keyof typeof settings]: value }));
+  };
+
+  // Order of Service State
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [servicePlan, setServicePlan] = useState<{id: string; title: string; type: string}[]>([]);
+  const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
+
+  useEffect(() => {
+    try {
+      const savedPlan = localStorage.getItem('ca_service_plan');
+      if (savedPlan) {
+        setServicePlan(JSON.parse(savedPlan));
+      } else {
+        setServicePlan([
+          { id: crypto.randomUUID(), title: 'Opening Prayer', type: 'prayer' },
+          { id: crypto.randomUUID(), title: 'Worship', type: 'worship' },
+          { id: crypto.randomUUID(), title: 'Announcements', type: 'announcement' },
+          { id: crypto.randomUUID(), title: 'Sermon', type: 'sermon' },
+          { id: crypto.randomUUID(), title: 'Altar Call', type: 'prayer' },
+          { id: crypto.randomUUID(), title: 'Closing', type: 'closing' }
+        ]);
+      }
+    } catch (e) {
+       console.error("Failed to load service plan", e);
+    }
+  }, []);
+
+  const saveServicePlan = (newPlan: {id: string; title: string; type: string}[]) => {
+    setServicePlan(newPlan);
+    localStorage.setItem('ca_service_plan', JSON.stringify(newPlan));
+  };
+
+  const advanceService = () => {
+    if (currentPlanIndex < servicePlan.length - 1) {
+      const nextIndex = currentPlanIndex + 1;
+      const nextItem = servicePlan[nextIndex];
+      setCurrentPlanIndex(nextIndex);
+      
+      // Smart Auto-Switcher
+      if (nextItem.type === 'worship') {
+         setRightPanelTab('lyrics');
+      } else if (nextItem.type === 'sermon') {
+         setRightPanelTab('scriptures');
+      }
+      
+      showToast(`Advanced to: ${nextItem.title}`);
+    }
   };
 
   // Bible & Lyrics Browser States
@@ -922,6 +972,12 @@ export default function App() {
           <div className="flex items-center gap-6">
             <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-gray-400 h-full">
               <button 
+                onClick={() => { setRightPanelTab('schedule'); setIsRightPanelOpen(true); }}
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'schedule' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
+                <ListOrdered size={16} /> Schedule
+                {rightPanelTab === 'schedule' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
+              </button>
+              <button 
                 onClick={() => { setRightPanelTab('scriptures'); setIsRightPanelOpen(true); }}
                 className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
                 <BookOpen size={16} /> Scriptures
@@ -993,21 +1049,18 @@ export default function App() {
                 <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 no-scrollbar bg-(--bg-primary)/50">
 
                    {/* LIVE INTERIM — prominent, sticky at top as words come in */}
-                   {(interimText || isListening) && (
+                   {interimText && (
                      <div className="sticky top-0 z-10 mb-1 px-3 py-2.5 rounded-xl bg-(--accent-color)/10 border border-(--accent-color)/30 shadow-lg backdrop-blur-sm">
                        <div className="flex items-center gap-1.5 mb-1">
                          <span className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse inline-block" />
-                         <span className="text-[8px] font-black text-(--accent-color) uppercase tracking-widest">{interimText ? 'Speaking now' : 'Listening...'}</span>
+                         <span className="text-[8px] font-black text-(--accent-color) uppercase tracking-widest">Speaking now</span>
                        </div>
-                       <p className="text-sm font-semibold text-white leading-snug min-h-[1.5em] flex items-end flex-wrap gap-x-1">
-                          <span>{interimText}</span>
-                          <span className="inline-block w-[4px] h-[1em] bg-(--accent-color) animate-pulse relative top-[-2px] ml-[2px]" />
-                       </p>
+                       <p className="text-sm font-semibold text-white leading-snug">{interimText}</p>
                      </div>
                    )}
 
                    {/* CONFIRMED sentences — stacked below */}
-                   {sentences.length === 0 && !interimText && !isListening ? (
+                   {sentences.length === 0 && !interimText ? (
                      <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
                         <FileText size={24} className="mb-2" />
                         <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>
@@ -1044,48 +1097,47 @@ export default function App() {
                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-(--text-primary)/60">Queue</h3>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1 no-scrollbar">
                    {(!liveState.detection_history || liveState.detection_history.length === 0) ? (
                       <p className="text-[9px] text-gray-700 italic text-center mt-4 uppercase tracking-widest opacity-30">Queue is empty</p>
                    ) : (
                       liveState.detection_history.map((det) => (
                          <div 
                             key={det.id} 
-                            className="relative flex flex-col p-3 bg-(--text-primary)/5 border border-(--border-color) rounded-xl hover:bg-(--text-primary)/10 hover:border-(--accent-color)/40 transition-all cursor-pointer group shadow-lg active:scale-[0.98]"
-                         >
-                            <div className="flex items-center justify-between mb-2">
-                               <span className="text-[8px] font-black text-(--accent-color)/40 uppercase group-hover:text-(--accent-color) transition-colors">Detected</span>
-                               <div className="flex items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
-                                  <button 
-                                     onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeDetection(det.id);
-                                     }}
-                                     className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded transition-colors"
-                                  >
-                                     <X size={10} />
-                                  </button>
-                               </div>
-                            </div>
-                            <div className="flex items-end justify-between" onClick={() => {
+                            onClick={() => {
                                setPreviewVerse(det.verse);
                                setSelectedBook(det.verse.book);
                                setSelectedChapter(det.verse.chapter);
-                            }}>
-                               <div>
-                                  <p className="text-[11px] font-bold text-(--text-primary) mb-0.5">{det.verse.book} {det.verse.chapter}:{det.verse.verse_start}</p>
-                                  <p className="text-[8px] font-mono text-(--text-secondary) tracking-tighter uppercase">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</p>
+                            }}
+                            className="relative flex items-center justify-between px-3 py-2 bg-(--text-primary)/5 hover:bg-(--text-primary)/10 border border-transparent hover:border-(--border-color) border-l-2 border-l-transparent hover:border-l-(--accent-color) rounded-md transition-all cursor-pointer group"
+                         >
+                            <div className="flex flex-col min-w-0 pr-2">
+                               <div className="flex items-baseline gap-1.5">
+                                 <span className="text-[9px] font-black text-(--accent-color)/80 uppercase tracking-widest leading-none block">{det.verse.book}</span>
+                                 <p className="text-[12px] font-bold text-white tracking-wide leading-none">{det.verse.chapter}:{det.verse.verse_start}</p>
                                </div>
+                               <span className="text-[8px] font-mono text-gray-500/60 tracking-tighter uppercase mt-1">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                <button 
                                  onClick={(e) => {
                                     e.stopPropagation();
                                     setPreviewVerse(det.verse);
-                                    // Give it a split-second to fetch the text before broadcasting
                                     setTimeout(() => goLive(), 400);
                                  }}
-                                 className="p-1.5 bg-(--accent-color)/10 rounded-lg text-(--accent-color) hover:bg-(--accent-color) hover:text-black transition-all"
+                                 className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)] active:scale-95"
                                >
                                   <Play size={10} fill="currentColor" />
+                               </button>
+                               <button 
+                                  onClick={(e) => {
+                                     e.stopPropagation();
+                                     removeDetection(det.id);
+                                  }}
+                                  className="p-1.5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded transition-colors"
+                               >
+                                  <X size={10} />
                                </button>
                             </div>
                          </div>
@@ -1440,6 +1492,111 @@ export default function App() {
               
               <div className="flex-1 overflow-y-auto p-5 pb-8 flex flex-col bg-[#0d0d0d]">
                 
+                {/* Schedule Tab */}
+                {rightPanelTab === 'schedule' && (
+                  <div className="flex flex-col h-full overflow-hidden space-y-4 animate-in slide-in-from-right-4">
+                     <div className="shrink-0 flex items-center justify-between pb-4 border-b border-white/5">
+                        <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                           <ListOrdered size={18} className="text-(--accent-color)" /> Service Plan
+                        </h3>
+                        <button 
+                           onClick={() => setIsEditingPlan(!isEditingPlan)}
+                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                             isEditingPlan ? 'bg-emerald-500 text-black' : 'bg-white/5 text-gray-400 hover:text-white'
+                           }`}
+                        >
+                           {isEditingPlan ? <Check size={14} /> : <Edit2 size={14} />}
+                           {isEditingPlan ? 'Done' : 'Edit'}
+                        </button>
+                     </div>
+                     <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-10">
+                        {servicePlan.map((item, idx) => {
+                           const isActive = idx === currentPlanIndex;
+                           const isPast = idx < currentPlanIndex;
+                           
+                           if (isEditingPlan) {
+                              return (
+                                 <div key={item.id} className="p-3 bg-[#1c1c1f] rounded-xl border border-white/10 flex items-center gap-3 animate-in fade-in">
+                                    <div className="flex flex-col gap-1 shrink-0">
+                                       <button disabled={idx === 0} onClick={() => { const nu = [...servicePlan]; [nu[idx-1], nu[idx]] = [nu[idx], nu[idx-1]]; saveServicePlan(nu); }} className="p-1 text-gray-600 hover:text-white disabled:opacity-20"><ArrowUp size={14} /></button>
+                                       <button disabled={idx === servicePlan.length - 1} onClick={() => { const nu = [...servicePlan]; [nu[idx+1], nu[idx]] = [nu[idx], nu[idx+1]]; saveServicePlan(nu); }} className="p-1 text-gray-600 hover:text-white disabled:opacity-20"><ArrowDown size={14} /></button>
+                                    </div>
+                                    <div className="flex-1 flex flex-col gap-2">
+                                       <input 
+                                          type="text" 
+                                          value={item.title} 
+                                          onChange={(e) => { const nu = [...servicePlan]; nu[idx].title = e.target.value; saveServicePlan(nu); }}
+                                          className="bg-black/50 border border-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-md focus:outline-none focus:border-(--accent-color)"
+                                       />
+                                       <select 
+                                          value={item.type}
+                                          onChange={(e) => { const nu = [...servicePlan]; nu[idx].type = e.target.value; saveServicePlan(nu); }}
+                                          className="bg-black/50 border border-white/10 text-gray-400 text-xs px-2 py-1.5 rounded-md focus:outline-none focus:border-(--accent-color) uppercase font-bold tracking-widest"
+                                       >
+                                          <option value="prayer">Prayer</option>
+                                          <option value="worship">Worship</option>
+                                          <option value="sermon">Sermon</option>
+                                          <option value="announcement">Announcement</option>
+                                          <option value="closing">Closing</option>
+                                          <option value="note">Note</option>
+                                       </select>
+                                    </div>
+                                    <button onClick={() => { const nu = servicePlan.filter((_, i) => i !== idx); saveServicePlan(nu); }} className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+                                       <Trash2 size={16} />
+                                    </button>
+                                 </div>
+                              );
+                           }
+
+                           return (
+                              <div 
+                                key={item.id}
+                                onClick={() => {
+                                   setCurrentPlanIndex(idx);
+                                   if (item.type === 'worship') setRightPanelTab('lyrics');
+                                   else if (item.type === 'sermon') setRightPanelTab('scriptures');
+                                }}
+                                className={`p-4 rounded-xl border flex flex-col gap-2 transition-all cursor-pointer relative group ${
+                                   isActive 
+                                     ? 'bg-(--accent-color)/10 border-(--accent-color)/50 ring-1 ring-(--accent-color) shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                                     : isPast
+                                        ? 'bg-white/5 border-white/5 opacity-60 hover:opacity-100 hover:bg-white/10'
+                                        : 'bg-[#1c1c1f] hover:bg-[#252525] border-white/5'
+                                }`}
+                              >
+                                 {isActive && <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-(--accent-color) animate-pulse shadow-[0_0_10px_rgba(16,185,129,1)]" />}
+                                 <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 flex items-center justify-center rounded-lg font-black text-xs ${isActive ? 'bg-(--accent-color) text-black' : isPast ? 'bg-white/5 text-gray-500' : 'bg-white/10 text-gray-400 group-hover:bg-white/20'}`}>
+                                       {idx + 1}
+                                    </div>
+                                    <h4 className={`font-bold text-base ${isActive ? 'text-white' : isPast ? 'text-gray-400' : 'text-gray-200'}`}>
+                                       {item.title}
+                                    </h4>
+                                 </div>
+                                 <div className="pl-11 flex items-center gap-2">
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${isActive ? 'bg-(--accent-color)/20 text-(--accent-color)' : 'bg-white/5 text-gray-500'}`}>
+                                       {item.type}
+                                    </span>
+                                 </div>
+                              </div>
+                           );
+                        })}
+
+                        {isEditingPlan && (
+                           <button 
+                             onClick={() => {
+                               const newItem = { id: crypto.randomUUID(), title: 'New Item', type: 'note' };
+                               saveServicePlan([...servicePlan, newItem]);
+                             }}
+                             className="w-full py-4 border-2 border-dashed border-white/10 hover:border-emerald-500/50 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:text-emerald-400 transition-colors uppercase font-black text-[10px] tracking-widest"
+                           >
+                              <Plus size={16} /> Add Item
+                           </button>
+                        )}
+                     </div>
+                  </div>
+                )}
+
                 {/* Broadcast Hub (The News Ticker Editor) */}
                 {rightPanelTab === 'broadcast' && (
                   <div className="space-y-6 animate-in slide-in-from-right-4">
@@ -1565,7 +1722,7 @@ export default function App() {
                               min={1}
                               value={selectedChapter}
                               onChange={(e) => setSelectedChapter(Math.max(1, Math.min(150, Number(e.target.value) || 1)))}
-                              className="w-6 bg-transparent text-center py-1 text-[10px] text-white focus:outline-none font-bold placeholder-gray-600"
+                              className="w-6 bg-transparent text-center py-1 text-[10px] text-white focus:outline-none font-bold placeholder-gray-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                             <button onClick={handleNextChapter} className="p-1 hover:text-white text-gray-500 transition-colors"><ChevronRight size={10} /></button>
                           </div>
