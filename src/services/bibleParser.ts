@@ -156,17 +156,40 @@ export function detectBibleVerse(text: string): BibleVerse[] {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Hard fix for common phrases
+  // Hard fix for common phrases and stories - Instant synchronous detection
   const SEMANTIC_HOTKEYS: Record<string, BibleVerse> = {
+    // Famous verses
     'fishers of men': { book: 'Matthew', chapter: 4, verse_start: 19, verse_end: 19 },
     'john 3 16': { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 },
     'for god so loved the world': { book: 'John', chapter: 3, verse_start: 16, verse_end: 16 },
     'great commission': { book: 'Matthew', chapter: 28, verse_start: 19, verse_end: 20 },
     'our father who art in heaven': { book: 'Matthew', chapter: 6, verse_start: 9, verse_end: 13 },
+    
+    // Most popular Bible stories
+    'prodigal son': { book: 'Luke', chapter: 15, verse_start: 11, verse_end: 32 },
+    'jesus walked on water': { book: 'Matthew', chapter: 14, verse_start: 25, verse_end: 33 },
+    'children obey your parents': { book: 'Ephesians', chapter: 6, verse_start: 1, verse_end: 3 },
+    'good samaritan': { book: 'Luke', chapter: 10, verse_start: 25, verse_end: 37 },
+    'david and goliath': { book: '1 Samuel', chapter: 17, verse_start: 1, verse_end: 58 },
+    'jonah and the whale': { book: 'Jonah', chapter: 1, verse_start: 1, verse_end: 17 },
+    'noah ark': { book: 'Genesis', chapter: 6, verse_start: 1, verse_end: 22 },
+    'garden of eden': { book: 'Genesis', chapter: 2, verse_start: 8, verse_end: 25 },
+    'adam and eve': { book: 'Genesis', chapter: 2, verse_start: 8, verse_end: 25 },
+    'daniels lions': { book: 'Daniel', chapter: 6, verse_start: 1, verse_end: 28 },
+    'fiery furnace': { book: 'Daniel', chapter: 3, verse_start: 1, verse_end: 30 },
+    'lord prayer': { book: 'Matthew', chapter: 6, verse_start: 9, verse_end: 13 },
+    'last supper': { book: 'Matthew', chapter: 26, verse_start: 26, verse_end: 29 },
+    'ten commandments': { book: 'Exodus', chapter: 20, verse_start: 1, verse_end: 17 },
+    'resurrection of jesus': { book: 'Matthew', chapter: 28, verse_start: 1, verse_end: 10 },
+    'beatitudes': { book: 'Matthew', chapter: 5, verse_start: 3, verse_end: 12 },
+    'psalm 23': { book: 'Psalms', chapter: 23, verse_start: 1, verse_end: 6 },
   };
+  
+  // Normalize and check for hotkeys using normalized text (handles punctuation)
+  const normalizedSanitized = normalizeForSearch(sanitizedText);
 
   for (const [phrase, verse] of Object.entries(SEMANTIC_HOTKEYS)) {
-    if (sanitizedText.toLowerCase().includes(phrase)) {
+    if (normalizedSanitized.includes(normalizeForSearch(phrase)) && verse.book) {
       addResult(verse.book, verse.chapter, verse.verse_start, verse.verse_end || verse.verse_start);
     }
   }
@@ -279,6 +302,18 @@ function getLevenshteinDistance(a: string, b: string): number {
 let bibleStoriesCache: any = null;
 
 /**
+ * Normalize text for search by removing punctuation and extra whitespace
+ * "Children, obey your parents." -> "children obey your parents"
+ */
+function normalizeForSearch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Replace all non-alphanumeric with spaces
+    .replace(/\s+/g, ' ')     // Collapse multiple spaces
+    .trim();
+}
+
+/**
  * Load Bible stories from the public JSON file (cached)
  */
 async function getBibleStories(): Promise<any> {
@@ -297,12 +332,12 @@ async function getBibleStories(): Promise<any> {
 }
 
 /**
- * Find Bible reference by matching story keywords
- * Checks if text contains any known story keywords and returns the reference
+ * Find Bible reference by matching story keywords against rolling window context
+ * Uses normalized text to handle punctuation variations like "Children, obey..."
  */
 export async function findStoryReference(text: string): Promise<BibleVerse[]> {
   const results: BibleVerse[] = [];
-  const lowerText = text.toLowerCase();
+  const normalizedText = normalizeForSearch(text);
   
   try {
     const storiesData = await getBibleStories();
@@ -310,8 +345,10 @@ export async function findStoryReference(text: string): Promise<BibleVerse[]> {
     
     for (const story of stories) {
       for (const keyword of story.keywords || []) {
-        // Check if the keyword (or any word from the keyword phrase) appears in the text
-        if (lowerText.includes(keyword)) {
+        const normalizedKeyword = normalizeForSearch(keyword);
+        
+        // Check if the normalized keyword appears in normalized text
+        if (normalizedText.includes(normalizedKeyword)) {
           // Add all references for this story
           for (const ref of story.references || []) {
             const verseKey = `${ref.book} ${ref.chapter}:${ref.verse_start}`;
@@ -325,7 +362,7 @@ export async function findStoryReference(text: string): Promise<BibleVerse[]> {
               });
             }
           }
-          // Only match the first matching story to avoid multiple matches
+          // Match found, stop searching keywords for this story
           break;
         }
       }
@@ -341,6 +378,7 @@ export async function findStoryReference(text: string): Promise<BibleVerse[]> {
 
 /**
  * Combined detection: First tries formal verse references, then story/phrase keywords
+ * Uses rolling window context for better phrase matching across sentence boundaries
  * Returns results from both methods, avoiding duplicates
  */
 export async function detectBibleVerseWithStories(text: string): Promise<BibleVerse[]> {
