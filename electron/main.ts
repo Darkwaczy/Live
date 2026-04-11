@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'path';
 import * as db from './db.js';
 import * as bibleDb from './bibleDb.js';
+import { SidecarManager } from './sidecar.js';
 
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -42,6 +43,11 @@ function createWindow() {
 
 app.on('ready', () => {
   createWindow();
+  
+  // Start the N-ATLAS sidecar
+  SidecarManager.getInstance().start().catch(err => {
+    console.error('[Main] Failed to start N-ATLAS sidecar:', err);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -52,6 +58,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  SidecarManager.getInstance().stop();
 });
 
 ipcMain.handle('app:get-version', async () => {

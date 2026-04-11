@@ -40,6 +40,7 @@ const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const db = __importStar(require("./db.js"));
 const bibleDb = __importStar(require("./bibleDb.js"));
+const sidecar_js_1 = require("./sidecar.js");
 const isDev = process.env.NODE_ENV !== 'production';
 let mainWindow = null;
 let projectorWindow = null;
@@ -72,6 +73,10 @@ function createWindow() {
 }
 electron_1.app.on('ready', () => {
     createWindow();
+    // Start the N-ATLAS sidecar
+    sidecar_js_1.SidecarManager.getInstance().start().catch(err => {
+        console.error('[Main] Failed to start N-ATLAS sidecar:', err);
+    });
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0)
             createWindow();
@@ -81,6 +86,9 @@ electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         electron_1.app.quit();
     }
+});
+electron_1.app.on('will-quit', () => {
+    sidecar_js_1.SidecarManager.getInstance().stop();
 });
 electron_1.ipcMain.handle('app:get-version', async () => {
     return electron_1.app.getVersion();

@@ -152,7 +152,7 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                         <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy) ⭐ System Audio</option>
                       </select>
                       {settings.speechEngine === 'n-atlas' && (
-                        <p className="text-xs text-emerald-500/80 mt-2 flex items-center gap-1">✅ N-ATLAS: Optimized for Nigerian English accent. Requires local Docker service running on port 5000.</p>
+                        <p className="text-xs text-emerald-500/80 mt-2 flex items-center gap-1">✅ N-ATLAS: Optimized for Nigerian English accent. Powered by built-in local engine (Port 5003).</p>
                       )}
                       {(settings.audioInput === 'system' && !['groq', 'deepgram', 'whisper'].includes(settings.speechEngine)) && (
                         <p className="text-xs text-yellow-500/80 mt-2 flex items-center gap-1">⚠️ Web Speech API with System Audio: Switch to a starred provider to capture YouTube/mixer audio.</p>

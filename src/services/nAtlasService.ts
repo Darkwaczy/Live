@@ -15,7 +15,7 @@ export interface NAtlasTranscriptionResult {
 }
 
 export interface NAtlasConfig {
-  endpoint: string; // e.g., "http://localhost:5000"
+  endpoint: string; // e.g., "http://localhost:5003"
   timeout?: number; // milliseconds
 }
 
@@ -29,13 +29,32 @@ export class NAtlasService {
   }
 
   /**
+   * Internal fetch wrapper with timeout support
+   */
+  private async fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
+  /**
    * Check if N-ATLAS service is healthy and running
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.endpoint}/health`, {
-        method: 'GET',
-        timeout: this.timeout
+      const response = await this.fetchWithTimeout(`${this.endpoint}/health`, {
+        method: 'GET'
       });
       return response.ok;
     } catch (error) {
@@ -58,10 +77,9 @@ export class NAtlasService {
 
       console.log(`[N-ATLAS] Sending ${audioBlob.size} bytes to transcribe...`);
 
-      const response = await fetch(`${this.endpoint}/transcribe`, {
+      const response = await this.fetchWithTimeout(`${this.endpoint}/transcribe`, {
         method: 'POST',
-        body: formData,
-        timeout: this.timeout
+        body: formData
       });
 
       if (!response.ok) {
@@ -97,13 +115,12 @@ export class NAtlasService {
     try {
       console.log(`[N-ATLAS] Sending raw PCM (${pcmBuffer.length} bytes)...`);
 
-      const response = await fetch(`${this.endpoint}/transcribe-raw`, {
+      const response = await this.fetchWithTimeout(`${this.endpoint}/transcribe-raw`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-pcm+int16'
         },
-        body: pcmBuffer,
-        timeout: this.timeout
+        body: pcmBuffer as any // Cast to any to avoid strict BodyInit type issues in some TS versions
       });
 
       if (!response.ok) {
@@ -132,9 +149,8 @@ export class NAtlasService {
    */
   async getInfo(): Promise<any> {
     try {
-      const response = await fetch(`${this.endpoint}/info`, {
-        method: 'GET',
-        timeout: this.timeout
+      const response = await this.fetchWithTimeout(`${this.endpoint}/info`, {
+        method: 'GET'
       });
 
       if (!response.ok) {

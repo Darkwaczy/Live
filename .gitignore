@@ -25,3 +25,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Sidecar & Model Bundling
+.venv/
+bin/
+services/model_cache/

@@ -62,7 +62,7 @@ export class AudioService {
     console.log(`AudioService init provider=${this.config.provider} input=${this.config.audioInput}`);
     
     // Initialize N-ATLAS client
-    const nAtlasEndpoint = this.config.nAtlasEndpoint || 'http://localhost:5000';
+    const nAtlasEndpoint = this.config.nAtlasEndpoint || 'http://localhost:5003';
     this.nAtlasClient = new NAtlasService({ endpoint: nAtlasEndpoint });
     
     if (this.config.provider === 'whisper' && this.config.apiKey && this.config.endpoint) {
@@ -704,7 +704,7 @@ export class AudioService {
       // - At least 2s elapsed AND 400ms of silence
       // - OR if we hit 30s max (N-ATLAS max duration)
       if ((elapsed > 2000 && silenceGap > 400) || elapsed > 30000) {
-        logger.info(`[AudioService] N-ATLAS: Stopping chunk (${elapsed}ms, silence ${silenceGap}ms)`);
+        console.log(`[AudioService] N-ATLAS: Stopping chunk (${elapsed}ms, silence ${silenceGap}ms)`);
         this.mediaRecorder.stop();
         startTime = now;
         lastSilenceTime = 0;
