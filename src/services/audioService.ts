@@ -3,6 +3,7 @@ import { RealSpeechProvider } from './speechProvider';
 import { NIGERIAN_VOCABULARY } from '../config/nigerianContext';
 import { DEEPGRAM_BOOST_LIST } from './religiousVocabulary';
 import applyNigerianPhoneticCorrections, { buildNigerianVariantKeywords } from './nigerianPhoneticCorrections';
+import { shouldFallbackToGoogleCloud, transcribeWithGoogleCloud } from './googleCloudSpeechService';
 
 // Injecting Web Speech API typings for the IDE
 declare global {
@@ -49,9 +50,12 @@ export class AudioService {
   private interimInterval?: any;
   private audioChunks: Blob[] = [];  // Buffer audio chunks before sending
   private isRecording: boolean = false;
+  private fallbackAudioChunks: Uint8Array[] = [];  // For Google Cloud fallback
+  private googleCloudApiKey?: string;
 
   constructor(config?: AudioServiceConfig) {
     this.config = { provider: 'web', locale: 'en-NG', ...config };
+    this.googleCloudApiKey = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY;
     console.log(`AudioService init provider=${this.config.provider} input=${this.config.audioInput}`);
     if (this.config.provider === 'whisper' && this.config.apiKey && this.config.endpoint) {
       this.whisperClient = new RealSpeechProvider({
@@ -261,13 +265,18 @@ export class AudioService {
       const data = JSON.parse(message.data);
       const transcript = data.channel?.alternatives?.[0]?.transcript;
       const isFinal = data.is_final;
+      const confidence = data.channel?.alternatives?.[0]?.confidence ?? 0;
       
       if (transcript && this.config.onTranscript) {
         let cleaned = this.deduplicateTranscript(transcript);
         // Apply Nigerian phonetic corrections for accent-related mishearings
         cleaned = applyNigerianPhoneticCorrections(cleaned, 0.80);
-        if (cleaned.trim().length > 0) {
-           this.config.onTranscript(cleaned, isFinal, Date.now(), data.channel.alternatives[0].confidence);
+        
+        // Check if we should fallback to Google Cloud (low confidence + problem words)
+        if (isFinal && shouldFallbackToGoogleCloud(cleaned, confidence) && this.googleCloudApiKey) {
+          this.handleFallbackToGoogleCloud(cleaned, transcript);
+        } else if (cleaned.trim().length > 0) {
+           this.config.onTranscript(cleaned, isFinal, Date.now(), confidence);
         }
       }
     };
@@ -291,6 +300,8 @@ export class AudioService {
           pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
         this.socket.send(pcmData.buffer);
+        // Also buffer for Google Cloud fallback
+        this.fallbackAudioChunks.push(new Uint8Array(pcmData.buffer));
       }
     };
   }
@@ -669,6 +680,95 @@ export class AudioService {
     this.processor = undefined;
     this.context = undefined;
     this.audioChunks = []; // Clear buffered audio chunks
+  }
+
+  private async handleFallbackToGoogleCloud(cleaned: string, original: string) {
+    if (!this.googleCloudApiKey || this.fallbackAudioChunks.length === 0) {
+      // Fallback failed, use original cleaned version
+      if (cleaned.trim().length > 0) {
+        this.config.onTranscript?.(cleaned, true, Date.now(), 0);
+      }
+      return;
+    }
+
+    try {
+      console.log('[AudioService] Triggering Google Cloud fallback due to uncertain transcription...');
+      
+      // Combine all audio chunks into a single WAV blob
+      const totalLength = this.fallbackAudioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedBuffer = new Int16Array(totalLength);
+      let offset = 0;
+      
+      for (const chunk of this.fallbackAudioChunks) {
+        combinedBuffer.set(new Int16Array(chunk.buffer), offset);
+        offset += chunk.length;
+      }
+      
+      // Create WAV blob from the audio buffer
+      const wavBlob = this.createWavBlob(combinedBuffer, 16000);
+      
+      // Attempt Google Cloud transcription
+      const result = await transcribeWithGoogleCloud(wavBlob, this.googleCloudApiKey, original);
+      
+      if (result.transcript && result.transcript !== original) {
+        console.log(`[AudioService] Google Cloud provided better transcription with ${(result.confidence * 100).toFixed(1)}% confidence`);
+        this.config.onTranscript?.(result.transcript, true, Date.now(), result.confidence);
+      } else {
+        // Use the cleaned/corrected version if Google Cloud didn't help
+        if (cleaned.trim().length > 0) {
+          this.config.onTranscript?.(cleaned, true, Date.now(), 0);
+        }
+      }
+    } catch (error) {
+      console.error('[AudioService] Google Cloud fallback failed:', error);
+      // Fall back to cleaned version with phonetic corrections
+      if (cleaned.trim().length > 0) {
+        this.config.onTranscript?.(cleaned, true, Date.now(), 0);
+      }
+    } finally {
+      // Clear fallback buffer for next sentence
+      this.fallbackAudioChunks = [];
+    }
+  }
+
+  private createWavBlob(audioBuffer: Int16Array, sampleRate: number): Blob {
+    const channels = 1; // Mono
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * channels * bitsPerSample / 8;
+    const blockAlign = channels * bitsPerSample / 8;
+    
+    const data = new ArrayBuffer(44 + audioBuffer.length * 2);
+    const view = new DataView(data);
+    
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + audioBuffer.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // fmt chunk size
+    view.setUint16(20, 1, true); // Audio format (1 = PCM)
+    view.setUint16(22, channels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(36, 'data');
+    view.setUint32(40, audioBuffer.length * 2, true);
+    
+    // Audio data
+    let audioOffset = 44;
+    for (let i = 0; i < audioBuffer.length; i++) {
+      view.setInt16(audioOffset, audioBuffer[i], true);
+      audioOffset += 2;
+    }
+    
+    return new Blob([data], { type: 'audio/wav' });
   }
 
   private deduplicateTranscript(text: string): string {
