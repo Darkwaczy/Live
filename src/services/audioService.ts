@@ -2,6 +2,7 @@ import { TranscriptionCallback } from './speechService';
 import { RealSpeechProvider } from './speechProvider';
 import { NIGERIAN_VOCABULARY } from '../config/nigerianContext';
 import { DEEPGRAM_BOOST_LIST } from './religiousVocabulary';
+import applyNigerianPhoneticCorrections, { buildNigerianVariantKeywords } from './nigerianPhoneticCorrections';
 
 // Injecting Web Speech API typings for the IDE
 declare global {
@@ -225,7 +226,18 @@ export class AudioService {
 
     // Build Deepgram URL with Advanced Context Bias (Keywords boost common mishearings)
     // We combine the general Nigerian context with the specialized religious dictionary
-    const KEYWORDS_TO_BOOST = [...DEEPGRAM_BOOST_LIST, ...NIGERIAN_VOCABULARY.slice(0, 15)];
+    // and phonetic variants to help recognition of accent-related patterns
+    const CRITICAL_PHONETIC_VARIANTS = [
+      'water', 'peter', // /w/ → /p/ substitution
+      'walking', 'kings', // Consonant cluster reduction
+      'happy', 'happen', 'sitter', 'setter', // Vowel patterns
+      'wink', 'wing', // Accent variants
+    ];
+    const KEYWORDS_TO_BOOST = [
+      ...DEEPGRAM_BOOST_LIST,
+      ...NIGERIAN_VOCABULARY.slice(0, 15),
+      ...CRITICAL_PHONETIC_VARIANTS
+    ];
     const keywordsParam = KEYWORDS_TO_BOOST
       .filter((k, i, s) => s.indexOf(k) === i) // Deduplicate
       .map(k => `keywords=${encodeURIComponent(k.toLowerCase())}:2`)
@@ -251,7 +263,9 @@ export class AudioService {
       const isFinal = data.is_final;
       
       if (transcript && this.config.onTranscript) {
-        const cleaned = this.deduplicateTranscript(transcript);
+        let cleaned = this.deduplicateTranscript(transcript);
+        // Apply Nigerian phonetic corrections for accent-related mishearings
+        cleaned = applyNigerianPhoneticCorrections(cleaned, 0.80);
         if (cleaned.trim().length > 0) {
            this.config.onTranscript(cleaned, isFinal, Date.now(), data.channel.alternatives[0].confidence);
         }
@@ -487,7 +501,9 @@ export class AudioService {
         const data = await res.json();
         const transcriptText = data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
         if (transcriptText && this.config.onTranscript) {
-          this.config.onTranscript(transcriptText, true, Date.now(), 1.0);
+          // Apply Nigerian phonetic corrections for accent-related mishearings
+          const corrected = applyNigerianPhoneticCorrections(transcriptText, 0.80);
+          this.config.onTranscript(corrected, true, Date.now(), 1.0);
         }
         console.log(`✅ Deepgram transcribed: ${transcriptText}`);
         return;
