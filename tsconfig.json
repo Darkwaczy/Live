@@ -18,7 +18,7 @@
     "allowImportingTsExtensions": true,
     "types": ["node", "electron"],
     "baseUrl": "./",
-    "ignoreDeprecations": "6.0"
+
   },
   "include": ["src"],
   "exclude": ["dist", "dist-electron", "node_modules", "electron"],

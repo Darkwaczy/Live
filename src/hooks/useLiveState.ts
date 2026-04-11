@@ -352,6 +352,7 @@ export function useLiveState(
               }, 0);
             }
           }
+        }
 
 
           if (song) {
