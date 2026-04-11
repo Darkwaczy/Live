@@ -88,8 +88,20 @@ const numberWords: Record<string, number> = {
   'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50, 'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90
 };
 
+const ordinals: Record<string, string> = {
+  'first': '1', 'second': '2', 'third': '3', 'fourth': '4', 'fifth': '5', '1st': '1', '2nd': '2', '3rd': '3'
+};
+
 function normalizePhoneticNumbers(text: string): string {
-  let words = text.toLowerCase().split(/\s+/);
+  let normalized = text.toLowerCase();
+  
+  // Replace ordinals: "First John" -> "1 John"
+  for (const [ord, num] of Object.entries(ordinals)) {
+    const regex = new RegExp(`\\b${ord}\\b`, 'gi');
+    normalized = normalized.replace(regex, num);
+  }
+
+  let words = normalized.split(/\s+/);
   let result: string[] = [];
   let currentNum = 0;
   let inNumber = false;
@@ -103,11 +115,9 @@ function normalizePhoneticNumbers(text: string): string {
         currentNum = val;
         inNumber = true;
       } else {
-        // Compound check: e.g., "twenty" + "five" = 25
         if (val < 10 && currentNum >= 10 && currentNum % 10 === 0) {
           currentNum += val;
         } else {
-          // New distinct number: e.g., "one" space "one" -> "1 1"
           result.push(currentNum.toString());
           currentNum = val;
         }
@@ -163,13 +173,11 @@ export function detectBibleVerse(text: string): BibleVerse[] {
   
   // Normalize spoken structures from speech-to-text engines
   let normalizedText = normalizePhoneticNumbers(sanitizedText)
-    .replace(/chapter\s+(\d+)(?:\s*,?\s*|\s+verses?\s+|\s+)(\d+)/gi, '$1:$2')
-    .replace(/\b(\d+)\s+verses?\s+(\d+)/gi, '$1:$2') 
-    .replace(/\b(\d+)\s+and\s+(\d+)\b/gi, '$1:$2') 
-    .replace(/\b(\d+)\s*(?::)\s*(\d+)\s*(?:to|through|until|-|–|—)\s*(\d+)\b/gi, '$1:$2-$3')
-    .replace(/(\d+)\s*,\s*(\d+)/g, '$1:$2') 
-    .replace(new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3})\\s+(\\d{1,3})\\b`, 'gi'), '$1 $2:$3')
-    .replace(/verses?\s+(\d+)/gi, ':$1')
+    .replace(/\bchapter\s+(\d+)\s+verse\s+(\d+)\b/gi, '$1:$2') // "chapter 3 verse 16" -> "3:16"
+    .replace(/\bchapter\s+(\d+)\b/gi, '$1') // Remove standalone "chapter" 
+    .replace(/\bverses?\s+(\d+)\b/gi, ':$1') // "verse 16" -> ":16"
+    .replace(/verse\s+(\d+)/gi, ':$1')
+    .replace(new RegExp(`\\b(${sortedBookRegex})\\s+(\\d{1,3})\\s+(\\d{1,3})\\b`, 'gi'), '$1 $2:$3') // "John 3 16" -> "John 3:16"
     .replace(/\s+/g, ' '); 
 
   // 1. Standard pattern with colon (multiple matching)

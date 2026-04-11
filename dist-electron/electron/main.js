@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const db = __importStar(require("./db.js"));
+const bibleDb = __importStar(require("./bibleDb.js"));
 const isDev = process.env.NODE_ENV !== 'production';
 let mainWindow = null;
 let projectorWindow = null;
@@ -101,6 +102,13 @@ electron_1.ipcMain.handle('db:get-live-state', async (event, sessionId) => {
 });
 electron_1.ipcMain.handle('db:get-session', async (event, sessionId) => {
     return db.getSession(sessionId);
+});
+// Advanced SQLite Handlers for Bible Data
+electron_1.ipcMain.handle('db:search-bible', async (event, queryText, limit) => {
+    return bibleDb.searchBibleQuotes(queryText, limit);
+});
+electron_1.ipcMain.handle('db:get-cross-references', async (event, book, chapter, verse, limit) => {
+    return bibleDb.getCrossReferences(book, chapter, verse, limit);
 });
 // Professional Projector Auto-Launch (Like EasyWorship/ProPresenter)
 electron_1.ipcMain.handle('app:open-projector', async () => {

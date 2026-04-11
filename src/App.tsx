@@ -7,7 +7,10 @@ import {
   ChevronLeft, RefreshCw, Volume2, VolumeX, ListOrdered, FastForward, ArrowUp, ArrowDown, Plus,
   Check,
   Edit2,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ArrowLeft,
+  Folder
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
@@ -19,7 +22,7 @@ import ProjectorPage from './components/ProjectorPage';
 import { login, logout, getCurrentUser } from './services/authService';
 import { 
    getNotes, saveNote, getSession, saveSession, getLiveState, saveLiveState,
-   savePastedSong, getPastedSongs
+   savePastedSong, getPastedSongs, getCrossReferences
 } from './services/dbService';
 import { loadEssentialLyrics, searchLyrics, addPastedSong, setInitialPastedSongs } from './services/lyricsService';
 import { Song } from './models/song';
@@ -200,32 +203,81 @@ export default function App() {
     setDraftSettings(prev => ({ ...prev, [key as keyof typeof settings]: value }));
   };
 
+  // Types for the Multi-Media Master Playlist
+  type ServicePlanMediaItem = { type: 'video' | 'audio' | 'image'; url: string; name: string };
+  type ServicePlanScripture = { book: string; chapter: number; verse_start: number; verse_end?: number; reference: string; text?: string };
+  type ServicePlanTextItem = { id: string; title: string; content: string };
+
+  type ServicePlanBlock = {
+    id: string;
+    title: string;
+    type: string;
+    songs?: Song[];
+    scriptures?: ServicePlanScripture[];
+    mediaItems?: ServicePlanMediaItem[];
+    textItems?: ServicePlanTextItem[];
+    fixed?: boolean;
+  };
+
   // Order of Service State
-  const [isEditingPlan, setIsEditingPlan] = useState(false);
-  const [servicePlan, setServicePlan] = useState<{id: string; title: string; type: string}[]>([]);
-  const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
+   const [isEditingPlan, setIsEditingPlan] = useState(false);
+   const [servicePlan, setServicePlan] = useState<ServicePlanBlock[]>([]);
+   const [currentPlanIndex, setCurrentPlanIndex] = useState(0);
+   const [expandedBlockId, setExpandedBlockId] = useState<string | null>(null);
+
+   // Text Item Input State
+   const [newTextTitle, setNewTextTitle] = useState('');
+   const [newTextContent, setNewTextContent] = useState('');
+
+  // Song Picker State
+  const [songPickerBlockId, setSongPickerBlockId] = useState<string | null>(null);
+  const [songPickerQuery, setSongPickerQuery] = useState('');
+  const [songPickerResults, setSongPickerResults] = useState<Song[]>([]);
+
+  // Scripture Picker State
+  const [scripturePickerBlockId, setScripturePickerBlockId] = useState<string | null>(null);
+  const [pickerSelectedBook, setPickerSelectedBook] = useState<string>('John');
+  const [pickerSelectedChapter, setPickerSelectedChapter] = useState<number>(3);
+  const [pickerSelectedVerse, setPickerSelectedVerse] = useState<number>(16);
+
+  const resetToMasterRundown = () => {
+    const masterSkeleton: ServicePlanBlock[] = [
+      { id: crypto.randomUUID(), title: 'Worship', type: 'worship', fixed: true },
+      { id: crypto.randomUUID(), title: 'Announcement', type: 'announcement', fixed: true },
+      { id: crypto.randomUUID(), title: 'Africa Praise', type: 'praise', fixed: true },
+      { id: crypto.randomUUID(), title: 'Contemporary Praise', type: 'praise', fixed: true },
+      { id: crypto.randomUUID(), title: 'Bible Reading', type: 'scripture', fixed: true },
+      { id: crypto.randomUUID(), title: 'Testimony', type: 'note', fixed: true },
+      { id: crypto.randomUUID(), title: 'News', type: 'media', fixed: true }
+    ];
+    saveServicePlan(masterSkeleton);
+    showToast("Standard Rundown Restored");
+  };
 
   useEffect(() => {
     try {
       const savedPlan = localStorage.getItem('ca_service_plan');
       if (savedPlan) {
-        setServicePlan(JSON.parse(savedPlan));
+        const parsed: ServicePlanBlock[] = JSON.parse(savedPlan);
+        // If the user has an old/incomplete plan, we'll nudge it toward the new master structure
+        // but only if it's missing the requested types.
+        const requiredTypes = ['worship', 'announcement', 'praise', 'scripture', 'media'];
+        const hasRequired = requiredTypes.every(t => parsed.some(p => p.type === t));
+        
+        if (!hasRequired && parsed.length < 5) {
+          resetToMasterRundown();
+        } else {
+          setServicePlan(parsed);
+        }
       } else {
-        setServicePlan([
-          { id: crypto.randomUUID(), title: 'Opening Prayer', type: 'prayer' },
-          { id: crypto.randomUUID(), title: 'Worship', type: 'worship' },
-          { id: crypto.randomUUID(), title: 'Announcements', type: 'announcement' },
-          { id: crypto.randomUUID(), title: 'Sermon', type: 'sermon' },
-          { id: crypto.randomUUID(), title: 'Altar Call', type: 'prayer' },
-          { id: crypto.randomUUID(), title: 'Closing', type: 'closing' }
-        ]);
+        resetToMasterRundown();
       }
     } catch (e) {
        console.error("Failed to load service plan", e);
     }
   }, []);
 
-  const saveServicePlan = (newPlan: {id: string; title: string; type: string}[]) => {
+  const saveServicePlan = (newPlan: ServicePlanBlock[]) => {
     setServicePlan(newPlan);
     localStorage.setItem('ca_service_plan', JSON.stringify(newPlan));
   };
@@ -237,10 +289,14 @@ export default function App() {
       setCurrentPlanIndex(nextIndex);
       
       // Smart Auto-Switcher
-      if (nextItem.type === 'worship') {
+      if (nextItem.type === 'worship' || nextItem.type === 'praise') {
          setRightPanelTab('lyrics');
-      } else if (nextItem.type === 'sermon') {
+      } else if (nextItem.type === 'sermon' || nextItem.type === 'scripture') {
          setRightPanelTab('scriptures');
+      } else if (nextItem.type === 'media' || nextItem.type === 'announcement') {
+         setRightPanelTab('broadcast');
+      } else if (nextItem.type === 'note') {
+         setRightPanelTab('notes');
       }
       
       showToast(`Advanced to: ${nextItem.title}`);
@@ -278,6 +334,21 @@ export default function App() {
     },
     { enabled: settings.aiVerseDetection, endpointUrl: settings.aiEndpoint, apiKey: settings.aiApiKey, modelName: settings.aiModel }
   );
+
+  const [crossRefs, setCrossRefs] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (liveState.preview_verse) {
+      getCrossReferences(
+        liveState.preview_verse.book, 
+        liveState.preview_verse.chapter, 
+        liveState.preview_verse.verse_start, 
+        3
+      ).then(setCrossRefs);
+    } else {
+      setCrossRefs([]);
+    }
+  }, [liveState.preview_verse]);
 
   // Sync state between Operator and Projector windows via BroadcastChannel
   // No internet required, same-origin only.
@@ -908,11 +979,8 @@ export default function App() {
         )}
 
         {/* Top Navbar */}
-        <header className="h-[72px] flex items-center justify-between px-6 border-b border-(--border-color) bg-transparent z-10 shrink-0 transition-colors">
-          <div className="flex items-center gap-6">
-            {/* <button onClick={() => showToast('Burger menu clicked')} className="text-(--text-secondary) hover:text-(--text-primary) transition-colors">
-              <Menu size={24} />
-            </button> */}
+        <header className="h-[72px] flex items-center justify-between px-6 border-b border-(--border-color) bg-transparent z-10 shrink-0 transition-colors gap-4 overflow-hidden">
+          <div className="flex items-center gap-6 flex-shrink-0">
             <div className={`flex items-center gap-2 rounded-md px-2.5 py-1 transition-colors ${isOnline ? 'bg-emerald-500' : 'bg-gray-600'}`} title={isOnline ? "Connected to the Internet" : "Offline / Local Mode"}>
               <div className={`w-1.5 h-1.5 rounded-full bg-white ${isOnline ? 'animate-pulse' : ''}`}></div>
               <span className="text-[11px] font-bold text-white tracking-widest uppercase">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
@@ -936,7 +1004,7 @@ export default function App() {
           </div>
 
           {/* MASTER CENTERED HARDWARE SWITCHER */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-[#1a1a1c]/60 backdrop-blur-md p-0.5 rounded-lg border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)] scale-90 lg:scale-100">
+          <div className="flex items-center gap-0.5 bg-[#1a1a1c]/60 backdrop-blur-md p-0.5 rounded-lg border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)] scale-90 lg:scale-100 flex-shrink-0 mx-auto">
             <button 
               onClick={clearText}
               className="px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all text-gray-500 hover:text-white hover:bg-white/5 active:bg-white/10 flex items-center gap-1.5"
@@ -969,30 +1037,30 @@ export default function App() {
             </button>
           </div>
 
-          <div className="flex items-center gap-6">
-            <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-gray-400 h-full">
+          <div className="flex items-center gap-3 lg:gap-6 flex-shrink-0">
+            <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium text-gray-400 h-full">
               <button 
                 onClick={() => { setRightPanelTab('schedule'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'schedule' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
-                <ListOrdered size={16} /> Schedule
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'schedule' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Schedule">
+                <ListOrdered size={18} /> <span className="hidden xl:inline">Schedule</span>
                 {rightPanelTab === 'schedule' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('scriptures'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
-                <BookOpen size={16} /> Scriptures
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Scriptures">
+                <BookOpen size={18} /> <span className="hidden xl:inline">Scriptures</span>
                 {rightPanelTab === 'scriptures' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('lyrics'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'lyrics' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
-                <Music size={16} /> Lyrics
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'lyrics' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Lyrics">
+                <Music size={18} /> <span className="hidden xl:inline">Lyrics</span>
                 {rightPanelTab === 'lyrics' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('notes'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'notes' ? 'text-(--accent-color)' : 'hover:text-white'}`}>
-                <FileText size={16} /> Notes
+                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'notes' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Notes">
+                <FileText size={18} /> <span className="hidden xl:inline">Notes</span>
                 {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
             </nav>
@@ -1115,6 +1183,9 @@ export default function App() {
                                <div className="flex items-baseline gap-1.5">
                                  <span className="text-[9px] font-black text-(--accent-color)/80 uppercase tracking-widest leading-none block">{det.verse.book}</span>
                                  <p className="text-[12px] font-bold text-white tracking-wide leading-none">{det.verse.chapter}:{det.verse.verse_start}</p>
+                                 {det.is_paraphrase && (
+                                   <span className="text-[7px] font-black bg-(--accent-color)/20 text-(--accent-color) px-1 rounded-[2px] ml-1 uppercase tracking-tighter border border-(--accent-color)/30">AI</span>
+                                 )}
                                </div>
                                <span className="text-[8px] font-mono text-gray-500/60 tracking-tighter uppercase mt-1">{new Date(det.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</span>
                             </div>
@@ -1226,11 +1297,35 @@ export default function App() {
                            <p className="text-sm font-bold text-white text-center leading-relaxed font-serif italic">"{liveState.preview_lyric_line}"</p>
                          </div>
                        ) : displayVersePreview && settings.detectVerses ? (
-                        <div className="w-full h-full flex flex-col justify-center">
-                          <div className="text-center space-y-3">
-                             <h4 className="text-(--accent-color) font-bold text-sm tracking-wide uppercase">{displayVersePreview.reference}</h4>
-                             <p className="text-(--text-primary) text-[13px] leading-relaxed font-serif line-clamp-5 italic">"{displayVersePreview.text}"</p>
+                        <div className="w-full h-full flex flex-col justify-center relative">
+                          <div className="text-center space-y-3 px-4">
+                             <h4 className="text-(--accent-color) font-bold text-lg tracking-wide uppercase">{displayVersePreview.reference}</h4>
+                             <p className="text-(--text-primary) text-base leading-relaxed font-serif line-clamp-4 italic">"{displayVersePreview.text}"</p>
                           </div>
+                          
+                          {/* CROSS REFERENCES VIRTUAL DOCK */}
+                          {crossRefs.length > 0 && (
+                            <div className="absolute bottom-4 left-0 w-full px-4 animate-in slide-in-from-bottom-2 duration-300">
+                               <div className="text-[9px] font-black uppercase tracking-[0.25em] text-gray-500 mb-1.5 text-center">See Also</div>
+                               <div className="flex flex-wrap justify-center gap-1.5">
+                                  {crossRefs.map((ref, idx) => (
+                                     <button 
+                                       key={idx}
+                                       onClick={() => {
+                                         setLiveState(s => ({
+                                           ...s,
+                                           preview_verse: { book: ref.book, chapter: ref.chapter, verse_start: ref.verse_start, verse_end: ref.verse_start }
+                                         }));
+                                       }}
+                                       className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-bold text-gray-300 transition-colors flex items-center gap-1 group/ref"
+                                     >
+                                        <BookOpen size={9} className="opacity-50 group-hover/ref:opacity-100" />
+                                        {ref.book} {ref.chapter}:{ref.verse_start}
+                                     </button>
+                                  ))}
+                               </div>
+                            </div>
+                          )}
                         </div>
                       ) : liveState.preview_text ? (
                           <div className="w-full h-full flex flex-col justify-center p-4">
@@ -1499,51 +1594,85 @@ export default function App() {
                         <h3 className="text-white font-bold text-lg flex items-center gap-2">
                            <ListOrdered size={18} className="text-(--accent-color)" /> Service Plan
                         </h3>
-                        <button 
-                           onClick={() => setIsEditingPlan(!isEditingPlan)}
-                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
-                             isEditingPlan ? 'bg-emerald-500 text-black' : 'bg-white/5 text-gray-400 hover:text-white'
-                           }`}
-                        >
-                           {isEditingPlan ? <Check size={14} /> : <Edit2 size={14} />}
-                           {isEditingPlan ? 'Done' : 'Edit'}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                           <button 
+                              onClick={() => { if(confirm("Reset to standard rundown?")) resetToMasterRundown(); }}
+                              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+                           >
+                              <RefreshCw size={12} /> Reset
+                           </button>
+                           <button 
+                              onClick={() => setIsEditingPlan(!isEditingPlan)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                isEditingPlan ? 'bg-emerald-500 text-black' : 'bg-white/5 text-gray-400 hover:text-white'
+                              }`}
+                           >
+                              {isEditingPlan ? <Check size={14} /> : <Edit2 size={14} />}
+                              {isEditingPlan ? 'Done' : 'Edit'}
+                           </button>
+                        </div>
                      </div>
+                     
+                     {expandedBlockId && (
+                        <div className="flex items-center gap-2 mb-4 animate-in slide-in-from-left-4 duration-300">
+                           <button 
+                              onClick={() => setExpandedBlockId(null)}
+                              className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all"
+                              title="Back to Rundown"
+                           >
+                              <ArrowLeft size={16} />
+                           </button>
+                        </div>
+                     )}
+
                      <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-10">
                         {servicePlan.map((item, idx) => {
-                           const isActive = idx === currentPlanIndex;
-                           const isPast = idx < currentPlanIndex;
+                           if (expandedBlockId && item.id !== expandedBlockId) return null;
+                           
+                           const isLive = idx === currentPlanIndex;
+                           const isExpanded = item.id === expandedBlockId;
+                           const itemCount = (item.songs?.length || 0) + (item.scriptures?.length || 0) + (item.mediaItems?.length || 0);
                            
                            if (isEditingPlan) {
                               return (
-                                 <div key={item.id} className="p-3 bg-[#1c1c1f] rounded-xl border border-white/10 flex items-center gap-3 animate-in fade-in">
-                                    <div className="flex flex-col gap-1 shrink-0">
-                                       <button disabled={idx === 0} onClick={() => { const nu = [...servicePlan]; [nu[idx-1], nu[idx]] = [nu[idx], nu[idx-1]]; saveServicePlan(nu); }} className="p-1 text-gray-600 hover:text-white disabled:opacity-20"><ArrowUp size={14} /></button>
-                                       <button disabled={idx === servicePlan.length - 1} onClick={() => { const nu = [...servicePlan]; [nu[idx+1], nu[idx]] = [nu[idx], nu[idx+1]]; saveServicePlan(nu); }} className="p-1 text-gray-600 hover:text-white disabled:opacity-20"><ArrowDown size={14} /></button>
+                                 <div key={item.id} className="p-3 bg-[#1c1c1f] rounded-xl border border-white/10 flex flex-col gap-3 animate-in fade-in">
+                                    <div className="flex items-center gap-3">
+                                       <div className="flex flex-col gap-1 shrink-0">
+                                          <button disabled={idx === 0} onClick={() => { const nu = [...servicePlan]; [nu[idx-1], nu[idx]] = [nu[idx], nu[idx-1]]; saveServicePlan(nu); }} className="p-1 text-gray-600 hover:text-white disabled:opacity-20"><ArrowUp size={14} /></button>
+                                          <button disabled={idx === servicePlan.length - 1} onClick={() => { const nu = [...servicePlan]; [nu[idx+1], nu[idx]] = [nu[idx], nu[idx+1]]; saveServicePlan(nu); }} className="p-1 text-gray-600 hover:text-white disabled:opacity-20"><ArrowDown size={14} /></button>
+                                       </div>
+                                       <div className="flex-1 flex flex-col gap-2">
+                                          <input 
+                                             type="text" 
+                                             value={item.title} 
+                                             onChange={(e) => { const nu = [...servicePlan]; nu[idx].title = e.target.value; saveServicePlan(nu); }}
+                                             className="bg-black/50 border border-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-md focus:outline-none focus:border-(--accent-color)"
+                                          />
+                                          <select 
+                                             value={item.type}
+                                             onChange={(e) => { const nu = [...servicePlan]; nu[idx].type = e.target.value; saveServicePlan(nu); }}
+                                             className="bg-black/50 border border-white/10 text-gray-400 text-xs px-2 py-1.5 rounded-md focus:outline-none focus:border-(--accent-color) uppercase font-bold tracking-widest"
+                                          >
+                                             <option value="prayer">Prayer</option>
+                                             <option value="worship">Worship</option>
+                                             <option value="praise">Praise</option>
+                                             <option value="sermon">Sermon</option>
+                                             <option value="scripture">Scripture</option>
+                                             <option value="announcement">Announcement</option>
+                                             <option value="media">Media</option>
+                                             <option value="closing">Closing</option>
+                                             <option value="note">Note</option>
+                                          </select>
+                                       </div>
+                                       {!item.fixed && (
+                                          <button onClick={() => { const nu = servicePlan.filter((_, i) => i !== idx); saveServicePlan(nu); }} className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0 self-start">
+                                             <Trash2 size={16} />
+                                          </button>
+                                       )}
                                     </div>
-                                    <div className="flex-1 flex flex-col gap-2">
-                                       <input 
-                                          type="text" 
-                                          value={item.title} 
-                                          onChange={(e) => { const nu = [...servicePlan]; nu[idx].title = e.target.value; saveServicePlan(nu); }}
-                                          className="bg-black/50 border border-white/10 text-white text-sm font-bold px-3 py-1.5 rounded-md focus:outline-none focus:border-(--accent-color)"
-                                       />
-                                       <select 
-                                          value={item.type}
-                                          onChange={(e) => { const nu = [...servicePlan]; nu[idx].type = e.target.value; saveServicePlan(nu); }}
-                                          className="bg-black/50 border border-white/10 text-gray-400 text-xs px-2 py-1.5 rounded-md focus:outline-none focus:border-(--accent-color) uppercase font-bold tracking-widest"
-                                       >
-                                          <option value="prayer">Prayer</option>
-                                          <option value="worship">Worship</option>
-                                          <option value="sermon">Sermon</option>
-                                          <option value="announcement">Announcement</option>
-                                          <option value="closing">Closing</option>
-                                          <option value="note">Note</option>
-                                       </select>
-                                    </div>
-                                    <button onClick={() => { const nu = servicePlan.filter((_, i) => i !== idx); saveServicePlan(nu); }} className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
-                                       <Trash2 size={16} />
-                                    </button>
+                                    <div className="text-[10px] text-gray-500 italic px-3 text-center">
+                                      Open the folder in main view to manage items.
+                                   </div>
                                  </div>
                               );
                            }
@@ -1551,33 +1680,259 @@ export default function App() {
                            return (
                               <div 
                                 key={item.id}
-                                onClick={() => {
-                                   setCurrentPlanIndex(idx);
-                                   if (item.type === 'worship') setRightPanelTab('lyrics');
-                                   else if (item.type === 'sermon') setRightPanelTab('scriptures');
-                                }}
-                                className={`p-4 rounded-xl border flex flex-col gap-2 transition-all cursor-pointer relative group ${
-                                   isActive 
-                                     ? 'bg-(--accent-color)/10 border-(--accent-color)/50 ring-1 ring-(--accent-color) shadow-[0_0_20px_rgba(16,185,129,0.15)]'
-                                     : isPast
-                                        ? 'bg-white/5 border-white/5 opacity-60 hover:opacity-100 hover:bg-white/10'
-                                        : 'bg-[#1c1c1f] hover:bg-[#252525] border-white/5'
+                                className={`rounded-xl border transition-all relative overflow-hidden ${
+                                   isLive 
+                                     ? 'ring-2 ring-(--accent-color) border-(--accent-color)/50' 
+                                     : 'border-white/5'
+                                } ${
+                                   isExpanded ? 'bg-[#1c1c1f] shadow-2xl scale-[1.02] -mx-1 z-10 p-2' : 'bg-[#161618] hover:bg-[#1c1c1f]'
                                 }`}
                               >
-                                 {isActive && <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-(--accent-color) animate-pulse shadow-[0_0_10px_rgba(16,185,129,1)]" />}
-                                 <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 flex items-center justify-center rounded-lg font-black text-xs ${isActive ? 'bg-(--accent-color) text-black' : isPast ? 'bg-white/5 text-gray-500' : 'bg-white/10 text-gray-400 group-hover:bg-white/20'}`}>
-                                       {idx + 1}
+                                 {/* Folder Header / List View */}
+                                 {!isExpanded && (
+                                    <div 
+                                       onClick={() => setExpandedBlockId(item.id)}
+                                       className="p-4 flex items-center justify-between cursor-pointer select-none group"
+                                    >
+                                       <div className="flex items-center gap-3">
+                                          <div className={`w-8 h-8 flex items-center justify-center rounded-lg font-black text-xs ${isLive ? 'bg-(--accent-color) text-black' : 'bg-white/10 text-gray-400 group-hover:bg-white/20'}`}>
+                                             {idx + 1}
+                                          </div>
+                                          <div className="flex flex-col">
+                                             <h4 className={`font-bold text-base transition-colors ${isLive ? 'text-white' : 'text-gray-400'}`}>
+                                                {item.title}
+                                             </h4>
+                                             <div className="flex items-center gap-2">
+                                                <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${isLive ? 'bg-(--accent-color)/20 text-(--accent-color)' : 'bg-white/5 text-gray-500'}`}>
+                                                   {item.type}
+                                                </span>
+                                                {itemCount > 0 && (
+                                                   <span className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                      {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                                                   </span>
+                                                )}
+                                             </div>
+                                          </div>
+                                       </div>
+                                       <div className="flex items-center gap-2">
+                                          {!isLive && (
+                                             <button 
+                                                onClick={(e) => { e.stopPropagation(); setCurrentPlanIndex(idx); }}
+                                                className="p-1.5 opacity-0 group-hover:opacity-100 bg-emerald-500/10 text-emerald-500 rounded-md hover:bg-emerald-500 hover:text-black transition-all"
+                                                title="Make Live Focus"
+                                             >
+                                                <Play size={14} fill="currentColor" />
+                                             </button>
+                                          )}
+                                          <ChevronRight size={18} className="text-gray-600 group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                       </div>
                                     </div>
-                                    <h4 className={`font-bold text-base ${isActive ? 'text-white' : isPast ? 'text-gray-400' : 'text-gray-200'}`}>
-                                       {item.title}
-                                    </h4>
-                                 </div>
-                                 <div className="pl-11 flex items-center gap-2">
-                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${isActive ? 'bg-(--accent-color)/20 text-(--accent-color)' : 'bg-white/5 text-gray-500'}`}>
-                                       {item.type}
-                                    </span>
-                                 </div>
+                                 )}
+
+                                 {/* Dedicated Workspace Interior */}
+                                 {isExpanded && (
+                                    <div className="px-4 pt-4 pb-8 bg-black/20 rounded-xl animate-in fade-in duration-500">
+                                       <div className="flex items-center gap-4 mb-6">
+                                          <div className="flex flex-col">
+                                             <h2 className="text-xl font-black text-white">{item.title}</h2>
+                                          </div>
+                                       </div>
+
+                                       <div className="space-y-6">
+                                          {/* Songs */}
+                                          {(item.type === 'worship' || item.type === 'praise') && (
+                                             <div className="space-y-2">
+                                                {item.songs && item.songs.length > 0 && (
+                                                   <div className="space-y-1.5">
+                                                      {item.songs.map((song, sIdx) => (
+                                                         <div key={sIdx} className="flex gap-2">
+                                                            <button 
+                                                               onClick={() => { loadSong(song); setRightPanelTab('lyrics'); showToast(`Loaded: ${song.title}`); }}
+                                                               className="flex-1 text-left bg-black/40 hover:bg-emerald-500/10 px-3 py-2 rounded-lg border border-white/5 shadow-inner flex items-center justify-between group/song transition-all"
+                                                            >
+                                                               <div className="flex items-center gap-2 min-w-0">
+                                                                  <span className="text-[10px] font-black text-emerald-500/50">{sIdx + 1}.</span>
+                                                                  <span className="text-xs font-bold text-gray-300 group-hover/song:text-emerald-400 transition-colors truncate">{song.title}</span>
+                                                               </div>
+                                                               <Music size={12} className="text-emerald-500 opacity-50 group-hover/song:opacity-100 transition-opacity" />
+                                                            </button>
+                                                            <button 
+                                                               onClick={() => { const nu = [...servicePlan]; nu[idx].songs = nu[idx].songs?.filter((_, i) => i !== sIdx); saveServicePlan(nu); }}
+                                                               className="px-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg border border-red-500/20 transition-colors"
+                                                            >
+                                                               <X size={12} />
+                                                            </button>
+                                                         </div>
+                                                      ))}
+                                                   </div>
+                                                )}
+                                                <button 
+                                                   onClick={() => setSongPickerBlockId(item.id)}
+                                                   className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500/5 border border-dashed border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all"
+                                                >
+                                                   <Plus size={14} /> Add Song
+                                                </button>
+                                             </div>
+                                          )}
+
+                                          {/* Scriptures */}
+                                          {(item.type === 'sermon' || item.type === 'scripture') && (
+                                             <div className="space-y-2">
+                                                {item.scriptures && item.scriptures.length > 0 && (
+                                                   <div className="space-y-1.5">
+                                                      {item.scriptures.map((scr, sIdx) => (
+                                                         <div key={sIdx} className="flex gap-2">
+                                                            <button 
+                                                               onClick={() => { setSelectedBook(scr.book); setSelectedChapter(scr.chapter); setPreviewVerse({ book: scr.book, chapter: scr.chapter, verse_start: scr.verse_start, verse_end: scr.verse_end || scr.verse_start }); setRightPanelTab('scriptures'); showToast(`Ready: ${scr.reference}`); }}
+                                                               className="flex-1 text-left bg-black/40 hover:bg-blue-500/10 px-3 py-2 rounded-lg border border-white/5 shadow-inner flex items-center justify-between group/scr transition-all"
+                                                            >
+                                                               <div className="flex items-center gap-2 min-w-0">
+                                                                  <span className="text-[10px] font-black text-blue-500/50">{sIdx + 1}.</span>
+                                                                  <span className="text-xs font-bold text-gray-300 group-hover/scr:text-blue-400 transition-colors">{scr.reference}</span>
+                                                               </div>
+                                                               <BookOpen size={12} className="text-blue-500 opacity-50 group-hover/scr:opacity-100 transition-opacity" />
+                                                            </button>
+                                                            <button 
+                                                               onClick={() => { const nu = [...servicePlan]; nu[idx].scriptures = nu[idx].scriptures?.filter((_, i) => i !== sIdx); saveServicePlan(nu); }}
+                                                               className="px-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg border border-red-500/20 transition-colors"
+                                                            >
+                                                               <X size={12} />
+                                                            </button>
+                                                         </div>
+                                                      ))}
+                                                   </div>
+                                                )}
+                                                <button 
+                                                   onClick={() => setScripturePickerBlockId(item.id)}
+                                                   className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-blue-500/5 border border-dashed border-blue-500/30 text-blue-500 hover:bg-blue-500/10 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all"
+                                                >
+                                                   <Plus size={14} /> Add Scripture
+                                                </button>
+                                             </div>
+                                          )}
+
+                                          {/* Media */}
+                                          {item.type === 'media' && (
+                                             <div className="space-y-2">
+                                                {item.mediaItems && item.mediaItems.length > 0 && (
+                                                   <div className="space-y-1.5">
+                                                      {item.mediaItems.map((med, sIdx) => (
+                                                         <div key={sIdx} className="flex gap-2">
+                                                            <button 
+                                                               onClick={() => { setLiveState((s: any) => ({ ...s, current_media: { type: med.type, url: med.url }, updated_at: new Date().toISOString() })); setRightPanelTab('broadcast'); showToast(`Playing: ${med.name}`); }}
+                                                               className="flex-1 text-left bg-black/40 hover:bg-purple-500/10 px-3 py-2 rounded-lg border border-white/5 shadow-inner flex items-center justify-between group/med transition-all"
+                                                            >
+                                                               <div className="flex items-center gap-2 min-w-0">
+                                                                  <span className="text-[10px] font-black text-purple-500/50">{sIdx + 1}.</span>
+                                                                  <span className="text-xs font-bold text-gray-300 group-hover/med:text-purple-400 transition-colors truncate">{med.name}</span>
+                                                               </div>
+                                                               <Monitor size={12} className="text-purple-500 opacity-50 group-hover/med:opacity-100 transition-opacity" />
+                                                            </button>
+                                                            <button 
+                                                               onClick={() => { const nu = [...servicePlan]; nu[idx].mediaItems = nu[idx].mediaItems?.filter((_, i) => i !== sIdx); saveServicePlan(nu); }}
+                                                               className="px-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg border border-red-500/20 transition-colors"
+                                                            >
+                                                               <X size={12} />
+                                                            </button>
+                                                         </div>
+                                                      ))}
+                                                   </div>
+                                                )}
+                                                <label className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-purple-500/5 border border-dashed border-purple-500/30 text-purple-500 hover:bg-purple-500/10 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all cursor-pointer">
+                                                   <input type="file" accept="video/*,image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const nu = [...servicePlan]; const type = file.type.startsWith('video') ? 'video' : 'image'; const url = URL.createObjectURL(file); nu[idx].mediaItems = nu[idx].mediaItems || []; nu[idx].mediaItems?.push({ type, url, name: file.name }); saveServicePlan(nu); } }} />
+                                                   <Plus size={14} /> Add Media
+                                                </label>
+                                             </div>
+                                          )}
+
+                                          {/* Text Content (Announcements, Testimonies, Notes) */}
+                                          {(item.type === 'announcement' || item.type === 'note' || item.type === 'testimony') && (
+                                             <div className="space-y-4">
+                                                {item.textItems && item.textItems.length > 0 && (
+                                                   <div className="space-y-1.5">
+                                                      {item.textItems.map((txt, sIdx) => (
+                                                         <div key={txt.id} className="flex gap-2">
+                                                            <button 
+                                                               onClick={() => { 
+                                                                  setLiveState((s: any) => ({ 
+                                                                     ...s, 
+                                                                     preview_text: txt.content, 
+                                                                     current_text: txt.content,
+                                                                     preview_verse: null,
+                                                                     preview_verse_text: null,
+                                                                     current_verse: null,
+                                                                     current_verse_text: null,
+                                                                     current_lyric_line: null,
+                                                                     preview_lyric_line: null,
+                                                                     updated_at: new Date().toISOString() 
+                                                                  })); 
+                                                                  setRightPanelTab('broadcast'); 
+                                                                  showToast(`Airing: ${txt.title}`); 
+                                                               }}
+                                                               className="flex-1 text-left bg-black/40 hover:bg-emerald-500/10 px-3 py-2.5 rounded-xl border border-white/5 shadow-inner flex items-center justify-between group/txt transition-all"
+                                                            >
+                                                               <div className="flex items-center gap-2 min-w-0">
+                                                                  <span className="text-[10px] font-black text-emerald-500/50">{sIdx + 1}.</span>
+                                                                  <span className="text-xs font-bold text-gray-300 group-hover/txt:text-white transition-colors truncate">{txt.title}</span>
+                                                               </div>
+                                                               <FileText size={12} className="text-emerald-500 opacity-50 group-hover/txt:opacity-100 transition-opacity" />
+                                                            </button>
+                                                            <button 
+                                                               onClick={() => { const nu = [...servicePlan]; nu[idx].textItems = nu[idx].textItems?.filter((_, i) => i !== sIdx); saveServicePlan(nu); }}
+                                                               className="px-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg border border-red-500/20 transition-colors"
+                                                            >
+                                                               <X size={12} />
+                                                            </button>
+                                                         </div>
+                                                      ))}
+                                                   </div>
+                                                )}
+
+                                                <div className="bg-black/40 p-3 rounded-xl border border-white/5 space-y-2">
+                                                   <input 
+                                                      type="text" 
+                                                      placeholder="Title (e.g. Next Meeting)" 
+                                                      value={newTextTitle}
+                                                      onChange={(e) => setNewTextTitle(e.target.value)}
+                                                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs font-bold text-white focus:border-emerald-500/50 outline-none"
+                                                   />
+                                                   <textarea 
+                                                      placeholder="Paste or write content here..." 
+                                                      value={newTextContent}
+                                                      onChange={(e) => setNewTextContent(e.target.value)}
+                                                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-300 focus:border-emerald-500/50 outline-none min-h-[80px] no-scrollbar"
+                                                   />
+                                                   <button 
+                                                      onClick={() => {
+                                                         if (!newTextTitle.trim()) return showToast("Title required");
+                                                         const nu = [...servicePlan];
+                                                         nu[idx].textItems = nu[idx].textItems || [];
+                                                         nu[idx].textItems?.push({ id: crypto.randomUUID(), title: newTextTitle, content: newTextContent });
+                                                         saveServicePlan(nu);
+                                                         setNewTextTitle('');
+                                                         setNewTextContent('');
+                                                         showToast("Item Added");
+                                                      }}
+                                                      className="w-full flex items-center justify-center gap-1.5 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20 rounded-lg text-[10px] uppercase font-black tracking-widest transition-all"
+                                                   >
+                                                      <Plus size={14} /> Add Text Item
+                                                   </button>
+                                                </div>
+                                             </div>
+                                          )}
+
+                                          {itemCount === 0 && !(['announcement', 'note', 'testimony'].includes(item.type)) && (
+                                             <div className="mb-8 p-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center text-center opacity-40">
+                                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                                                   <Folder size={32} />
+                                                </div>
+                                                <p className="text-base font-bold text-gray-300 mb-1">This folder is empty</p>
+                                                <p className="text-[10px] uppercase font-black tracking-widest text-gray-500">Add songs, scriptures or media below</p>
+                                             </div>
+                                          )}
+                                       </div>
+                                    </div>
+                                 )}
                               </div>
                            );
                         })}
@@ -1585,7 +1940,7 @@ export default function App() {
                         {isEditingPlan && (
                            <button 
                              onClick={() => {
-                               const newItem = { id: crypto.randomUUID(), title: 'New Item', type: 'note' };
+                               const newItem = { id: crypto.randomUUID(), title: 'New Item', type: 'note', songs: [] };
                                saveServicePlan([...servicePlan, newItem]);
                              }}
                              className="w-full py-4 border-2 border-dashed border-white/10 hover:border-emerald-500/50 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:text-emerald-400 transition-colors uppercase font-black text-[10px] tracking-widest"
@@ -1594,6 +1949,144 @@ export default function App() {
                            </button>
                         )}
                      </div>
+
+                     {/* Song Picker Overlay (Floating) */}
+                     {songPickerBlockId && (
+                        <div className="absolute inset-0 z-50 bg-[#0d0d0d]/98 backdrop-blur-xl flex flex-col p-5 animate-in slide-in-from-bottom-8">
+                           <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+                              <h3 className="text-white font-black text-lg flex items-center gap-2"><Music size={18} className="text-emerald-500" /> SELECT SONG</h3>
+                              <button onClick={() => { setSongPickerBlockId(null); setSongPickerQuery(''); setSongPickerResults([]); }} className="p-1 hover:bg-white/10 rounded-lg text-gray-400 transition-colors"><X size={20} /></button>
+                           </div>
+                           
+                           <div className="relative group mb-4">
+                              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                              <input 
+                                 type="text" autoFocus placeholder="Search 10,000+ local songs..." 
+                                 value={songPickerQuery}
+                                 onChange={async (e) => {
+                                    const q = e.target.value; 
+                                    setSongPickerQuery(q);
+                                    if (q.trim().length > 1) {
+                                       try {
+                                          const results = await searchLyrics(q, 'All');
+                                          setSongPickerResults(results);
+                                       } catch(err) {
+                                          console.error('Song search failed', err);
+                                       }
+                                    } else {
+                                       setSongPickerResults([]);
+                                    }
+                                 }}
+                                 className="w-full bg-[#1c1c1f] border border-white/5 rounded-xl pl-12 pr-4 py-3.5 text-sm font-bold text-white shadow-inner focus:border-emerald-500/50 outline-none transition-all"
+                              />
+                           </div>
+                           
+                           <div className="flex-1 overflow-y-auto no-scrollbar space-y-2 pb-10">
+                              {songPickerResults.length === 0 ? (
+                                 <div className="flex flex-col items-center justify-center p-10 opacity-30">
+                                    <Music size={48} className="text-gray-500 mb-4" />
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Type a song title or lyrics<br/>to attach it to the playlist</p>
+                                 </div>
+                              ) : songPickerResults.map(s => (
+                                 <button 
+                                    key={s.id}
+                                    onClick={() => {
+                                       const nu = [...servicePlan];
+                                       const blk = nu.find(b => b.id === songPickerBlockId);
+                                       if (blk) {
+                                          blk.songs = blk.songs || [];
+                                          if (blk.songs.length < 10) blk.songs.push(s);
+                                       }
+                                       saveServicePlan(nu);
+                                       setSongPickerBlockId(null);
+                                       setSongPickerQuery('');
+                                       setSongPickerResults([]);
+                                    }}
+                                    className="w-full bg-white/5 hover:bg-white/10 hover:border-emerald-500/50 border border-white/5 p-4 rounded-xl flex items-center justify-between text-left transition-all group"
+                                 >
+                                    <div className="flex flex-col gap-1 min-w-0 pr-4">
+                                       <span className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors truncate">{s.title}</span>
+                                       <span className="text-[10px] uppercase tracking-widest font-black text-gray-500">{s.artist || 'Traditional'}</span>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0">
+                                       <Plus size={16} />
+                                    </div>
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+                     )}
+
+                     {/* Scripture Picker Overlay (Floating) */}
+                     {scripturePickerBlockId && (
+                        <div className="absolute inset-0 z-50 bg-[#0d0d0d]/98 backdrop-blur-xl flex flex-col p-5 animate-in slide-in-from-bottom-8">
+                           <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+                              <h3 className="text-white font-black text-lg flex items-center gap-2"><BookOpen size={18} className="text-emerald-500" /> SELECT SCRIPTURE</h3>
+                              <button onClick={() => setScripturePickerBlockId(null)} className="p-1 hover:bg-white/10 rounded-lg text-gray-400 transition-colors"><X size={20} /></button>
+                           </div>
+                           
+                           <div className="grid grid-cols-1 gap-4">
+                              <div className="space-y-1.5">
+                                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Book of the Bible</label>
+                                 <select 
+                                    className="w-full bg-[#1c1c1f] border border-white/5 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none"
+                                    value={pickerSelectedBook}
+                                    onChange={(e) => {
+                                       setPickerSelectedBook(e.target.value);
+                                       setPickerSelectedChapter(1);
+                                    }}
+                                 >
+                                    {bibleBooks.map(b => <option key={b} value={b}>{b}</option>)}
+                                 </select>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                 <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Chapter</label>
+                                    <input 
+                                       type="number" 
+                                       min={1}
+                                       max={BIBLE_CHAPTER_COUNTS[pickerSelectedBook] || 150}
+                                       className="w-full bg-[#1c1c1f] border border-white/5 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none"
+                                       value={pickerSelectedChapter}
+                                       onChange={(e) => setPickerSelectedChapter(Number(e.target.value))}
+                                    />
+                                 </div>
+                                 <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Start Verse</label>
+                                    <input 
+                                       type="number" 
+                                       min={1}
+                                       className="w-full bg-[#1c1c1f] border border-white/5 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none"
+                                       value={pickerSelectedVerse}
+                                       onChange={(e) => setPickerSelectedVerse(Number(e.target.value))}
+                                    />
+                                 </div>
+                              </div>
+
+                              <button 
+                                 onClick={() => {
+                                    const nu = [...servicePlan];
+                                    const blk = nu.find(b => b.id === scripturePickerBlockId);
+                                    if (blk) {
+                                       blk.scriptures = blk.scriptures || [];
+                                       blk.scriptures.push({
+                                          book: pickerSelectedBook,
+                                          chapter: pickerSelectedChapter,
+                                          verse_start: pickerSelectedVerse,
+                                          reference: `${pickerSelectedBook} ${pickerSelectedChapter}:${pickerSelectedVerse}`
+                                       });
+                                    }
+                                    saveServicePlan(nu);
+                                    setScripturePickerBlockId(null);
+                                 }}
+                                 className="w-full py-4 mt-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                              >
+                                 Attach to Schedule
+                              </button>
+                           </div>
+                        </div>
+                     )}
                   </div>
                 )}
 

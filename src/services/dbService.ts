@@ -58,14 +58,38 @@ export async function getSession(session_id: string): Promise<Session | null> {
 }
 
 export async function getLiveState(session_id: string): Promise<LiveState | null> {
-  if (electronDb) return electronDb.getLiveState(session_id);
+  const sanitize = (state: any): LiveState | null => {
+    if (!state) return state;
+    return {
+      ...state,
+      current_verse: null,
+      preview_verse: null,
+      current_verse_text: '',
+      preview_verse_text: '',
+      current_lyric_line: null,
+      preview_lyric_line: null,
+      current_media: null,
+      preview_media: null,
+      current_text: '',
+      preview_text: '',
+      is_blank: false,
+      is_logo: false,
+      current_lyric_index: undefined,
+      preview_lyric_index: undefined
+    };
+  };
+
+  if (electronDb) {
+    const raw = await electronDb.getLiveState(session_id);
+    return sanitize(raw);
+  }
 
   const { data, error } = await supabase.from('live_state').select('*').eq('session_id', session_id).single();
   if (error) {
     console.warn('getLiveState failed', error);
     return null;
   }
-  return data as LiveState;
+  return sanitize(data);
 }
 
 export async function getNotes(session_id: string): Promise<Note[]> {
@@ -101,4 +125,18 @@ export async function getPastedSongs(): Promise<Song[]> {
     return store?.get('pasted_songs') || [];
   }
   return [];
+}
+
+export async function searchBibleQuotes(queryText: string, limit: number = 1): Promise<any[]> {
+  if (isElectron && electronDb.searchBibleQuotes) {
+    return electronDb.searchBibleQuotes(queryText, limit);
+  }
+  return []; // Fallback for web mode if no cloud API is set up for FTS
+}
+
+export async function getCrossReferences(book: string, chapter: number, verse: number, limit: number = 5): Promise<any[]> {
+  if (isElectron && electronDb.getCrossReferences) {
+    return electronDb.getCrossReferences(book, chapter, verse, limit);
+  }
+  return []; // Fallback for web mode
 }

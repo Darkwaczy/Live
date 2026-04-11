@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('sermonSync', {
     saveNote: (note: any) => ipcRenderer.invoke('db:save-note', note),
     getNotes: (sessionId: string) => ipcRenderer.invoke('db:get-notes', sessionId),
     getLiveState: (sessionId: string) => ipcRenderer.invoke('db:get-live-state', sessionId),
-    getSession: (sessionId: string) => ipcRenderer.invoke('db:get-session', sessionId)
+    getSession: (sessionId: string) => ipcRenderer.invoke('db:get-session', sessionId),
+    searchBibleQuotes: (queryText: string, limit?: number) => ipcRenderer.invoke('db:search-bible', queryText, limit),
+    getCrossReferences: (book: string, chapter: number, verse: number, limit?: number) => ipcRenderer.invoke('db:get-cross-references', book, chapter, verse, limit)
   }
 });

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'path';
 import * as db from './db.js';
+import * as bibleDb from './bibleDb.js';
 
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -79,6 +80,15 @@ ipcMain.handle('db:get-live-state', async (event, sessionId) => {
 
 ipcMain.handle('db:get-session', async (event, sessionId) => {
   return db.getSession(sessionId);
+});
+
+// Advanced SQLite Handlers for Bible Data
+ipcMain.handle('db:search-bible', async (event, queryText, limit) => {
+  return bibleDb.searchBibleQuotes(queryText, limit);
+});
+
+ipcMain.handle('db:get-cross-references', async (event, book, chapter, verse, limit) => {
+  return bibleDb.getCrossReferences(book, chapter, verse, limit);
 });
 
 // Professional Projector Auto-Launch (Like EasyWorship/ProPresenter)

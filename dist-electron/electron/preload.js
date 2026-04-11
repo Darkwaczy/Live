@@ -26,6 +26,8 @@ electron_1.contextBridge.exposeInMainWorld('sermonSync', {
         saveNote: (note) => electron_1.ipcRenderer.invoke('db:save-note', note),
         getNotes: (sessionId) => electron_1.ipcRenderer.invoke('db:get-notes', sessionId),
         getLiveState: (sessionId) => electron_1.ipcRenderer.invoke('db:get-live-state', sessionId),
-        getSession: (sessionId) => electron_1.ipcRenderer.invoke('db:get-session', sessionId)
+        getSession: (sessionId) => electron_1.ipcRenderer.invoke('db:get-session', sessionId),
+        searchBibleQuotes: (queryText, limit) => electron_1.ipcRenderer.invoke('db:search-bible', queryText, limit),
+        getCrossReferences: (book, chapter, verse, limit) => electron_1.ipcRenderer.invoke('db:get-cross-references', book, chapter, verse, limit)
     }
 });

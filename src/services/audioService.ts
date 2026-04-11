@@ -1,6 +1,7 @@
 import { TranscriptionCallback } from './speechService';
 import { RealSpeechProvider } from './speechProvider';
 import { NIGERIAN_VOCABULARY } from '../config/nigerianContext';
+import { DEEPGRAM_BOOST_LIST } from './religiousVocabulary';
 
 // Injecting Web Speech API typings for the IDE
 declare global {
@@ -222,11 +223,19 @@ export class AudioService {
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     this.processor = processor;
 
-    // Build Deepgram URL with Nigerian Context Bias (Keywords boost common mishearings)
-    // We only take the top 15 most CRITICAL terms to maintain high speed
-    const KEYWORDS_TO_BOOST = NIGERIAN_VOCABULARY.slice(0, 15);
-    const keywordsParam = KEYWORDS_TO_BOOST.map(k => `keywords=${encodeURIComponent(k)}:2`).join('&');
-    const url = `wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&filler_words=true&${keywordsParam}`;
+    // Build Deepgram URL with Advanced Context Bias (Keywords boost common mishearings)
+    // We combine the general Nigerian context with the specialized religious dictionary
+    const KEYWORDS_TO_BOOST = [...DEEPGRAM_BOOST_LIST, ...NIGERIAN_VOCABULARY.slice(0, 15)];
+    const keywordsParam = KEYWORDS_TO_BOOST
+      .filter((k, i, s) => s.indexOf(k) === i) // Deduplicate
+      .map(k => `keywords=${encodeURIComponent(k.toLowerCase())}:2`)
+      .join('&');
+
+    // Rhema-style optimizations: 
+    // - endpointing=300 (faster finalization)
+    // - interim_results=true (instant UI)
+    // - smart_format=true (proper punctuation/casing for verses)
+    const url = `wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&filler_words=true&endpointing=300&interim_results=true&${keywordsParam}`;
 
     this.socket = new WebSocket(url, ['token', this.config.apiKey]);
 
