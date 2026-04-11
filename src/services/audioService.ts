@@ -4,6 +4,7 @@ import { NIGERIAN_VOCABULARY } from '../config/nigerianContext';
 import { DEEPGRAM_BOOST_LIST } from './religiousVocabulary';
 import applyNigerianPhoneticCorrections, { buildNigerianVariantKeywords } from './nigerianPhoneticCorrections';
 import { shouldFallbackToGoogleCloud, transcribeWithGoogleCloud } from './googleCloudSpeechService';
+import NAtlasService from './nAtlasService';
 
 // Injecting Web Speech API typings for the IDE
 declare global {
@@ -27,11 +28,12 @@ declare global {
 }
 
 export type AudioServiceConfig = {
-  provider?: 'web' | 'worker' | 'whisper' | 'groq' | 'deepgram';
+  provider?: 'web' | 'worker' | 'whisper' | 'groq' | 'deepgram' | 'n-atlas';
   audioInput?: 'live' | 'system';
   locale?: string;
   apiKey?: string;
   endpoint?: string;
+  nAtlasEndpoint?: string; // N-ATLAS local service endpoint
   previousContext?: string; // Whisper memory
   onTranscript?: (text: string, isFinal: boolean, timestamp: number, confidence?: number) => void;
   onError?: (error: Error) => void;
@@ -46,6 +48,7 @@ export class AudioService {
   private mediaRecorder?: MediaRecorder;
   private socket?: WebSocket;
   private whisperClient?: RealSpeechProvider;
+  private nAtlasClient?: NAtlasService;
   private config: AudioServiceConfig;
   private interimInterval?: any;
   private audioChunks: Blob[] = [];  // Buffer audio chunks before sending
@@ -54,9 +57,14 @@ export class AudioService {
   private googleCloudApiKey?: string;
 
   constructor(config?: AudioServiceConfig) {
-    this.config = { provider: 'web', locale: 'en-NG', ...config };
+    this.config = { provider: 'n-atlas', locale: 'en-NG', ...config };
     this.googleCloudApiKey = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY;
     console.log(`AudioService init provider=${this.config.provider} input=${this.config.audioInput}`);
+    
+    // Initialize N-ATLAS client
+    const nAtlasEndpoint = this.config.nAtlasEndpoint || 'http://localhost:5000';
+    this.nAtlasClient = new NAtlasService({ endpoint: nAtlasEndpoint });
+    
     if (this.config.provider === 'whisper' && this.config.apiKey && this.config.endpoint) {
       this.whisperClient = new RealSpeechProvider({
         provider: 'whisper',
@@ -580,6 +588,142 @@ export class AudioService {
     }
   }
 
+  private async startNAtlasTranscription() {
+    if (!this.nAtlasClient) {
+      this.config.onError?.(new Error("N-ATLAS client not initialized"));
+      return;
+    }
+
+    try {
+      // Check N-ATLAS service health
+      const isHealthy = await this.nAtlasClient.healthCheck();
+      if (!isHealthy) {
+        this.config.onError?.(new Error(
+          "N-ATLAS service is not running. Please start it with: docker-compose up -d n-atlas"
+        ));
+        return;
+      }
+
+      console.log("[AudioService] ✅ N-ATLAS service is healthy");
+      this.config.onTranscript?.("🎤 Listening with N-ATLAS (Nigerian English)...", false, Date.now(), 1);
+    } catch (error) {
+      console.error("[AudioService] N-ATLAS health check failed:", error);
+      this.config.onError?.(error as Error);
+      return;
+    }
+
+    const stream = await this.getAudioStream();
+    this.stream = stream;
+    this.isRecording = true;
+
+    // Detect supported mimeType
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+    this.mediaRecorder = new MediaRecorder(stream, { mimeType });
+    this.audioChunks = [];
+
+    this.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        this.audioChunks.push(e.data);
+      }
+    };
+
+    // Process audio chunks for N-ATLAS
+    this.mediaRecorder.onstop = async () => {
+      if (this.stream && this.stream.active) {
+        if (this.audioChunks.length > 0) {
+          const mimeType = this.audioChunks[0].type || (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg');
+          const rawBlob = new Blob(this.audioChunks, { type: mimeType });
+          
+          try {
+            // Send to N-ATLAS for transcription
+            const result = await this.nAtlasClient!.transcribe(rawBlob);
+            if (result.text.trim().length > 0) {
+              this.config.onTranscript?.(result.text, true, Date.now(), result.confidence);
+            }
+          } catch (err) {
+            console.error("[AudioService] N-ATLAS transcription failed:", err);
+            this.config.onError?.(err as Error);
+          }
+          
+          this.audioChunks = [];
+        }
+
+        // Restart immediately for continuous listening
+        setTimeout(() => {
+          if (this.stream && this.stream.active && this.mediaRecorder && this.mediaRecorder.state === 'inactive') {
+            try {
+              this.mediaRecorder.start();
+            } catch (err) {
+              console.warn('Could not restart media recorder', err);
+            }
+          }
+        }, 100);
+      }
+    };
+
+    let startTime = Date.now();
+    let lastSilenceTime = 0;
+
+    // Monitor audio volume and trigger transcription on silence
+    const audioCtx = new AudioContext();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    const buffer = new Uint8Array(analyser.frequencyBinCount);
+    let peakVolume = 0;
+
+    const volCheckInterval = setInterval(() => {
+      analyser.getByteTimeDomainData(buffer);
+      for (let i = 0; i < buffer.length; i++) {
+        const volume = Math.abs(buffer[i] - 128) / 128;
+        if (volume > peakVolume) peakVolume = volume;
+      }
+    }, 100);
+
+    // Adaptive chunking: Stop when silence is detected
+    this.interimInterval = setInterval(() => {
+      if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+
+      const now = Date.now();
+      const elapsed = now - startTime;
+
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i++) sum += Math.abs(buffer[i] - 128);
+      const instantVol = sum / buffer.length;
+
+      if (instantVol < 2) {
+        if (lastSilenceTime === 0) lastSilenceTime = now;
+      } else {
+        lastSilenceTime = 0;
+      }
+
+      const silenceGap = lastSilenceTime > 0 ? (now - lastSilenceTime) : 0;
+
+      // Stop recording when:
+      // - At least 2s elapsed AND 400ms of silence
+      // - OR if we hit 30s max (N-ATLAS max duration)
+      if ((elapsed > 2000 && silenceGap > 400) || elapsed > 30000) {
+        logger.info(`[AudioService] N-ATLAS: Stopping chunk (${elapsed}ms, silence ${silenceGap}ms)`);
+        this.mediaRecorder.stop();
+        startTime = now;
+        lastSilenceTime = 0;
+      }
+    }, 200);
+
+    // Start recording
+    this.mediaRecorder.start();
+
+    // Cleanup on stop
+    const originalStop = this.stop.bind(this);
+    this.stop = () => {
+      clearInterval(volCheckInterval);
+      clearInterval(this.interimInterval);
+      audioCtx.close();
+      originalStop();
+    };
+  }
+
   private voskSimInterval?: any;
 
   private async startVoskTranscription() {
@@ -630,7 +774,9 @@ export class AudioService {
 
   async start() {
     try {
-      if (this.config.provider === 'worker') {
+      if (this.config.provider === 'n-atlas') {
+        await this.startNAtlasTranscription();
+      } else if (this.config.provider === 'worker') {
         await this.startVoskTranscription();
       } else if (this.config.provider === 'deepgram') {
         await this.startDeepgramStreaming();

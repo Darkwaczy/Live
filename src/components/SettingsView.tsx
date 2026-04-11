@@ -144,12 +144,16 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">Primary Speech Engine</label>
                       <select value={settings.speechEngine} onChange={e => onUpdate('speechEngine', e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50">
+                        <option value="n-atlas">🇳🇬 N-ATLAS Nigerian English (Local, Offline) ⭐ RECOMMENDED</option>
                         <option value="web">Chrome Web Speech API (Free, Requires Internet)</option>
                         <option value="worker">Vosk WASM Engine (Free, 100% Offline)</option>
                         <option value="groq">Groq Cloud API (Ultra-Fast Whisper) ⭐ System Audio</option>
                         <option value="deepgram">Deepgram Nova Cloud API ⭐ System Audio</option>
                         <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy) ⭐ System Audio</option>
                       </select>
+                      {settings.speechEngine === 'n-atlas' && (
+                        <p className="text-xs text-emerald-500/80 mt-2 flex items-center gap-1">✅ N-ATLAS: Optimized for Nigerian English accent. Requires local Docker service running on port 5000.</p>
+                      )}
                       {(settings.audioInput === 'system' && !['groq', 'deepgram', 'whisper'].includes(settings.speechEngine)) && (
                         <p className="text-xs text-yellow-500/80 mt-2 flex items-center gap-1">⚠️ Web Speech API with System Audio: Switch to a starred provider to capture YouTube/mixer audio.</p>
                       )}

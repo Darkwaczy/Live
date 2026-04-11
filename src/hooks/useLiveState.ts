@@ -261,7 +261,7 @@ export function useLiveState(
               }
             })();
             
-            const performDbAndAiChecks = () => {
+            function performDbAndAiChecks() {
               // Limit fast exact DB quote check to statements with at least 5 words to avoid false positive short phrases
               if (!prev.is_analyzing && chunkWordCount >= 5) {
                 setLiveState(s => ({ ...s, is_analyzing: true }));
@@ -360,9 +360,7 @@ export function useLiveState(
                 }).catch(() => setLiveState(s => ({ ...s, is_analyzing: false })));
               }
             };
-          }
-        }
-
+          } // Close if (!localVerses || localVerses.length === 0)
 
           if (song) {
             setCurrentSong(song);
@@ -376,22 +374,7 @@ export function useLiveState(
             return [...filtered, { timestamp, words, confidence }];
           });
 
-          return {
-            ...nextState,
-            history: [
-               ...(nextState.history || []),
-               {
-                  id: `note-${Date.now()}`,
-                  type: 'note' as const,
-                  content: cleanChunk,
-                  timestamp: new Date(timestamp).toISOString()
-               }
-            ].slice(-200), // keep the last 200 notes to prevent memory bloat
-            session_id: sessionId,
-            transcription_text: updatedTranscription,
-            content_type: contentClassification.type,
-            updated_at: new Date(timestamp).toISOString()
-          } as any;
+          return nextState;
         });
       },
       onError: (err) => {
