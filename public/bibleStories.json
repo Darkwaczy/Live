@@ -1,0 +1,1124 @@
+{
+  "stories": [
+    {
+      "keywords": ["prodigal son"],
+      "references": [
+        { "book": "Luke", "chapter": 15, "verse_start": 11, "verse_end": 32 }
+      ]
+    },
+    {
+      "keywords": ["jesus walked on water", "walking on water", "walked on water"],
+      "references": [
+        { "book": "Matthew", "chapter": 14, "verse_start": 25, "verse_end": 33 },
+        { "book": "Mark", "chapter": 6, "verse_start": 48, "verse_end": 51 },
+        { "book": "John", "chapter": 6, "verse_start": 19, "verse_end": 21 }
+      ]
+    },
+    {
+      "keywords": ["children obey your parents", "obey your parents"],
+      "references": [
+        { "book": "Ephesians", "chapter": 6, "verse_start": 1, "verse_end": 3 },
+        { "book": "Colossians", "chapter": 3, "verse_start": 20, "verse_end": 20 }
+      ]
+    },
+    {
+      "keywords": ["good samaritan", "samaritan"],
+      "references": [
+        { "book": "Luke", "chapter": 10, "verse_start": 25, "verse_end": 37 }
+      ]
+    },
+    {
+      "keywords": ["ten commandments"],
+      "references": [
+        { "book": "Exodus", "chapter": 20, "verse_start": 1, "verse_end": 17 },
+        { "book": "Deuteronomy", "chapter": 5, "verse_start": 4, "verse_end": 21 }
+      ]
+    },
+    {
+      "keywords": ["last supper"],
+      "references": [
+        { "book": "Matthew", "chapter": 26, "verse_start": 26, "verse_end": 29 },
+        { "book": "Mark", "chapter": 14, "verse_start": 22, "verse_end": 25 },
+        { "book": "Luke", "chapter": 22, "verse_start": 19, "verse_end": 20 }
+      ]
+    },
+    {
+      "keywords": ["lord's prayer"],
+      "references": [
+        { "book": "Matthew", "chapter": 6, "verse_start": 9, "verse_end": 13 },
+        { "book": "Luke", "chapter": 11, "verse_start": 2, "verse_end": 4 }
+      ]
+    },
+    {
+      "keywords": ["beatitudes"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 3, "verse_end": 12 }
+      ]
+    },
+    {
+      "keywords": ["sermon on the mount"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 1, "verse_end": 7 }
+      ]
+    },
+    {
+      "keywords": ["resurrection of jesus", "resurrection of christ", "jesus rose", "christ rose"],
+      "references": [
+        { "book": "Matthew", "chapter": 28, "verse_start": 1, "verse_end": 10 },
+        { "book": "Mark", "chapter": 16, "verse_start": 1, "verse_end": 8 },
+        { "book": "Luke", "chapter": 24, "verse_start": 1, "verse_end": 12 },
+        { "book": "John", "chapter": 20, "verse_start": 1, "verse_end": 18 }
+      ]
+    },
+    {
+      "keywords": ["virgin birth", "born of a virgin", "virgin mary"],
+      "references": [
+        { "book": "Matthew", "chapter": 1, "verse_start": 18, "verse_end": 25 },
+        { "book": "Luke", "chapter": 1, "verse_start": 26, "verse_end": 38 }
+      ]
+    },
+    {
+      "keywords": ["nativity", "birth of jesus", "birth of christ"],
+      "references": [
+        { "book": "Matthew", "chapter": 2, "verse_start": 1, "verse_end": 12 },
+        { "book": "Luke", "chapter": 2, "verse_start": 1, "verse_end": 20 }
+      ]
+    },
+    {
+      "keywords": ["crucifixion", "jesus crucified", "christ crucified"],
+      "references": [
+        { "book": "Matthew", "chapter": 27, "verse_start": 32, "verse_end": 56 },
+        { "book": "Mark", "chapter": 15, "verse_start": 20, "verse_end": 41 },
+        { "book": "Luke", "chapter": 23, "verse_start": 26, "verse_end": 49 },
+        { "book": "John", "chapter": 19, "verse_start": 17, "verse_end": 37 }
+      ]
+    },
+    {
+      "keywords": ["ascension of jesus", "jesus ascended", "ascension"],
+      "references": [
+        { "book": "Acts", "chapter": 1, "verse_start": 9, "verse_end": 11 },
+        { "book": "Luke", "chapter": 24, "verse_start": 50, "verse_end": 53 }
+      ]
+    },
+    {
+      "keywords": ["pentecost", "day of pentecost"],
+      "references": [
+        { "book": "Acts", "chapter": 2, "verse_start": 1, "verse_end": 31 }
+      ]
+    },
+    {
+      "keywords": ["armor of god"],
+      "references": [
+        { "book": "Ephesians", "chapter": 6, "verse_start": 10, "verse_end": 18 }
+      ]
+    },
+    {
+      "keywords": ["fruits of the spirit"],
+      "references": [
+        { "book": "Galatians", "chapter": 5, "verse_start": 22, "verse_end": 23 }
+      ]
+    },
+    {
+      "keywords": ["love chapter", "love is patient", "faith hope love"],
+      "references": [
+        { "book": "1 Corinthians", "chapter": 13, "verse_start": 1, "verse_end": 13 }
+      ]
+    },
+    {
+      "keywords": ["garden of eden", "adam and eve"],
+      "references": [
+        { "book": "Genesis", "chapter": 2, "verse_start": 8, "verse_end": 25 },
+        { "book": "Genesis", "chapter": 3, "verse_start": 1, "verse_end": 24 }
+      ]
+    },
+    {
+      "keywords": ["noah's ark", "great flood", "flood"],
+      "references": [
+        { "book": "Genesis", "chapter": 6, "verse_start": 1, "verse_end": 22 },
+        { "book": "Genesis", "chapter": 7, "verse_start": 1, "verse_end": 24 },
+        { "book": "Genesis", "chapter": 8, "verse_start": 1, "verse_end": 22 }
+      ]
+    },
+    {
+      "keywords": ["tower of babel"],
+      "references": [
+        { "book": "Genesis", "chapter": 11, "verse_start": 1, "verse_end": 9 }
+      ]
+    },
+    {
+      "keywords": ["abraham", "abram", "abraham's faith", "abraham's covenant"],
+      "references": [
+        { "book": "Genesis", "chapter": 12, "verse_start": 1, "verse_end": 9 },
+        { "book": "Genesis", "chapter": 15, "verse_start": 1, "verse_end": 21 }
+      ]
+    },
+    {
+      "keywords": ["sodom and gomorrah"],
+      "references": [
+        { "book": "Genesis", "chapter": 19, "verse_start": 1, "verse_end": 29 }
+      ]
+    },
+    {
+      "keywords": ["jacob's ladder"],
+      "references": [
+        { "book": "Genesis", "chapter": 28, "verse_start": 10, "verse_end": 22 }
+      ]
+    },
+    {
+      "keywords": ["moses", "moses parts the sea", "red sea", "parting the sea"],
+      "references": [
+        { "book": "Exodus", "chapter": 14, "verse_start": 1, "verse_end": 31 }
+      ]
+    },
+    {
+      "keywords": ["jonah and the whale", "whale", "jonah"],
+      "references": [
+        { "book": "Jonah", "chapter": 1, "verse_start": 1, "verse_end": 17 },
+        { "book": "Jonah", "chapter": 2, "verse_start": 1, "verse_end": 10 }
+      ]
+    },
+    {
+      "keywords": ["david and goliath", "goliath", "sling and stone"],
+      "references": [
+        { "book": "1 Samuel", "chapter": 17, "verse_start": 1, "verse_end": 58 }
+      ]
+    },
+    {
+      "keywords": ["daniel and the lions", "lions den", "lion's den"],
+      "references": [
+        { "book": "Daniel", "chapter": 6, "verse_start": 1, "verse_end": 28 }
+      ]
+    },
+    {
+      "keywords": ["shadrach meshach abednego", "fiery furnace", "burning furnace", "three men in fire"],
+      "references": [
+        { "book": "Daniel", "chapter": 3, "verse_start": 1, "verse_end": 30 }
+      ]
+    },
+    {
+      "keywords": ["feeding of the five thousand"],
+      "references": [
+        { "book": "Matthew", "chapter": 14, "verse_start": 13, "verse_end": 21 },
+        { "book": "Mark", "chapter": 6, "verse_start": 30, "verse_end": 44 },
+        { "book": "Luke", "chapter": 9, "verse_start": 10, "verse_end": 17 },
+        { "book": "John", "chapter": 6, "verse_start": 1, "verse_end": 14 }
+      ]
+    },
+    {
+      "keywords": ["loaves and fishes", "five loaves two fish"],
+      "references": [
+        { "book": "Matthew", "chapter": 14, "verse_start": 15, "verse_end": 21 }
+      ]
+    },
+    {
+      "keywords": ["jesus heals the blind", "blind man healed"],
+      "references": [
+        { "book": "Matthew", "chapter": 9, "verse_start": 27, "verse_end": 31 },
+        { "book": "Mark", "chapter": 10, "verse_start": 46, "verse_end": 52 },
+        { "book": "Luke", "chapter": 7, "verse_start": 21, "verse_end": 23 }
+      ]
+    },
+    {
+      "keywords": ["jesus calms the storm"],
+      "references": [
+        { "book": "Matthew", "chapter": 8, "verse_start": 23, "verse_end": 27 },
+        { "book": "Mark", "chapter": 4, "verse_start": 35, "verse_end": 41 },
+        { "book": "Luke", "chapter": 8, "verse_start": 22, "verse_end": 25 }
+      ]
+    },
+    {
+      "keywords": ["woman at the well"],
+      "references": [
+        { "book": "John", "chapter": 4, "verse_start": 1, "verse_end": 42 }
+      ]
+    },
+    {
+      "keywords": ["woman caught in adultery"],
+      "references": [
+        { "book": "John", "chapter": 8, "verse_start": 1, "verse_end": 11 }
+      ]
+    },
+    {
+      "keywords": ["lazarus", "jesus raises lazarus"],
+      "references": [
+        { "book": "John", "chapter": 11, "verse_start": 1, "verse_end": 45 }
+      ]
+    },
+    {
+      "keywords": ["peter's denial", "peter denies jesus"],
+      "references": [
+        { "book": "Matthew", "chapter": 26, "verse_start": 69, "verse_end": 75 },
+        { "book": "Mark", "chapter": 14, "verse_start": 66, "verse_end": 72 },
+        { "book": "Luke", "chapter": 22, "verse_start": 54, "verse_end": 62 },
+        { "book": "John", "chapter": 13, "verse_start": 36, "verse_end": 38 }
+      ]
+    },
+    {
+      "keywords": ["judas betrayal", "judas"],
+      "references": [
+        { "book": "Matthew", "chapter": 26, "verse_start": 14, "verse_end": 50 }
+      ]
+    },
+    {
+      "keywords": ["temptation of jesus", "jesus temptation", "forty days"],
+      "references": [
+        { "book": "Matthew", "chapter": 4, "verse_start": 1, "verse_end": 11 },
+        { "book": "Mark", "chapter": 1, "verse_start": 12, "verse_end": 13 },
+        { "book": "Luke", "chapter": 4, "verse_start": 1, "verse_end": 13 }
+      ]
+    },
+    {
+      "keywords": ["jesus fasts", "40 days", "forty days"],
+      "references": [
+        { "book": "Matthew", "chapter": 4, "verse_start": 2, "verse_end": 4 }
+      ]
+    },
+    {
+      "keywords": ["transfiguration"],
+      "references": [
+        { "book": "Matthew", "chapter": 17, "verse_start": 1, "verse_end": 13 },
+        { "book": "Mark", "chapter": 9, "verse_start": 2, "verse_end": 13 },
+        { "book": "Luke", "chapter": 9, "verse_start": 28, "verse_end": 36 }
+      ]
+    },
+    {
+      "keywords": ["rich young ruler"],
+      "references": [
+        { "book": "Matthew", "chapter": 19, "verse_start": 16, "verse_end": 26 },
+        { "book": "Mark", "chapter": 10, "verse_start": 17, "verse_end": 27 },
+        { "book": "Luke", "chapter": 18, "verse_start": 18, "verse_end": 27 }
+      ]
+    },
+    {
+      "keywords": ["pharisee and tax collector", "pharisee", "tax collector"],
+      "references": [
+        { "book": "Luke", "chapter": 18, "verse_start": 9, "verse_end": 14 }
+      ]
+    },
+    {
+      "keywords": ["jesus forgives sins", "your sins are forgiven"],
+      "references": [
+        { "book": "Matthew", "chapter": 9, "verse_start": 1, "verse_end": 8 },
+        { "book": "Mark", "chapter": 2, "verse_start": 1, "verse_end": 12 },
+        { "book": "Luke", "chapter": 5, "verse_start": 17, "verse_end": 26 }
+      ]
+    },
+    {
+      "keywords": ["trial of jesus", "before pilate"],
+      "references": [
+        { "book": "Matthew", "chapter": 27, "verse_start": 11, "verse_end": 26 }
+      ]
+    },
+    {
+      "keywords": ["pontius pilate"],
+      "references": [
+        { "book": "Matthew", "chapter": 27, "verse_start": 1, "verse_end": 26 }
+      ]
+    },
+    {
+      "keywords": ["road to damascus", "paul's conversion"],
+      "references": [
+        { "book": "Acts", "chapter": 9, "verse_start": 1, "verse_end": 19 }
+      ]
+    },
+    {
+      "keywords": ["peter and paul"],
+      "references": [
+        { "book": "Acts", "chapter": 8, "verse_start": 1, "verse_end": 40 }
+      ]
+    },
+    {
+      "keywords": ["shipwreck", "paul shipwreck"],
+      "references": [
+        { "book": "Acts", "chapter": 27, "verse_start": 1, "verse_end": 44 }
+      ]
+    },
+    {
+      "keywords": ["samson and delilah", "samson"],
+      "references": [
+        { "book": "Judges", "chapter": 13, "verse_start": 1, "verse_end": 25 },
+        { "book": "Judges", "chapter": 16, "verse_start": 1, "verse_end": 31 }
+      ]
+    },
+    {
+      "keywords": ["ruth and boaz"],
+      "references": [
+        { "book": "Ruth", "chapter": 1, "verse_start": 1, "verse_end": 22 },
+        { "book": "Ruth", "chapter": 2, "verse_start": 1, "verse_end": 23 },
+        { "book": "Ruth", "chapter": 3, "verse_start": 1, "verse_end": 18 },
+        { "book": "Ruth", "chapter": 4, "verse_start": 1, "verse_end": 22 }
+      ]
+    },
+    {
+      "keywords": ["job's suffering", "job"],
+      "references": [
+        { "book": "Job", "chapter": 1, "verse_start": 1, "verse_end": 22 }
+      ]
+    },
+    {
+      "keywords": ["psalm 23", "shepherd"],
+      "references": [
+        { "book": "Psalms", "chapter": 23, "verse_start": 1, "verse_end": 6 }
+      ]
+    },
+    {
+      "keywords": ["grace"],
+      "references": [
+        { "book": "Romans", "chapter": 3, "verse_start": 23, "verse_end": 24 },
+        { "book": "Ephesians", "chapter": 2, "verse_start": 8, "verse_end": 9 }
+      ]
+    },
+    {
+      "keywords": ["faith without works"],
+      "references": [
+        { "book": "James", "chapter": 2, "verse_start": 14, "verse_end": 26 }
+      ]
+    },
+    {
+      "keywords": ["born again"],
+      "references": [
+        { "book": "John", "chapter": 3, "verse_start": 1, "verse_end": 8 }
+      ]
+    },
+    {
+      "keywords": ["god loves you", "god loves the world"],
+      "references": [
+        { "book": "John", "chapter": 3, "verse_start": 16, "verse_end": 16 }
+      ]
+    },
+    {
+      "keywords": ["honor thy father and mother"],
+      "references": [
+        { "book": "Exodus", "chapter": 20, "verse_start": 12, "verse_end": 12 },
+        { "book": "Ephesians", "chapter": 6, "verse_start": 2, "verse_end": 3 }
+      ]
+    },
+    {
+      "keywords": ["thou shalt love", "love thy neighbor"],
+      "references": [
+        { "book": "Matthew", "chapter": 22, "verse_start": 37, "verse_end": 40 },
+        { "book": "Mark", "chapter": 12, "verse_start": 28, "verse_end": 31 }
+      ]
+    },
+    {
+      "keywords": ["salt of the earth"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 13, "verse_end": 13 }
+      ]
+    },
+    {
+      "keywords": ["light of the world"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 14, "verse_end": 16 }
+      ]
+    },
+    {
+      "keywords": ["golden rule"],
+      "references": [
+        { "book": "Matthew", "chapter": 7, "verse_start": 12, "verse_end": 12 }
+      ]
+    },
+    {
+      "keywords": ["judge not", "do not judge"],
+      "references": [
+        { "book": "Matthew", "chapter": 7, "verse_start": 1, "verse_end": 5 }
+      ]
+    },
+    {
+      "keywords": ["take up your cross"],
+      "references": [
+        { "book": "Matthew", "chapter": 16, "verse_start": 24, "verse_end": 26 }
+      ]
+    },
+    {
+      "keywords": ["ask and it shall be given"],
+      "references": [
+        { "book": "Matthew", "chapter": 7, "verse_start": 7, "verse_end": 11 }
+      ]
+    },
+    {
+      "keywords": ["two cannot walk together"],
+      "references": [
+        { "book": "Amos", "chapter": 3, "verse_start": 3, "verse_end": 3 }
+      ]
+    },
+    {
+      "keywords": ["come follow me"],
+      "references": [
+        { "book": "Matthew", "chapter": 4, "verse_start": 18, "verse_end": 20 }
+      ]
+    },
+    {
+      "keywords": ["isaac's binding", "binding of isaac"],
+      "references": [
+        { "book": "Genesis", "chapter": 22, "verse_start": 1, "verse_end": 19 }
+      ]
+    },
+    {
+      "keywords": ["jacob wrestled with god", "jacob's wrestling"],
+      "references": [
+        { "book": "Genesis", "chapter": 32, "verse_start": 22, "verse_end": 32 }
+      ]
+    },
+    {
+      "keywords": ["joseph and his coat", "coat of many colors"],
+      "references": [
+        { "book": "Genesis", "chapter": 37, "verse_start": 1, "verse_end": 36 }
+      ]
+    },
+    {
+      "keywords": ["joseph in egypt", "pharaoh's dream"],
+      "references": [
+        { "book": "Genesis", "chapter": 41, "verse_start": 1, "verse_end": 44 }
+      ]
+    },
+    {
+      "keywords": ["elijah and elisha"],
+      "references": [
+        { "book": "2 Kings", "chapter": 2, "verse_start": 1, "verse_end": 25 }
+      ]
+    },
+    {
+      "keywords": ["elijah's rapture", "elijah taken to heaven"],
+      "references": [
+        { "book": "2 Kings", "chapter": 2, "verse_start": 11, "verse_end": 12 }
+      ]
+    },
+    {
+      "keywords": ["elijah and the prophets of baal"],
+      "references": [
+        { "book": "1 Kings", "chapter": 18, "verse_start": 1, "verse_end": 46 }
+      ]
+    },
+    {
+      "keywords": ["naaman's leprosy", "naaman healed"],
+      "references": [
+        { "book": "2 Kings", "chapter": 5, "verse_start": 1, "verse_end": 27 }
+      ]
+    },
+    {
+      "keywords": ["king david and bathsheba"],
+      "references": [
+        { "book": "2 Samuel", "chapter": 11, "verse_start": 1, "verse_end": 27 }
+      ]
+    },
+    {
+      "keywords": ["king david's anointing"],
+      "references": [
+        { "book": "1 Samuel", "chapter": 16, "verse_start": 1, "verse_end": 13 }
+      ]
+    },
+    {
+      "keywords": ["king solomon's wisdom"],
+      "references": [
+        { "book": "1 Kings", "chapter": 3, "verse_start": 1, "verse_end": 28 }
+      ]
+    },
+    {
+      "keywords": ["temple building", "solomon's temple"],
+      "references": [
+        { "book": "1 Kings", "chapter": 6, "verse_start": 1, "verse_end": 38 }
+      ]
+    },
+    {
+      "keywords": ["nehemiah rebuilds the wall"],
+      "references": [
+        { "book": "Nehemiah", "chapter": 3, "verse_start": 1, "verse_end": 32 }
+      ]
+    },
+    {
+      "keywords": ["esther's courage"],
+      "references": [
+        { "book": "Esther", "chapter": 7, "verse_start": 1, "verse_end": 10 }
+      ]
+    },
+    {
+      "keywords": ["zacchaeus"],
+      "references": [
+        { "book": "Luke", "chapter": 19, "verse_start": 1, "verse_end": 10 }
+      ]
+    },
+    {
+      "keywords": ["mary magdalene"],
+      "references": [
+        { "book": "John", "chapter": 20, "verse_start": 11, "verse_end": 18 }
+      ]
+    },
+    {
+      "keywords": ["ten virgins", "ten bridesmaids"],
+      "references": [
+        { "book": "Matthew", "chapter": 25, "verse_start": 1, "verse_end": 13 }
+      ]
+    },
+    {
+      "keywords": ["talents parable"],
+      "references": [
+        { "book": "Matthew", "chapter": 25, "verse_start": 14, "verse_end": 30 }
+      ]
+    },
+    {
+      "keywords": ["sheep and goats", "judgment of nations"],
+      "references": [
+        { "book": "Matthew", "chapter": 25, "verse_start": 31, "verse_end": 46 }
+      ]
+    },
+    {
+      "keywords": ["sower parable", "sowing seeds"],
+      "references": [
+        { "book": "Matthew", "chapter": 13, "verse_start": 1, "verse_end": 23 }
+      ]
+    },
+    {
+      "keywords": ["mustard seed parable"],
+      "references": [
+        { "book": "Matthew", "chapter": 13, "verse_start": 31, "verse_end": 32 }
+      ]
+    },
+    {
+      "keywords": ["hidden treasure parable"],
+      "references": [
+        { "book": "Matthew", "chapter": 13, "verse_start": 44, "verse_end": 44 }
+      ]
+    },
+    {
+      "keywords": ["pearl of great price"],
+      "references": [
+        { "book": "Matthew", "chapter": 13, "verse_start": 45, "verse_end": 46 }
+      ]
+    },
+    {
+      "keywords": ["fishing net parable"],
+      "references": [
+        { "book": "Matthew", "chapter": 13, "verse_start": 47, "verse_end": 50 }
+      ]
+    },
+    {
+      "keywords": ["unmerciful servant"],
+      "references": [
+        { "book": "Matthew", "chapter": 18, "verse_start": 23, "verse_end": 35 }
+      ]
+    },
+    {
+      "keywords": ["workers in vineyard"],
+      "references": [
+        { "book": "Matthew", "chapter": 20, "verse_start": 1, "verse_end": 16 }
+      ]
+    },
+    {
+      "keywords": ["two sons and the vineyard"],
+      "references": [
+        { "book": "Matthew", "chapter": 21, "verse_start": 28, "verse_end": 32 }
+      ]
+    },
+    {
+      "keywords": ["wedding feast parable"],
+      "references": [
+        { "book": "Matthew", "chapter": 22, "verse_start": 1, "verse_end": 14 }
+      ]
+    },
+    {
+      "keywords": ["emmaus road"],
+      "references": [
+        { "book": "Luke", "chapter": 24, "verse_start": 13, "verse_end": 35 }
+      ]
+    },
+    {
+      "keywords": ["thomas's doubt", "doubting thomas"],
+      "references": [
+        { "book": "John", "chapter": 20, "verse_start": 24, "verse_end": 29 }
+      ]
+    },
+    {
+      "keywords": ["peter fishing for tax money"],
+      "references": [
+        { "book": "Matthew", "chapter": 17, "verse_start": 24, "verse_end": 27 }
+      ]
+    },
+    {
+      "keywords": ["ananias and sapphira"],
+      "references": [
+        { "book": "Acts", "chapter": 5, "verse_start": 1, "verse_end": 11 }
+      ]
+    },
+    {
+      "keywords": ["simon the magician"],
+      "references": [
+        { "book": "Acts", "chapter": 8, "verse_start": 9, "verse_end": 24 }
+      ]
+    },
+    {
+      "keywords": ["cornelius's vision"],
+      "references": [
+        { "book": "Acts", "chapter": 10, "verse_start": 1, "verse_end": 48 }
+      ]
+    },
+    {
+      "keywords": ["philip and the ethiopian"],
+      "references": [
+        { "book": "Acts", "chapter": 8, "verse_start": 26, "verse_end": 40 }
+      ]
+    },
+    {
+      "keywords": ["peter's escape from prison"],
+      "references": [
+        { "book": "Acts", "chapter": 12, "verse_start": 1, "verse_end": 19 }
+      ]
+    },
+    {
+      "keywords": ["priscilla and aquila"],
+      "references": [
+        { "book": "Acts", "chapter": 18, "verse_start": 1, "verse_end": 28 }
+      ]
+    },
+    {
+      "keywords": ["stephen's martyrdom"],
+      "references": [
+        { "book": "Acts", "chapter": 7, "verse_start": 54, "verse_end": 60 }
+      ]
+    },
+    {
+      "keywords": ["forgive seventy times seven"],
+      "references": [
+        { "book": "Matthew", "chapter": 18, "verse_start": 21, "verse_end": 22 }
+      ]
+    },
+    {
+      "keywords": ["seek first the kingdom"],
+      "references": [
+        { "book": "Matthew", "chapter": 6, "verse_start": 33, "verse_end": 33 }
+      ]
+    },
+    {
+      "keywords": ["no one can serve two masters"],
+      "references": [
+        { "book": "Matthew", "chapter": 6, "verse_start": 24, "verse_end": 24 }
+      ]
+    },
+    {
+      "keywords": ["cast your cares on him"],
+      "references": [
+        { "book": "1 Peter", "chapter": 5, "verse_start": 7, "verse_end": 7 }
+      ]
+    },
+    {
+      "keywords": ["come to me all who are weary"],
+      "references": [
+        { "book": "Matthew", "chapter": 11, "verse_start": 28, "verse_end": 30 }
+      ]
+    },
+    {
+      "keywords": ["i am the way the truth the life"],
+      "references": [
+        { "book": "John", "chapter": 14, "verse_start": 6, "verse_end": 6 }
+      ]
+    },
+    {
+      "keywords": ["i am the door"],
+      "references": [
+        { "book": "John", "chapter": 10, "verse_start": 7, "verse_end": 10 }
+      ]
+    },
+    {
+      "keywords": ["i am the good shepherd"],
+      "references": [
+        { "book": "John", "chapter": 10, "verse_start": 11, "verse_end": 18 }
+      ]
+    },
+    {
+      "keywords": ["i am the vine"],
+      "references": [
+        { "book": "John", "chapter": 15, "verse_start": 1, "verse_end": 8 }
+      ]
+    },
+    {
+      "keywords": ["i am the resurrection and the life"],
+      "references": [
+        { "book": "John", "chapter": 11, "verse_start": 25, "verse_end": 26 }
+      ]
+    },
+    {
+      "keywords": ["before abraham was i am"],
+      "references": [
+        { "book": "John", "chapter": 8, "verse_start": 58, "verse_end": 58 }
+      ]
+    },
+    {
+      "keywords": ["it is finished"],
+      "references": [
+        { "book": "John", "chapter": 19, "verse_start": 28, "verse_end": 30 }
+      ]
+    },
+    {
+      "keywords": ["father forgive them"],
+      "references": [
+        { "book": "Luke", "chapter": 23, "verse_start": 34, "verse_end": 34 }
+      ]
+    },
+    {
+      "keywords": ["today you will be with me in paradise"],
+      "references": [
+        { "book": "Luke", "chapter": 23, "verse_start": 43, "verse_end": 43 }
+      ]
+    },
+    {
+      "keywords": ["woman your faith has healed you"],
+      "references": [
+        { "book": "Luke", "chapter": 7, "verse_start": 50, "verse_end": 50 }
+      ]
+    },
+    {
+      "keywords": ["go and sin no more"],
+      "references": [
+        { "book": "John", "chapter": 8, "verse_start": 11, "verse_end": 11 }
+      ]
+    },
+    {
+      "keywords": ["you must be born again"],
+      "references": [
+        { "book": "John", "chapter": 3, "verse_start": 7, "verse_end": 7 }
+      ]
+    },
+    {
+      "keywords": ["thou art peter and on this rock"],
+      "references": [
+        { "book": "Matthew", "chapter": 16, "verse_start": 18, "verse_end": 18 }
+      ]
+    },
+    {
+      "keywords": ["the greatest commandment"],
+      "references": [
+        { "book": "Matthew", "chapter": 22, "verse_start": 37, "verse_end": 40 }
+      ]
+    },
+    {
+      "keywords": ["love covers all sins"],
+      "references": [
+        { "book": "1 Peter", "chapter": 4, "verse_start": 8, "verse_end": 8 }
+      ]
+    },
+    {
+      "keywords": ["marriage supper of the lamb"],
+      "references": [
+        { "book": "Revelation", "chapter": 19, "verse_start": 7, "verse_end": 9 }
+      ]
+    },
+    {
+      "keywords": ["new jerusalem"],
+      "references": [
+        { "book": "Revelation", "chapter": 21, "verse_start": 1, "verse_end": 27 }
+      ]
+    },
+    {
+      "keywords": ["streets of gold"],
+      "references": [
+        { "book": "Revelation", "chapter": 21, "verse_start": 21, "verse_end": 21 }
+      ]
+    },
+    {
+      "keywords": ["no more tears"],
+      "references": [
+        { "book": "Revelation", "chapter": 21, "verse_start": 4, "verse_end": 4 }
+      ]
+    },
+    {
+      "keywords": ["god is love"],
+      "references": [
+        { "book": "1 John", "chapter": 4, "verse_start": 8, "verse_end": 8 }
+      ]
+    },
+    {
+      "keywords": ["manna from heaven"],
+      "references": [
+        { "book": "Exodus", "chapter": 16, "verse_start": 1, "verse_end": 36 }
+      ]
+    },
+    {
+      "keywords": ["bronze serpent"],
+      "references": [
+        { "book": "Numbers", "chapter": 21, "verse_start": 4, "verse_end": 9 }
+      ]
+    },
+    {
+      "keywords": ["ark of the covenant"],
+      "references": [
+        { "book": "Exodus", "chapter": 25, "verse_start": 10, "verse_end": 22 }
+      ]
+    },
+    {
+      "keywords": ["golden calf"],
+      "references": [
+        { "book": "Exodus", "chapter": 32, "verse_start": 1, "verse_end": 35 }
+      ]
+    },
+    {
+      "keywords": ["moses on mount sinai"],
+      "references": [
+        { "book": "Exodus", "chapter": 19, "verse_start": 1, "verse_end": 25 }
+      ]
+    },
+    {
+      "keywords": ["water from rock"],
+      "references": [
+        { "book": "Exodus", "chapter": 17, "verse_start": 1, "verse_end": 7 }
+      ]
+    },
+    {
+      "keywords": ["hagar and ishmael"],
+      "references": [
+        { "book": "Genesis", "chapter": 21, "verse_start": 1, "verse_end": 21 }
+      ]
+    },
+    {
+      "keywords": ["enoch walked with god"],
+      "references": [
+        { "book": "Genesis", "chapter": 5, "verse_start": 21, "verse_end": 24 }
+      ]
+    },
+    {
+      "keywords": ["lot's wife"],
+      "references": [
+        { "book": "Genesis", "chapter": 19, "verse_start": 15, "verse_end": 26 }
+      ]
+    },
+    {
+      "keywords": ["balaam's donkey"],
+      "references": [
+        { "book": "Numbers", "chapter": 22, "verse_start": 1, "verse_end": 35 }
+      ]
+    },
+    {
+      "keywords": ["gideon's fleece"],
+      "references": [
+        { "book": "Judges", "chapter": 6, "verse_start": 36, "verse_end": 40 }
+      ]
+    },
+    {
+      "keywords": ["jephthah's vow"],
+      "references": [
+        { "book": "Judges", "chapter": 11, "verse_start": 1, "verse_end": 40 }
+      ]
+    },
+    {
+      "keywords": ["hosea and gomer"],
+      "references": [
+        { "book": "Hosea", "chapter": 1, "verse_start": 1, "verse_end": 11 }
+      ]
+    },
+    {
+      "keywords": ["isaiah's vision"],
+      "references": [
+        { "book": "Isaiah", "chapter": 6, "verse_start": 1, "verse_end": 13 }
+      ]
+    },
+    {
+      "keywords": ["jeremiah's trials"],
+      "references": [
+        { "book": "Jeremiah", "chapter": 1, "verse_start": 1, "verse_end": 19 }
+      ]
+    },
+    {
+      "keywords": ["ezekiel's visions"],
+      "references": [
+        { "book": "Ezekiel", "chapter": 1, "verse_start": 1, "verse_end": 28 }
+      ]
+    },
+    {
+      "keywords": ["nicodemus"],
+      "references": [
+        { "book": "John", "chapter": 3, "verse_start": 1, "verse_end": 21 }
+      ]
+    },
+    {
+      "keywords": ["philemon and onesimus"],
+      "references": [
+        { "book": "Philemon", "chapter": 1, "verse_start": 1, "verse_end": 25 }
+      ]
+    },
+    {
+      "keywords": ["thou shalt not steal"],
+      "references": [
+        { "book": "Exodus", "chapter": 20, "verse_start": 15, "verse_end": 15 }
+      ]
+    },
+    {
+      "keywords": ["thou shalt not covet"],
+      "references": [
+        { "book": "Exodus", "chapter": 20, "verse_start": 17, "verse_end": 17 }
+      ]
+    },
+    {
+      "keywords": ["forgive us our debts"],
+      "references": [
+        { "book": "Matthew", "chapter": 6, "verse_start": 11, "verse_end": 12 }
+      ]
+    },
+    {
+      "keywords": ["they shall know you by your love"],
+      "references": [
+        { "book": "John", "chapter": 13, "verse_start": 35, "verse_end": 35 }
+      ]
+    },
+    {
+      "keywords": ["jesus wept"],
+      "references": [
+        { "book": "John", "chapter": 11, "verse_start": 35, "verse_end": 35 }
+      ]
+    },
+    {
+      "keywords": ["ask and receive"],
+      "references": [
+        { "book": "John", "chapter": 16, "verse_start": 24, "verse_end": 24 }
+      ]
+    },
+    {
+      "keywords": ["peace i leave with you"],
+      "references": [
+        { "book": "John", "chapter": 14, "verse_start": 27, "verse_end": 27 }
+      ]
+    },
+    {
+      "keywords": ["i am with you always"],
+      "references": [
+        { "book": "Matthew", "chapter": 28, "verse_start": 20, "verse_end": 20 }
+      ]
+    },
+    {
+      "keywords": ["fear not"],
+      "references": [
+        { "book": "Joshua", "chapter": 1, "verse_start": 9, "verse_end": 9 }
+      ]
+    },
+    {
+      "keywords": ["trust in the lord"],
+      "references": [
+        { "book": "Proverbs", "chapter": 3, "verse_start": 5, "verse_end": 6 }
+      ]
+    },
+    {
+      "keywords": ["jesus is lord"],
+      "references": [
+        { "book": "1 Corinthians", "chapter": 12, "verse_start": 3, "verse_end": 3 }
+      ]
+    },
+    {
+      "keywords": ["all things to all people"],
+      "references": [
+        { "book": "1 Corinthians", "chapter": 9, "verse_start": 22, "verse_end": 22 }
+      ]
+    },
+    {
+      "keywords": ["sold out to jesus"],
+      "references": [
+        { "book": "Romans", "chapter": 12, "verse_start": 1, "verse_end": 2 }
+      ]
+    },
+    {
+      "keywords": ["renewing of your mind"],
+      "references": [
+        { "book": "Romans", "chapter": 12, "verse_start": 2, "verse_end": 2 }
+      ]
+    },
+    {
+      "keywords": ["christ in you the hope of glory"],
+      "references": [
+        { "book": "Colossians", "chapter": 1, "verse_start": 27, "verse_end": 27 }
+      ]
+    },
+    {
+      "keywords": ["know him and the power of his resurrection"],
+      "references": [
+        { "book": "Philippians", "chapter": 3, "verse_start": 10, "verse_end": 10 }
+      ]
+    },
+    {
+      "keywords": ["run the race"],
+      "references": [
+        { "book": "Hebrews", "chapter": 12, "verse_start": 1, "verse_end": 2 }
+      ]
+    },
+    {
+      "keywords": ["faith is substance of things hoped for"],
+      "references": [
+        { "book": "Hebrews", "chapter": 11, "verse_start": 1, "verse_end": 1 }
+      ]
+    },
+    {
+      "keywords": ["cloud of witnesses"],
+      "references": [
+        { "book": "Hebrews", "chapter": 12, "verse_start": 1, "verse_end": 1 }
+      ]
+    },
+    {
+      "keywords": ["greater is he that is in you"],
+      "references": [
+        { "book": "1 John", "chapter": 4, "verse_start": 4, "verse_end": 4 }
+      ]
+    },
+    {
+      "keywords": ["behold i stand at the door"],
+      "references": [
+        { "book": "Revelation", "chapter": 3, "verse_start": 20, "verse_end": 20 }
+      ]
+    },
+    {
+      "keywords": ["blessed are the pure in heart"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 8, "verse_end": 8 }
+      ]
+    },
+    {
+      "keywords": ["blessed are the merciful"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 7, "verse_end": 7 }
+      ]
+    },
+    {
+      "keywords": ["blessed are those who mourn"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 4, "verse_end": 4 }
+      ]
+    },
+    {
+      "keywords": ["rejoice and be glad"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 11, "verse_end": 12 }
+      ]
+    },
+    {
+      "keywords": ["be ye therefore perfect"],
+      "references": [
+        { "book": "Matthew", "chapter": 5, "verse_start": 48, "verse_end": 48 }
+      ]
+    },
+    {
+      "keywords": ["blessed is the man"],
+      "references": [
+        { "book": "Psalms", "chapter": 1, "verse_start": 1, "verse_end": 3 }
+      ]
+    },
+    {
+      "keywords": ["the lord is my light"],
+      "references": [
+        { "book": "Psalms", "chapter": 27, "verse_start": 1, "verse_end": 1 }
+      ]
+    },
+    {
+      "keywords": ["i will fear no evil"],
+      "references": [
+        { "book": "Psalms", "chapter": 23, "verse_start": 4, "verse_end": 4 }
+      ]
+    },
+    {
+      "keywords": ["surely goodness and mercy shall follow me"],
+      "references": [
+        { "book": "Psalms", "chapter": 23, "verse_start": 6, "verse_end": 6 }
+      ]
+    },
+    {
+      "keywords": ["the lord is my shepherd"],
+      "references": [
+        { "book": "Psalms", "chapter": 23, "verse_start": 1, "verse_end": 1 }
+      ]
+    }
+  ]
+}

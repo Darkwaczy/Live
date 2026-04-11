@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LiveState, BibleVerse } from '../models/liveState';
-import { detectBibleVerse, detectBibleVerseAI, classifyContent } from '../services/bibleParser';
+import { detectBibleVerse, detectBibleVerseAI, detectBibleVerseWithStories, classifyContent } from '../services/bibleParser';
 import { searchBibleQuotes } from '../services/dbService';
 import { findSongByWords, locateCurrentLine } from '../services/lyricsService';
 import { Song } from '../models/song';
@@ -194,67 +194,124 @@ export function useLiveState(
             }
           }
 
-          // If local regex didn't intercept anything with high confidence, run DB/AI checks
+          // If local regex didn't intercept anything with high confidence, run story/DB/AI checks
           if (!localVerses || localVerses.length === 0) {
             
             const chunkWordCount = cleanChunk.split(' ').length;
             
-            // Limit fast exact DB quote check to statements with at least 5 words to avoid false positive short phrases
-            if (!prev.is_analyzing && chunkWordCount >= 5) {
-              setTimeout(() => {
-                setLiveState(s => ({ ...s, is_analyzing: true }));
-                
-                // 1. LOCAL FTS5 REVERSE MATCH (Instant, Exact Quotes)
-                searchBibleQuotes(cleanChunk, 1).then((ftsVerses: any[]) => {
-                  if (ftsVerses && ftsVerses.length > 0) {
-                    const matchedDbVerse = ftsVerses[0];
-                    const newVerse: BibleVerse = {
-                      book: matchedDbVerse.book,
-                      chapter: matchedDbVerse.chapter,
-                      verse_start: matchedDbVerse.verse,
-                      verse_end: matchedDbVerse.verse
-                    };
+            // First, try story/phrase detection (fast, lightweight)
+            detectBibleVerseWithStories(cleanChunk).then((storyVerses) => {
+              if (storyVerses && storyVerses.length > 0) {
+                // Found via story detection!
+                setLiveState(s => {
+                  let finalDetections = [...s.detection_history];
+                  let firstStoryVerse: BibleVerse | null = null;
+                  
+                  for (const verse of storyVerses) {
+                    const alreadyExists = finalDetections.some(d =>
+                      d.verse.book === verse.book &&
+                      d.verse.chapter === verse.chapter &&
+                      d.verse.verse_start === verse.verse_start &&
+                      (Date.now() - new Date(d.timestamp).getTime()) < LOCKOUT_MS
+                    );
 
-                    setLiveState(s => {
-                      let finalDetections = [...s.detection_history];
-                      const alreadyExists = finalDetections.some(d =>
-                        d.verse.book === newVerse.book &&
-                        d.verse.chapter === newVerse.chapter &&
-                        d.verse.verse_start === newVerse.verse_start &&
-                        (Date.now() - new Date(d.timestamp).getTime()) < LOCKOUT_MS
-                      );
+                    const currentlyShowing = s.preview_verse &&
+                      s.preview_verse.book === verse.book &&
+                      s.preview_verse.chapter === verse.chapter &&
+                      s.preview_verse.verse_start === verse.verse_start;
 
-                      const currentlyShowing = s.preview_verse &&
-                        s.preview_verse.book === newVerse.book &&
-                        s.preview_verse.chapter === newVerse.chapter &&
-                        s.preview_verse.verse_start === newVerse.verse_start;
-
-                      if (!alreadyExists && !currentlyShowing) {
-                        finalDetections = [{
-                          id: `det-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
-                          verse: newVerse,
-                          timestamp: new Date().toISOString(),
-                          is_paraphrase: false
-                        }, ...finalDetections].slice(0, 50);
-                        
-                        setCurrentVerse(newVerse);
-                        console.log(`[useLiveState] FTS5 Reverse Match: ${newVerse.book} ${newVerse.chapter}:${newVerse.verse_start}`);
-                        
-                        return {
-                          ...s,
-                          preview_verse: newVerse,
-                          is_live_dirty: true,
-                          is_analyzing: false,
-                          detection_history: finalDetections
-                        };
+                    if (!alreadyExists && !currentlyShowing) {
+                      finalDetections = [{
+                        id: `det-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
+                        verse: verse,
+                        timestamp: new Date().toISOString(),
+                        is_paraphrase: false
+                      }, ...finalDetections].slice(0, 50);
+                      
+                      if (!firstStoryVerse) {
+                        firstStoryVerse = verse;
+                        setCurrentVerse(verse);
                       }
-                      return { ...s, is_analyzing: false, detection_history: finalDetections };
-                    });
+                    }
+                  }
+                  
+                  if (firstStoryVerse) {
+                    console.log(`[useLiveState] Story Detection: ${firstStoryVerse.book} ${firstStoryVerse.chapter}:${firstStoryVerse.verse_start}`);
+                    return {
+                      ...s,
+                      preview_verse: firstStoryVerse,
+                      is_live_dirty: true,
+                      detection_history: finalDetections
+                    };
+                  }
+                  return { ...s, detection_history: finalDetections };
+                });
+              } else {
+                // Story detection didn't find anything, proceed to FTS5/AI checks
+                performDbAndAiChecks();
+              }
+            }).catch(error => {
+              console.warn('Story detection failed, falling back to DB/AI:', error);
+              performDbAndAiChecks();
+            });
+            
+            const performDbAndAiChecks = () => {
+              // Limit fast exact DB quote check to statements with at least 5 words to avoid false positive short phrases
+              if (!prev.is_analyzing && chunkWordCount >= 5) {
+                setTimeout(() => {
+                  setLiveState(s => ({ ...s, is_analyzing: true }));
+                  
+                  // 1. LOCAL FTS5 REVERSE MATCH (Instant, Exact Quotes)
+                  searchBibleQuotes(cleanChunk, 1).then((ftsVerses: any[]) => {
+                    if (ftsVerses && ftsVerses.length > 0) {
+                      const matchedDbVerse = ftsVerses[0];
+                      const newVerse: BibleVerse = {
+                        book: matchedDbVerse.book,
+                        chapter: matchedDbVerse.chapter,
+                        verse_start: matchedDbVerse.verse,
+                        verse_end: matchedDbVerse.verse
+                      };
 
-                  } else if (currentAi.enabled && chunkWordCount >= 10) {
-                    // 2. GROQ AI STORY DETECTION FALLBACK (Paraphrasing & Deep semantics)
-                    const storyContext = updatedTranscription.split(' ').slice(-35).join(' ');
-                    detectBibleVerseAI(storyContext, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
+                      setLiveState(s => {
+                        let finalDetections = [...s.detection_history];
+                        const alreadyExists = finalDetections.some(d =>
+                          d.verse.book === newVerse.book &&
+                          d.verse.chapter === newVerse.chapter &&
+                          d.verse.verse_start === newVerse.verse_start &&
+                          (Date.now() - new Date(d.timestamp).getTime()) < LOCKOUT_MS
+                        );
+
+                        const currentlyShowing = s.preview_verse &&
+                          s.preview_verse.book === newVerse.book &&
+                          s.preview_verse.chapter === newVerse.chapter &&
+                          s.preview_verse.verse_start === newVerse.verse_start;
+
+                        if (!alreadyExists && !currentlyShowing) {
+                          finalDetections = [{
+                            id: `det-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
+                            verse: newVerse,
+                            timestamp: new Date().toISOString(),
+                            is_paraphrase: false
+                          }, ...finalDetections].slice(0, 50);
+                          
+                          setCurrentVerse(newVerse);
+                          console.log(`[useLiveState] FTS5 Reverse Match: ${newVerse.book} ${newVerse.chapter}:${newVerse.verse_start}`);
+                          
+                          return {
+                            ...s,
+                            preview_verse: newVerse,
+                            is_live_dirty: true,
+                            is_analyzing: false,
+                            detection_history: finalDetections
+                          };
+                        }
+                        return { ...s, is_analyzing: false, detection_history: finalDetections };
+                      });
+
+                    } else if (currentAi.enabled && chunkWordCount >= 10) {
+                      // 2. GROQ AI STORY DETECTION FALLBACK (Paraphrasing & Deep semantics)
+                      const storyContext = updatedTranscription.split(' ').slice(-35).join(' ');
+                      detectBibleVerseAI(storyContext, currentAi.endpointUrl, currentAi.apiKey, currentAi.modelName)
                       .then((aiVerses) => {
                         if (aiVerses && aiVerses.length > 0) {
                           setLiveState(s => {

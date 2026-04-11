@@ -275,6 +275,88 @@ function getLevenshteinDistance(a: string, b: string): number {
   return matrix[a.length][b.length];
 }
 
+// Cache for Bible stories
+let bibleStoriesCache: any = null;
+
+/**
+ * Load Bible stories from the public JSON file (cached)
+ */
+async function getBibleStories(): Promise<any> {
+  if (bibleStoriesCache) return bibleStoriesCache;
+  
+  try {
+    // In browser/electron context, fetch from public folder
+    const response = await fetch('/bibleStories.json');
+    if (!response.ok) throw new Error('Failed to load Bible stories');
+    bibleStoriesCache = await response.json();
+    return bibleStoriesCache;
+  } catch (error) {
+    console.warn('Could not load Bible stories JSON:', error);
+    return { stories: [] };
+  }
+}
+
+/**
+ * Find Bible reference by matching story keywords
+ * Checks if text contains any known story keywords and returns the reference
+ */
+export async function findStoryReference(text: string): Promise<BibleVerse[]> {
+  const results: BibleVerse[] = [];
+  const lowerText = text.toLowerCase();
+  
+  try {
+    const storiesData = await getBibleStories();
+    const stories = storiesData.stories || [];
+    
+    for (const story of stories) {
+      for (const keyword of story.keywords || []) {
+        // Check if the keyword (or any word from the keyword phrase) appears in the text
+        if (lowerText.includes(keyword)) {
+          // Add all references for this story
+          for (const ref of story.references || []) {
+            const verseKey = `${ref.book} ${ref.chapter}:${ref.verse_start}`;
+            // Avoid duplicates
+            if (!results.some(r => `${r.book} ${r.chapter}:${r.verse_start}` === verseKey)) {
+              results.push({
+                book: ref.book,
+                chapter: ref.chapter,
+                verse_start: ref.verse_start,
+                verse_end: ref.verse_end || ref.verse_start
+              });
+            }
+          }
+          // Only match the first matching story to avoid multiple matches
+          break;
+        }
+      }
+      
+      if (results.length > 0) break; // Stop after finding first story match
+    }
+  } catch (error) {
+    console.error('Error finding story reference:', error);
+  }
+  
+  return results;
+}
+
+/**
+ * Combined detection: First tries formal verse references, then story/phrase keywords
+ * Returns results from both methods, avoiding duplicates
+ */
+export async function detectBibleVerseWithStories(text: string): Promise<BibleVerse[]> {
+  // First try formal verse detection (fast, sync)
+  const formalVerses = detectBibleVerse(text);
+  
+  // If we found verses through formal detection, return those
+  if (formalVerses && formalVerses.length > 0) {
+    return formalVerses;
+  }
+  
+  // Otherwise, try story/phrase matching (async)
+  const storyVerses = await findStoryReference(text);
+  return storyVerses;
+}
+
 export async function detectBibleVerseAI(
   text: string,
   endpoint: string,
