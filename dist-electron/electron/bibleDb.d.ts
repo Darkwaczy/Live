@@ -1,11 +1,11 @@
-import Database from 'better-sqlite3';
-export declare function getDb(): Database.Database;
+export declare function getDb(): Promise<any>;
 /**
- * Perform a Full-Text Search on the Bible to reverse-match spoken quotes.
+ * Perform a Keyword Search on the Bible to reverse-match spoken quotes.
+ * Note: sql.js FTS5 availability varies, using LIKE as a safe fallback if needed.
  */
-export declare function searchBibleQuotes(queryText: string, limit?: number): unknown[];
+export declare function searchBibleQuotes(queryText: string, limit?: number): Promise<any[]>;
 /**
  * Get Cross-References for a specific verse, ordered by votes.
  */
-export declare function getCrossReferences(book: string, chapter: number, verse: number, limit?: number): any[];
+export declare function getCrossReferences(book: string, chapter: number, verse: number, limit?: number): Promise<any[]>;
 export declare function closeDb(): void;

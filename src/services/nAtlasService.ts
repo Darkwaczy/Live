@@ -64,6 +64,21 @@ export class NAtlasService {
   }
 
   /**
+   * Get the current download/initialization status of the model
+   */
+  async getDownloadStatus(): Promise<{progress: number, is_downloading: boolean, error: string | null, ready: boolean}> {
+    try {
+      const response = await this.fetchWithTimeout(`${this.endpoint}/download-status`, {
+        method: 'GET'
+      });
+      if (!response.ok) throw new Error('Failed to fetch download status');
+      return await response.json();
+    } catch (error) {
+       return { progress: 0, is_downloading: false, error: (error as Error).message, ready: false };
+    }
+  }
+
+  /**
    * Transcribe an audio blob
    */
   async transcribe(audioBlob: Blob): Promise<NAtlasTranscriptionResult> {
