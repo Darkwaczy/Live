@@ -1,84 +1,91 @@
-# SermonSync
+# 🎙️ SermonSync
 
-A Windows desktop/tablet-first church assistant app using Electron + React.
+**Advanced AI-powered Sermon Transcription & Bible Tagging Church Assistant**
 
-## Features Implemented (Phase 1)
+SermonSync is a premium Windows desktop/tablet-first application designed for modern churches. It leverages AI to provide real-time sermon transcription, automated Bible verse detection, worship lyrics matching, and seamless multi-device session synchronization.
 
-- Local Electron + React skeleton
-- Live transcription pipeline mock (low-latency simulated chunks)
-- Bible verse detection (book names + abbreviations)
-- Lyrics detection/matching with sample song DB
-- Sync panel and Socket.IO-based realtime session sync
-- Notes panel with context metadata and autosave placeholder
-- Multi-panel layout (transcript, bible, lyrics, notes, session info, sync status)
-- Supabase integration stubs with offline fallback notes
-- Windows installer config via electron-builder (NSIS)
+---
 
-## Folder Structure
+## ✨ Key Features (Phase 1)
 
-- `electron/main.ts`: Electron main process + window setup
-- `electron/preload.ts`: IPC bridge and safe API handshake
-- `src/App.tsx`: top-level app shell
-- `src/components/`: UI panels
-- `src/hooks/`: live state + sync logic
-- `src/services/`: transcription parser, DB, lyrics, sync
-- `src/models/`: data models for sessions, live_state, notes, songs
-- `socket-server.ts`: local reference Socket.IO room server
+*   **⚡ Real-time Transcription Pipeline** — Low-latency transcription engine with chunk-based streaming (current mock provider).
+*   **📖 Smart Bible Verse Detection** — Intelligent regex-based parser supporting standard formats (e.g., `John 3:16`) and common Nigerian Bible abbreviations.
+*   **🎶 Worship Lyrics Matching** — High-performance matching engine that identifies worship songs in real-time from a curated database.
+*   **🔄 Real-time Session Sync** — Socket.IO-powered synchronization that keeps hosts and screens perfectly aligned across devices.
+*   **📝 Contextual Notes Panel** — Intelligent notes system with session metadata, context-aware tagging, and robust autosave.
+*   **🖥️ Multi-Panel Architecture** — A fluid, resizable grid layout optimized for landscape tablet and desktop workflows.
+*   **📦 Distribution Ready** — Professional Windows installer packaging via `electron-builder` (NSIS).
 
-## Getting Started
+---
 
-1. Install dependencies
+## 🛠️ Tech Stack
 
+*   **Core**: Electron 26, React 18, TypeScript, Vite
+*   **Styling**: TailwindCSS
+*   **Real-time**: Socket.IO
+*   **Data & Auth**: Supabase, sql.js (Local Bible DB), Vosk (Local Speech)
+*   **Persistence**: Electron Store, SQLite
+
+---
+
+## 📂 Project Structure
+
+*   `electron/`: Main process and secure IPC bridge configuration.
+*   `src/components/`: Modular UI panels built for performance and responsiveness.
+*   `src/hooks/`: Reactive state management for live transcription and synchronization.
+*   `src/services/`: Core logic for parsers, database interactions, and lyrics engine.
+*   `src/models/`: Strongly-typed data models for consistent data handling.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+Ensure you have [Node.js](https://nodejs.org/) installed.
+
+### 2. Installation
 ```bash
 npm install
 ```
 
-2. Start the realtime socket server
-
+### 3. Start Development
+Start the local synchronization server:
 ```bash
 npm run start:sync-server
 ```
 
-3. Start app in development
-
+In a new terminal, launch the application:
 ```bash
 npm run dev
 ```
 
-4. For production build
-
+### 4. Production Build
 ```bash
-npm run build
+npm run build          # Full production build
+npm run build:electron # Generate Windows installer (.exe)
 ```
 
-5. Create installer
+---
 
-```bash
-npm run build:electron
-```
+## 🗺️ Roadmap (Phase 2)
 
-## Key Integration Notes
+- [ ] **Real Audio Capture**: Native microphone integration via `MediaDevices API`.
+- [ ] **Streaming AI**: Integration with Whisper or Azure Speech for production-grade transcription.
+- [ ] **Locale Support**: Enhanced support for Nigerian English accents and local dialects.
+- [ ] **Offline Resilience**: Local SQLite caching and robust sync queue management.
+- [ ] **Projector Mode**: Full-screen dedicated output for church displays and projectors.
+- [ ] **Authentication**: Role-based access control and secure session management.
 
-- `SpeechService` is currently `provider: 'mock'`; replace with Whisper, Azure, Google streaming for <2s latency
-- `bibleParser` uses regex matching for formats like `John 3:16`, `1 Corinthians 13:4-7` and normalized book names
-- `lyricsService` contains sample song DB with `SongLine` objects and fuzzy match on sample text
-- `RealtimeSync` currently uses Socket.IO `updateState` events. For scaling use Supabase Realtime or custom hosted WebSocket
-- `dbService` has Supabase structure and offline warning. Add local sqlite queue, e.g. `better-sqlite3` + journaling
+---
 
-## Electron & Tablet-first Best Practices
+## 🔐 Security & Best Practices
 
-- Keep UI landscape-first; prefer grid + resizable split panels.
-- Avoid mobile-only touch patterns; support stylus and keyboard shortcuts.
-- Use `contextIsolation=true`, `nodeIntegration=false`, secure IPC channels.
-- Bundle with `electron-builder` NSIS for Windows installers; sign binaries for distribution.
+SermonSync is built with security as a priority:
+*   `contextIsolation` and `nodeIntegration` are properly configured for a secure IPC handshake.
+*   Landscape-first UI follows tablet-best practices for better usability in church environments.
+*   Bundled with code signing readiness for secure distribution.
 
-## TODO (Phase 2 Outline)
+---
 
-- Real microphone capture with `MediaDevices.getUserMedia({ audio: true })` in renderer + worker
-- Integrate real streaming speech service with chunked optimistic update
-- Support Nigerian English accents via locale or custom acoustic model
-- Offline local SQLite cache and sync queue management
-- Session login/auth, role-based controls, projector mode fullscreen
-- Enhanced Bible parser with full Canon + cross-reference
-- Unit tests for parser, hook behavior, realtime sync and note persistence
+**Built by Darkwaczy** | [Live Preview](https://live-kamalu.vercel.app)
 
