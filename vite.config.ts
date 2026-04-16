@@ -19,6 +19,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    chunkSizeWarningLimit: 2000
+    chunkSizeWarningLimit: 10000, // Increased for AI workers
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          lucide: ['lucide-react']
+        }
+      }
+    }
+  },
+  worker: {
+    format: 'es',
+    plugins: () => [react()]
   }
 });

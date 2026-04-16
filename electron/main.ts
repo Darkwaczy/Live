@@ -151,17 +151,23 @@ async function installNAtlasAddon(): Promise<{ success: boolean; error?: string 
   setNAtlasProgressBar(0);
 
   try {
+    console.log(`[Main] Preparing download directory: ${installDir}`);
     fs.mkdirSync(installDir, { recursive: true });
+    
     if (fs.existsSync(tempPath)) {
       fs.unlinkSync(tempPath);
     }
 
+    console.log(`[Main] Starting download from: ${downloadUrl}`);
     await downloadFileToPath(downloadUrl, tempPath);
 
     if (fs.existsSync(finalPath)) {
+      console.log(`[Main] Removing old binary: ${finalPath}`);
       fs.unlinkSync(finalPath);
     }
+    
     fs.renameSync(tempPath, finalPath);
+    console.log(`[Main] N-ATLAS successfully installed at: ${finalPath}`);
 
     nAtlasDownloadState = {
       inProgress: false,
@@ -169,18 +175,24 @@ async function installNAtlasAddon(): Promise<{ success: boolean; error?: string 
       error: null
     };
     clearNAtlasProgressBar();
-    await SidecarManager.getInstance().startAll();
+    
+    // Start the service immediately
+    setTimeout(() => {
+       SidecarManager.getInstance().startAll().catch(e => console.error("Sidecar restart failed", e));
+    }, 1000);
+    
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown download error';
+    console.error(`[Main] N-ATLAS Download Failed: ${message}`);
     nAtlasDownloadState = {
       inProgress: false,
-      progress: null,
+      progress: 0, // Reset to 0 instead of null to help UI
       error: message
     };
     clearNAtlasProgressBar();
     if (fs.existsSync(tempPath)) {
-      fs.unlinkSync(tempPath);
+      try { fs.unlinkSync(tempPath); } catch {}
     }
     return { success: false, error: message };
   }
@@ -233,9 +245,12 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    // In production, the executable is inside dist-electron/electron,
-    // so we need to go up two levels to reach the root dist folder.
-    mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+    // USE app.getAppPath() for absolute reliability in production
+    const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
+    mainWindow.loadFile(indexPath);
+    
+    // Optional: Keep devtools open in prod build for troubleshooting if needed
+    // mainWindow.webContents.openDevTools();
   }
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {

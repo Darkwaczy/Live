@@ -10,7 +10,9 @@ import {
   Trash2,
   ChevronDown,
   ArrowLeft,
-  Folder
+  Folder,
+  ArrowUpRight,
+  Link2
 } from 'lucide-react';
 import { useLiveState } from './hooks/useLiveState';
 import { LiveState } from './models/liveState';
@@ -1503,7 +1505,65 @@ export default function App() {
                    </div>
                 </div>
 
-                <div className="flex-1 bg-transparent border border-white/5 border-dashed rounded-3xl flex items-center justify-center relative"><p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/10 select-none">Expansion Zone</p></div>
+                {/* Feature 4: THE CROSS-REFERENCE EXPLORER (Expansion Zone) */}
+                <div className="flex-1 bg-(--bg-secondary)/40 border border-white/5 rounded-3xl flex flex-col overflow-hidden relative group">
+                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/2 shrink-0">
+                      <div className="flex items-center gap-2">
+                         <span className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg"><Link2 size={12} /></span>
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-300">Scriptural Context & Cross-Refs</span>
+                      </div>
+                      {crossRefs.length > 0 && <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">{crossRefs.length} References Found</span>}
+                   </div>
+                   
+                   <div className="flex-1 overflow-y-auto no-scrollbar p-6">
+                      {crossRefs.length === 0 ? (
+                         <div className="h-full flex flex-col items-center justify-center text-center px-10 opacity-10">
+                            <BookOpen size={48} className="text-white mb-4" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white">No Detection Active</p>
+                            <p className="text-[9px] font-medium text-gray-400 mt-2">Awaiting Bible verse detection to find related scriptures...</p>
+                         </div>
+                      ) : (
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {crossRefs.map((ref, idx) => (
+                               <div 
+                                 key={idx}
+                                 className="group/ref-card p-4 bg-black/40 hover:bg-white/5 border border-white/5 rounded-2xl flex flex-col gap-3 transition-all cursor-pointer"
+                                 onClick={() => {
+                                   setLiveState(s => ({
+                                     ...s,
+                                     preview_verse: { book: ref.book, chapter: ref.chapter, verse_start: ref.verse_start, verse_end: ref.verse_start }
+                                   }));
+                                   setActiveView('live');
+                                   showToast(`Staged: ${ref.book} ${ref.chapter}:${ref.verse_start}`);
+                                 }}
+                               >
+                                  <div className="flex items-center justify-between">
+                                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{ref.book} {ref.chapter}:{ref.verse_start}</span>
+                                     <ArrowUpRight size={12} className="text-gray-600 group-hover/ref-card:text-blue-400 transition-colors" />
+                                  </div>
+                                  <p className="text-[11px] text-gray-400 line-clamp-3 leading-relaxed italic group-hover/ref-card:text-gray-200 transition-colors">"{ref.text || 'Fetching related content...'}"</p>
+                                  <div className="flex items-center gap-1.5 opacity-0 group-hover/ref-card:opacity-100 transition-opacity">
+                                     <button className="flex-1 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg text-[8px] font-black uppercase tracking-widest">Preview</button>
+                                     <button 
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         directAir({
+                                           type: 'scripture',
+                                           content: ref.text,
+                                           reference: `${ref.book} ${ref.chapter}:${ref.verse_start}`
+                                         });
+                                       }}
+                                       className="flex-1 py-1.5 bg-blue-500 text-black rounded-lg text-[8px] font-black uppercase tracking-widest"
+                                     >
+                                       Air Now
+                                      </button>
+                                  </div>
+                               </div>
+                            ))}
+                         </div>
+                      )}
+                   </div>
+                </div>
 
                 {liveState.ticker_enabled && (liveState.ticker_items?.length ?? 0) > 0 && (
                   <div className="absolute bottom-0 left-0 right-0 h-10 bg-red-600/40 backdrop-blur-md border-t border-red-500/30 flex items-center overflow-hidden z-20">
@@ -1768,7 +1828,12 @@ export default function App() {
                                                       {item.songs.map((song, sIdx) => (
                                                          <div key={sIdx} className="flex gap-2">
                                                             <button 
-                                                               onClick={() => { loadSong(song); setRightPanelTab('lyrics'); showToast(`Loaded: ${song.title}`); }}
+                                                               onClick={() => { 
+                                                                  loadSong(song); 
+                                                                  setRightPanelTab('lyrics'); 
+                                                                  setActiveView('live');
+                                                                  showToast(`Loaded: ${song.title}`); 
+                                                               }}
                                                                className="flex-1 text-left bg-black/40 hover:bg-emerald-500/10 px-3 py-2 rounded-lg border border-white/5 shadow-inner flex items-center justify-between group/song transition-all"
                                                             >
                                                                <div className="flex items-center gap-2 min-w-0">
@@ -1804,7 +1869,14 @@ export default function App() {
                                                       {item.scriptures.map((scr, sIdx) => (
                                                          <div key={sIdx} className="flex gap-2">
                                                             <button 
-                                                               onClick={() => { setSelectedBook(scr.book); setSelectedChapter(scr.chapter); setPreviewVerse({ book: scr.book, chapter: scr.chapter, verse_start: scr.verse_start, verse_end: scr.verse_end || scr.verse_start }); setRightPanelTab('scriptures'); showToast(`Ready: ${scr.reference}`); }}
+                                                               onClick={() => { 
+                                                                  setSelectedBook(scr.book); 
+                                                                  setSelectedChapter(scr.chapter); 
+                                                                  setPreviewVerse({ book: scr.book, chapter: scr.chapter, verse_start: scr.verse_start, verse_end: scr.verse_end || scr.verse_start }); 
+                                                                  setRightPanelTab('scriptures'); 
+                                                                  setActiveView('live');
+                                                                  showToast(`Ready: ${scr.reference}`); 
+                                                               }}
                                                                className="flex-1 text-left bg-black/40 hover:bg-blue-500/10 px-3 py-2 rounded-lg border border-white/5 shadow-inner flex items-center justify-between group/scr transition-all"
                                                             >
                                                                <div className="flex items-center gap-2 min-w-0">
@@ -1840,7 +1912,12 @@ export default function App() {
                                                       {item.mediaItems.map((med, sIdx) => (
                                                          <div key={sIdx} className="flex gap-2">
                                                             <button 
-                                                               onClick={() => { setLiveState((s: any) => ({ ...s, current_media: { type: med.type, url: med.url }, updated_at: new Date().toISOString() })); setRightPanelTab('broadcast'); showToast(`Playing: ${med.name}`); }}
+                                                               onClick={() => { 
+                                                                  setLiveState((s: any) => ({ ...s, preview_media: med.url, updated_at: new Date().toISOString() })); 
+                                                                  setRightPanelTab('broadcast'); 
+                                                                  setActiveView('live');
+                                                                  showToast(`Staged: ${med.name}`); 
+                                                               }}
                                                                className="flex-1 text-left bg-black/40 hover:bg-purple-500/10 px-3 py-2 rounded-lg border border-white/5 shadow-inner flex items-center justify-between group/med transition-all"
                                                             >
                                                                <div className="flex items-center gap-2 min-w-0">
@@ -1878,17 +1955,11 @@ export default function App() {
                                                                   setLiveState((s: any) => ({ 
                                                                      ...s, 
                                                                      preview_text: txt.content, 
-                                                                     current_text: txt.content,
-                                                                     preview_verse: null,
-                                                                     preview_verse_text: null,
-                                                                     current_verse: null,
-                                                                     current_verse_text: null,
-                                                                     current_lyric_line: null,
-                                                                     preview_lyric_line: null,
                                                                      updated_at: new Date().toISOString() 
                                                                   })); 
                                                                   setRightPanelTab('broadcast'); 
-                                                                  showToast(`Airing: ${txt.title}`); 
+                                                                  setActiveView('live');
+                                                                  showToast(`Staged: ${txt.title}`); 
                                                                }}
                                                                className="flex-1 text-left bg-black/40 hover:bg-emerald-500/10 px-3 py-2.5 rounded-xl border border-white/5 shadow-inner flex items-center justify-between group/txt transition-all"
                                                             >
