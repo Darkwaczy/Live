@@ -9,6 +9,7 @@ exports.default = (0, vite_1.defineConfig)({
     plugins: [(0, plugin_react_1.default)()],
     server: {
         port: 5173,
+        strictPort: true,
         watch: {
             usePolling: true
         },

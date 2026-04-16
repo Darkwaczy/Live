@@ -9,8 +9,7 @@ const path_1 = __importDefault(require("path"));
 const isDev = process.env.NODE_ENV !== 'production';
 class SidecarManager {
     constructor() {
-        this.pythonProcess = null;
-        this.port = 5003;
+        this.processes = new Map();
     }
     static getInstance() {
         if (!SidecarManager.instance) {
@@ -18,67 +17,83 @@ class SidecarManager {
         }
         return SidecarManager.instance;
     }
-    async start() {
-        if (this.pythonProcess) {
-            console.log('[Sidecar] N-ATLAS is already running.');
+    async startAll() {
+        const sidecars = [
+            {
+                name: 'N-ATLAS',
+                port: 5003,
+                script: 'n_atlas_service.py',
+                binary: 'n-atlas-service.exe',
+                args: ['--model-dir', this.getModelDir()]
+            },
+            {
+                name: 'NDI-Broadcast',
+                port: 5004,
+                script: 'ndi_broadcast_service.py',
+                binary: 'ndi-broadcast-service.exe'
+            }
+        ];
+        for (const config of sidecars) {
+            this.startSidecar(config);
+        }
+    }
+    startSidecar(config) {
+        if (this.processes.has(config.name)) {
+            console.log(`[Sidecar] ${config.name} is already running.`);
             return;
         }
-        const { pythonPath, scriptPath, modelDir } = this.getPaths();
-        console.log(`[Sidecar] Starting N-ATLAS on port ${this.port}...`);
-        console.log(`[Sidecar] Execution Path: ${pythonPath}`);
-        console.log(`[Sidecar] Model Directory: ${modelDir}`);
-        this.pythonProcess = (0, child_process_1.spawn)(pythonPath, [
-            scriptPath,
-            '--port', this.port.toString(),
-            '--model-dir', modelDir
-        ], {
-            env: { ...process.env }
+        const { execPath, scriptArg } = this.getPaths(config);
+        const args = scriptArg ? [scriptArg] : [];
+        args.push('--port', config.port.toString());
+        if (config.args)
+            args.push(...config.args);
+        console.log(`[Sidecar] Starting ${config.name} on port ${config.port}...`);
+        // On Windows, spawn handles spaces in paths correctly IF shell: false is used.
+        const proc = (0, child_process_1.spawn)(execPath, args, {
+            env: { ...process.env },
+            shell: false
         });
-        this.pythonProcess.stdout?.on('data', (data) => {
-            console.log(`[N-ATLAS Service] ${data.toString().trim()}`);
+        proc.stdout?.on('data', (data) => {
+            console.log(`[${config.name}] ${data.toString().trim()}`);
         });
-        this.pythonProcess.stderr?.on('data', (data) => {
+        proc.stderr?.on('data', (data) => {
             const msg = data.toString().trim();
             if (msg.toLowerCase().includes('error')) {
-                console.error(`[N-ATLAS Error] ${msg}`);
+                console.error(`[${config.name} Error] ${msg}`);
             }
             else {
-                console.log(`[N-ATLAS Log] ${msg}`);
+                console.log(`[${config.name} Log] ${msg}`);
             }
         });
-        this.pythonProcess.on('close', (code) => {
-            console.log(`[Sidecar] N-ATLAS process exited with code ${code}`);
-            this.pythonProcess = null;
+        proc.on('close', (code) => {
+            console.log(`[Sidecar] ${config.name} process exited with code ${code}`);
+            this.processes.delete(config.name);
         });
-        // We don't wait for loading here as it takes ~20s. 
-        // The frontend handles health checks.
+        this.processes.set(config.name, proc);
     }
-    stop() {
-        if (this.pythonProcess) {
-            console.log('[Sidecar] Stopping N-ATLAS...');
-            this.pythonProcess.kill();
-            this.pythonProcess = null;
+    stopAll() {
+        for (const [name, proc] of this.processes.entries()) {
+            console.log(`[Sidecar] Stopping ${name}...`);
+            proc.kill();
         }
+        this.processes.clear();
     }
-    getPaths() {
-        let pythonPath;
-        let scriptPath;
-        let modelDir;
+    getModelDir() {
+        return isDev
+            ? path_1.default.join(process.cwd(), 'services', 'model_cache')
+            : path_1.default.join(process.resourcesPath, 'model_cache');
+    }
+    getPaths(config) {
+        let execPath;
+        let scriptArg = null;
         if (isDev) {
-            // In development, use the local .venv and script
-            pythonPath = path_1.default.join(process.cwd(), '.venv', 'Scripts', 'python.exe');
-            scriptPath = path_1.default.join(process.cwd(), 'services', 'n_atlas_service.py');
-            modelDir = path_1.default.join(process.cwd(), 'services', 'model_cache');
+            execPath = path_1.default.join(process.cwd(), '.venv', 'Scripts', 'python.exe');
+            scriptArg = path_1.default.join(process.cwd(), 'services', config.script);
         }
         else {
-            // In production, everything is in the resources folder
-            const resourcesPath = process.resourcesPath;
-            pythonPath = path_1.default.join(resourcesPath, 'bin', 'n-atlas-service.exe');
-            scriptPath = '';
-            // In production, the model_cache is an extraResource
-            modelDir = path_1.default.join(resourcesPath, 'model_cache');
+            execPath = path_1.default.join(process.resourcesPath, 'bin', config.binary);
         }
-        return { pythonPath, scriptPath, modelDir };
+        return { execPath, scriptArg };
     }
 }
 exports.SidecarManager = SidecarManager;

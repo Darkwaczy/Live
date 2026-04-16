@@ -37,6 +37,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
+const child_process_1 = require("child_process");
+const util_1 = require("util");
+const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const db = __importStar(require("./db.js"));
 const bibleDb = __importStar(require("./bibleDb.js"));
@@ -59,7 +62,7 @@ function createWindow() {
     });
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173');
-        // mainWindow.webContents.openDevTools();
+        mainWindow.webContents.openDevTools();
     }
     else {
         // In production, the executable is inside dist-electron/electron,
@@ -73,9 +76,9 @@ function createWindow() {
 }
 electron_1.app.on('ready', () => {
     createWindow();
-    // Start the N-ATLAS sidecar
-    sidecar_js_1.SidecarManager.getInstance().start().catch(err => {
-        console.error('[Main] Failed to start N-ATLAS sidecar:', err);
+    // Start all sidecars (N-ATLAS and NDI Broadcast)
+    sidecar_js_1.SidecarManager.getInstance().startAll().catch(err => {
+        console.error('[Main] Failed to start sidecars:', err);
     });
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0)
@@ -88,7 +91,7 @@ electron_1.app.on('window-all-closed', () => {
     }
 });
 electron_1.app.on('will-quit', () => {
-    sidecar_js_1.SidecarManager.getInstance().stop();
+    sidecar_js_1.SidecarManager.getInstance().stopAll();
 });
 electron_1.ipcMain.handle('app:get-version', async () => {
     return electron_1.app.getVersion();
@@ -170,5 +173,30 @@ electron_1.ipcMain.handle('app:open-projector', async () => {
 });
 electron_1.ipcMain.handle('app:get-projector-status', async () => {
     return !!projectorWindow;
+});
+const execAsync = (0, util_1.promisify)(child_process_1.exec);
+electron_1.ipcMain.handle('app:check-ndi-runtime', async () => {
+    // Common paths for NDI 5/6 Runtime
+    const paths = [
+        'C:\\Windows\\System32\\Processing.NDI.Lib.x64.dll',
+        'C:\\Program Files\\NDI\\NDI 5 Runtime\\v5\\Processing.NDI.Lib.x64.dll',
+        'C:\\Program Files\\NDI\\NDI 6 Runtime\\v6\\Processing.NDI.Lib.x64.dll'
+    ];
+    return paths.some(p => fs_1.default.existsSync(p));
+});
+electron_1.ipcMain.handle('app:install-ndi-runtime', async () => {
+    try {
+        // Try winget first as it's the most reliable "silent" way on Windows
+        // ID for NDI Runtime is often NewTek.NDI
+        console.log('[Main] Attempting NDI install via winget...');
+        await execAsync('winget install --id NewTek.NDI -e --source winget --accept-package-agreements --accept-source-agreements');
+        return { success: true };
+    }
+    catch (error) {
+        console.error('[Main] Winget install failed, opening direct download link', error);
+        // Fallback: Open the NDI download page
+        electron_1.shell.openExternal('https://ndi.video/download-ndi/');
+        return { success: false, manual: true };
+    }
 });
 // Placeholder: could forward system settings, persistence API, offline sync and audio device info.

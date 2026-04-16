@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('sermonSync', {
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   openProjector: () => ipcRenderer.invoke('app:open-projector'),
   getProjectorStatus: () => ipcRenderer.invoke('app:get-projector-status'),
+  checkNDIRuntime: () => ipcRenderer.invoke('app:check-ndi-runtime'),
+  installNDIRuntime: () => ipcRenderer.invoke('app:install-ndi-runtime'),
   onProjectorStatus: (callback: (isActive: boolean) => void) => {
     ipcRenderer.on('projector-status-changed', (_event, isActive) => callback(isActive));
   },

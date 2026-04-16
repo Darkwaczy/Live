@@ -1,4 +1,7 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
 import path from 'path';
 import * as db from './db.js';
 import * as bibleDb from './bibleDb.js';
@@ -44,9 +47,9 @@ function createWindow() {
 app.on('ready', () => {
   createWindow();
   
-  // Start the N-ATLAS sidecar
-  SidecarManager.getInstance().start().catch(err => {
-    console.error('[Main] Failed to start N-ATLAS sidecar:', err);
+  // Start all sidecars (N-ATLAS and NDI Broadcast)
+  SidecarManager.getInstance().startAll().catch(err => {
+    console.error('[Main] Failed to start sidecars:', err);
   });
 
   app.on('activate', () => {
@@ -61,7 +64,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-  SidecarManager.getInstance().stop();
+  SidecarManager.getInstance().stopAll();
 });
 
 ipcMain.handle('app:get-version', async () => {
@@ -161,6 +164,34 @@ ipcMain.handle('app:open-projector', async () => {
 
 ipcMain.handle('app:get-projector-status', async () => {
   return !!projectorWindow;
+});
+
+const execAsync = promisify(exec);
+
+ipcMain.handle('app:check-ndi-runtime', async () => {
+  // Common paths for NDI 5/6 Runtime
+  const paths = [
+    'C:\\Windows\\System32\\Processing.NDI.Lib.x64.dll',
+    'C:\\Program Files\\NDI\\NDI 5 Runtime\\v5\\Processing.NDI.Lib.x64.dll',
+    'C:\\Program Files\\NDI\\NDI 6 Runtime\\v6\\Processing.NDI.Lib.x64.dll'
+  ];
+  
+  return paths.some(p => fs.existsSync(p));
+});
+
+ipcMain.handle('app:install-ndi-runtime', async () => {
+  try {
+    // Try winget first as it's the most reliable "silent" way on Windows
+    // ID for NDI Runtime is often NewTek.NDI
+    console.log('[Main] Attempting NDI install via winget...');
+    await execAsync('winget install --id NewTek.NDI -e --source winget --accept-package-agreements --accept-source-agreements');
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Winget install failed, opening direct download link', error);
+    // Fallback: Open the NDI download page
+    shell.openExternal('https://ndi.video/download-ndi/');
+    return { success: false, manual: true };
+  }
 });
 
 

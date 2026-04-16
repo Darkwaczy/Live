@@ -1,10 +1,11 @@
 export declare class SidecarManager {
     private static instance;
-    private pythonProcess;
-    private port;
+    private processes;
     private constructor();
     static getInstance(): SidecarManager;
-    start(): Promise<void>;
-    stop(): void;
+    startAll(): Promise<void>;
+    private startSidecar;
+    stopAll(): void;
+    private getModelDir;
     private getPaths;
 }

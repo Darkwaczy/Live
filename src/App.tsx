@@ -27,6 +27,7 @@ import {
 import { loadEssentialLyrics, searchLyrics, addPastedSong, setInitialPastedSongs } from './services/lyricsService';
 import { Song } from './models/song';
 import SettingsView from './components/SettingsView';
+import { BroadcastService } from './services/broadcastService';
 
 const SESSION_ID = 'service-001';
 
@@ -433,6 +434,13 @@ export default function App() {
       setLiveState((s: any) => ({ ...s, preview_lyric_line: null, preview_lyric_index: undefined }));
     }
   }, [liveState.preview_lyric_index, liveState.preview_lyric_line, currentSong]);
+
+  // Sync state to NDI Broadcast Sidecar
+  useEffect(() => {
+    if (settings.speechEngine === 'n-atlas' || settings.speechEngine === 'deepgram' || settings.detectVerses) {
+      BroadcastService.updateNDI(liveState, true);
+    }
+  }, [liveState, settings.speechEngine, settings.detectVerses]);
 
   // Helpers for transcription column
   const sentences = useMemo(() => {
@@ -980,7 +988,7 @@ export default function App() {
 
         {/* Top Navbar */}
         <header className="h-[72px] flex items-center justify-between px-6 border-b border-(--border-color) bg-transparent z-10 shrink-0 transition-colors gap-4 overflow-hidden">
-          <div className="flex items-center gap-6 flex-shrink-0">
+          <div className="flex items-center gap-6 shrink-0">
             <div className={`flex items-center gap-2 rounded-md px-2.5 py-1 transition-colors ${isOnline ? 'bg-emerald-500' : 'bg-gray-600'}`} title={isOnline ? "Connected to the Internet" : "Offline / Local Mode"}>
               <div className={`w-1.5 h-1.5 rounded-full bg-white ${isOnline ? 'animate-pulse' : ''}`}></div>
               <span className="text-[11px] font-bold text-white tracking-widest uppercase">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
@@ -1004,7 +1012,7 @@ export default function App() {
           </div>
 
           {/* MASTER CENTERED HARDWARE SWITCHER */}
-          <div className="flex items-center gap-0.5 bg-[#1a1a1c]/60 backdrop-blur-md p-0.5 rounded-lg border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)] scale-90 lg:scale-100 flex-shrink-0 mx-auto">
+          <div className="flex items-center gap-0.5 bg-[#1a1a1c]/60 backdrop-blur-md p-0.5 rounded-lg border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)] scale-90 lg:scale-100 shrink-0 mx-auto">
             <button 
               onClick={clearText}
               className="px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all text-gray-500 hover:text-white hover:bg-white/5 active:bg-white/10 flex items-center gap-1.5"
@@ -1037,7 +1045,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="flex items-center gap-3 lg:gap-6 flex-shrink-0">
+          <div className="flex items-center gap-3 lg:gap-6 shrink-0">
             <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium text-gray-400 h-full">
               <button 
                 onClick={() => { setRightPanelTab('schedule'); setIsRightPanelOpen(true); }}
@@ -1068,13 +1076,6 @@ export default function App() {
             <div className="w-px h-6 bg-gray-700/50 mx-2 hidden lg:block"></div>
 
             <div className="flex items-center gap-4 text-gray-400">
-              <button 
-                onClick={() => { setRightPanelTab('broadcast'); setIsRightPanelOpen(true); }} 
-                className={`p-2 transition-colors ${rightPanelTab === 'broadcast' && isRightPanelOpen ? 'text-(--accent-color) bg-white/10 rounded-lg' : 'hover:text-white'}`}
-                title="Broadcast Controls"
-              >
-                <Radio size={20} className={rightPanelTab === 'broadcast' && isRightPanelOpen ? 'animate-pulse' : ''} />
-              </button>
               
               <button 
                 onClick={async () => {

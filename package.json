@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "start:sync-server": "ts-node --transpile-only socket-server.ts",
     "download:model": ".venv\\Scripts\\python services/download_model.py",
-    "build:sidecar": ".venv\\Scripts\\pyinstaller --onefile --name n-atlas-service --distpath bin services/n_atlas_service.py"
+    "build:sidecar": ".venv\\Scripts\\pyinstaller --onefile --name n-atlas-service --distpath bin services/n_atlas_service.py && .venv\\Scripts\\pyinstaller --onefile --name ndi-broadcast-service --distpath bin services/ndi_broadcast_service.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",
@@ -78,6 +78,10 @@
       {
         "from": "bin/n-atlas-service.exe",
         "to": "bin/n-atlas-service.exe"
+      },
+      {
+        "from": "bin/ndi-broadcast-service.exe",
+        "to": "bin/ndi-broadcast-service.exe"
       },
       {
         "from": "node_modules/sql.js/dist/sql-wasm.wasm",
