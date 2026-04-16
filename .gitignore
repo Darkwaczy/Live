@@ -1,9 +1,14 @@
 # Electron / Build output - NEVER commit these
 dist/
+dist-electron/
 win-unpacked/
 out/
 build/
 release/
+.pyinstaller-build/
+sidecar-dist/
+*.tsbuildinfo
+*.spec
 
 # Large binary files
 *.pak
