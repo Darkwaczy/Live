@@ -1,13 +1,13 @@
 {
   "name": "sermonsync",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SermonSync: AI-powered Sermon Transcription and Bible Tagging.",
   "private": true,
   "main": "dist-electron/electron/main.js",
   "author": "SermonSync Team",
   "license": "MIT",
   "sermonSync": {
-    "nAtlasDownloadUrl": ""
+    "nAtlasDownloadUrl": "https://github.com/Darkwaczy/Live/releases/latest/download/n-atlas-service.exe"
   },
   "scripts": {
     "dev": "concurrently \"npm:dev:electron\" \"npm:dev:react\"",
@@ -71,7 +71,12 @@
   "build": {
     "appId": "com.sermonsync.app",
     "productName": "SermonSync",
-    "compression": "normal",
+    "copyright": "Copyright © 2026 SermonSync Team",
+    "compression": "maximum",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
     "files": [
       "dist/index.html",
       "dist/assets/**",
@@ -97,23 +102,24 @@
         "to": "bible-temp.db"
       }
     ],
-    "directories": {
-      "buildResources": "build",
-      "output": "release"
-    },
     "win": {
       "target": [
         "nsis"
       ],
-      "publisherName": "SermonSync",
+      "icon": "build/icon.png",
+      "publisherName": "SermonSync Team",
       "cscLink": null,
       "forceCodeSigning": false
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": true,
       "allowElevation": true,
-      "allowToChangeInstallationDirectory": false
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.png",
+      "uninstallerIcon": "build/icon.png",
+      "createDesktopShortcut": true,
+      "runAfterFinish": true
     }
   }
 }

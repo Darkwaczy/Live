@@ -14,7 +14,7 @@ const isDev = !app.isPackaged;
 const execAsync = promisify(exec);
 const appStore = new Store();
 const N_ATLAS_BINARY_NAME = 'n-atlas-service.exe';
-const N_ATLAS_PROMPT_VERSION_KEY = 'nAtlas.promptDismissedForVersion';
+const N_ATLAS_AUTO_INSTALL_VERSION_KEY = 'nAtlas.autoInstallAttemptedForVersion';
 
 type NAtlasDownloadState = {
   inProgress: boolean;
@@ -186,52 +186,31 @@ async function installNAtlasAddon(): Promise<{ success: boolean; error?: string 
   }
 }
 
-async function promptForNAtlasDownload() {
+async function autoInstallNAtlasIfNeeded() {
   if (isDev || !mainWindow || isNAtlasInstalled()) return;
 
   const downloadUrl = getConfiguredNAtlasDownloadUrl();
   if (!downloadUrl) {
-    console.warn('[Main] N-ATLAS prompt skipped because no download URL is configured.');
+    console.warn('[Main] N-ATLAS auto-install skipped because no download URL is configured.');
     return;
   }
 
-  const dismissedForVersion = appStore.get(N_ATLAS_PROMPT_VERSION_KEY);
-  if (dismissedForVersion === app.getVersion()) {
+  const attemptedForVersion = appStore.get(N_ATLAS_AUTO_INSTALL_VERSION_KEY);
+  if (attemptedForVersion === app.getVersion()) {
     return;
   }
-
-  const { response } = await dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    buttons: ['Download N-ATLAS', 'Later'],
-    defaultId: 0,
-    cancelId: 1,
-    title: 'Install N-ATLAS',
-    message: 'N-ATLAS is available as an optional add-on.',
-    detail:
-      'Download the Nigerian English offline transcription engine now? You can still use SermonSync without it, and install it later.',
-    noLink: true
-  });
-
-  if (response !== 0) {
-    appStore.set(N_ATLAS_PROMPT_VERSION_KEY, app.getVersion());
-    return;
-  }
+  appStore.set(N_ATLAS_AUTO_INSTALL_VERSION_KEY, app.getVersion());
 
   const result = await installNAtlasAddon();
   if (result.success) {
-    appStore.delete(N_ATLAS_PROMPT_VERSION_KEY);
-    await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'N-ATLAS Installed',
-      message: 'N-ATLAS was downloaded successfully.',
-      detail: 'The local Nigerian English transcription engine is now ready to use.'
-    });
+    console.log('[Main] N-ATLAS add-on downloaded successfully.');
   } else {
+    console.error('[Main] N-ATLAS auto-install failed:', result.error);
     await dialog.showMessageBox(mainWindow, {
-      type: 'error',
-      title: 'N-ATLAS Download Failed',
-      message: 'SermonSync could not download N-ATLAS.',
-      detail: result.error || 'Unknown download error.'
+      type: 'warning',
+      title: 'N-ATLAS Could Not Be Installed Automatically',
+      message: 'SermonSync could not finish the N-ATLAS setup in the background.',
+      detail: `${result.error || 'Unknown download error.'}\n\nYou can retry from Settings > AI & Detection.`
     });
   }
 }
@@ -250,24 +229,21 @@ function createWindow() {
     }
   });
 
-
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    // mainWindow.webContents.openDevTools();
+    mainWindow.webContents.openDevTools();
   } else {
     // In production, the executable is inside dist-electron/electron,
     // so we need to go up two levels to reach the root dist folder.
     mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Electron] Page failed to load: ${validatedURL} [${errorCode}] ${errorDescription}`);
   });
 
-  mainWindow.webContents.once('did-finish-load', () => {
-    promptForNAtlasDownload().catch((error) => {
-      console.error('[Main] Failed to prompt for N-ATLAS download', error);
-    });
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error(`[Electron] Renderer process gone: ${details.reason} (${details.exitCode})`);
   });
 
   return mainWindow;

@@ -115,6 +115,10 @@ export default function App() {
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('notes');
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Live Paste Lyrics Modal
+  const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pasteTitle, setPasteTitle] = useState('');
+  const [pasteLyrics, setPasteLyrics] = useState('');
   const [isProjector, setProjector] = useState(false);
   const [projectionRole, setProjectionRole] = useState<'audience' | 'stage'>('audience');
   const [manualLineOffset, setManualLineOffset] = useState(0);
@@ -186,7 +190,23 @@ export default function App() {
     if ((window as any).sermonSync?.onProjectorStatus) {
       (window as any).sermonSync.onProjectorStatus(setIsProjectorActive);
     }
-  }, []);
+
+    // --- OPTION 2: Silent N-ATLAS Background Download ---
+    const triggerSilentAutoInstall = async () => {
+      if (settings.speechEngine === 'n-atlas' && (window as any).sermonSync?.getNAtlasStatus) {
+        try {
+          const status = await (window as any).sermonSync.getNAtlasStatus();
+          if (!status.installed && !status.inProgress && (window as any).sermonSync.installNAtlas) {
+            console.log("N-ATLAS: Starting silent background download...");
+            await (window as any).sermonSync.installNAtlas();
+          }
+        } catch (e) {
+          console.warn("N-ATLAS Auto-install check failed:", e);
+        }
+      }
+    };
+    triggerSilentAutoInstall();
+  }, [settings.speechEngine]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -2380,30 +2400,81 @@ export default function App() {
                     <div className="flex items-center justify-between">
                        <h3 className="text-white font-bold text-lg">Worship Lyrics</h3>
                        <button 
-                         onClick={() => {
-                            const title = prompt("Song title:");
-                            if (!title) return;
-                            const p = prompt(`Paste lyrics for "${title}" (each line will be a slide):`);
-                            if (p) {
-                              const lines = p.split('\n').filter(l => l.trim().length > 0);
-                              const newId = `pasted-${Date.now()}`;
-                              const newSong: Song = {
-                                id: newId,
-                                title: title.trim(),
-                                artist: 'Operator',
-                                lyrics: lines.map((l, i) => ({ order: i, line: l.trim() }))
-                              };
-                              addPastedSong(newSong);
-                              savePastedSong(newSong);
-                              setLyricSearchResults(prev => [newSong, ...prev]);
-                              loadSong(newSong);
-                              showToast(`"${title}" loaded & ready!`);
-                            }
-                          }}
+                         onClick={() => { setPasteTitle(''); setPasteLyrics(''); setShowPasteModal(true); }}
                          className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 px-2 py-1 rounded-md"
                        >
                          Live Paste
                        </button>
+
+                     {/* Live Paste Modal */}
+                     {showPasteModal && (
+                       <div className="fixed inset-0 z-200 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                         <div className="bg-[#131313] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden">
+                           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                             <h3 className="text-white font-black text-base flex items-center gap-2"><Music size={16} className="text-emerald-400" /> Live Paste Lyrics</h3>
+                             <button onClick={() => setShowPasteModal(false)} className="text-gray-500 hover:text-white transition-colors"><X size={18} /></button>
+                           </div>
+                           <div className="p-6 flex flex-col gap-4">
+                             <div className="flex flex-col gap-1.5">
+                               <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Song Title</label>
+                               <input
+                                 autoFocus
+                                 type="text"
+                                 value={pasteTitle}
+                                 onChange={e => setPasteTitle(e.target.value)}
+                                 placeholder="e.g. Amazing Grace"
+                                 className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all"
+                               />
+                             </div>
+                             <div className="flex flex-col gap-1.5">
+                               <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Lyrics — one line per slide</label>
+                               <textarea
+                                 value={pasteLyrics}
+                                 onChange={e => setPasteLyrics(e.target.value)}
+                                 placeholder={`Amazing grace how sweet the sound\nThat saved a wretch like me\nI once was lost but now am found`}
+                                 rows={10}
+                                 className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all resize-none font-mono leading-relaxed"
+                               />
+                             </div>
+                           </div>
+                           <div className="flex gap-3 px-6 pb-6">
+                             <button
+                               onClick={() => setShowPasteModal(false)}
+                               className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 font-black text-[11px] uppercase tracking-widest transition-all"
+                             >
+                               Cancel
+                             </button>
+                             <button
+                               onClick={() => {
+                                 const title = pasteTitle.trim();
+                                 const lyrics = pasteLyrics.trim();
+                                 if (!title || !lyrics) return;
+                                 const lines = lyrics.split('\n').filter(l => l.trim().length > 0);
+                                 const newId = `pasted-${Date.now()}`;
+                                 const newSong: Song = {
+                                   id: newId,
+                                   title,
+                                   artist: 'Operator',
+                                   lyrics: lines.map((l, i) => ({ order: i, line: l.trim() }))
+                                 };
+                                 addPastedSong(newSong);
+                                 savePastedSong(newSong);
+                                 setLyricSearchResults(prev => [newSong, ...prev]);
+                                 loadSong(newSong);
+                                 setShowPasteModal(false);
+                                 setPasteTitle('');
+                                 setPasteLyrics('');
+                                 showToast(`"${title}" loaded & ready!`);
+                               }}
+                               className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-40 disabled:pointer-events-none"
+                               disabled={!pasteTitle.trim() || !pasteLyrics.trim()}
+                             >
+                               Load Song
+                             </button>
+                           </div>
+                         </div>
+                       </div>
+                     )}
                     </div>
 
                     {/* SEARCH BAR */}
