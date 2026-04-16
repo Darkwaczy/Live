@@ -3,11 +3,14 @@ import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
 
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = !app.isPackaged;
 
 // The database is stored in the userData folder so it persists across updates in production
 const userDataPath = app.getPath('userData');
 const dbPath = path.join(userDataPath, 'bible.db');
+const seedDbPath = isDev
+  ? path.join(__dirname, '..', 'bible-temp.db')
+  : path.join(process.resourcesPath, 'bible-temp.db');
 
 let db: any = null;
 let SQL: any = null;
@@ -32,9 +35,8 @@ async function initDb() {
   if (!db) {
     // If the database doesn't exist in userData yet, copy the pre-built one
     if (!fs.existsSync(dbPath)) {
-      const devTempPath = path.join(__dirname, '..', 'bible-temp.db');
-      if (fs.existsSync(devTempPath)) {
-         fs.copyFileSync(devTempPath, dbPath);
+      if (fs.existsSync(seedDbPath)) {
+         fs.copyFileSync(seedDbPath, dbPath);
          console.log('Installed newly compiled bible-temp.db into user AppData folder.');
       }
     }

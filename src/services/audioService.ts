@@ -599,7 +599,7 @@ export class AudioService {
       const isHealthy = await this.nAtlasClient.healthCheck();
       if (!isHealthy) {
         this.config.onError?.(new Error(
-          "N-ATLAS service is not running. Please start it with: docker-compose up -d n-atlas"
+          "N-ATLAS is not installed or not running yet. Use the in-app N-ATLAS download prompt, then try again."
         ));
         return;
       }

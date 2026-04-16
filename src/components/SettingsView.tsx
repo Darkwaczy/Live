@@ -6,6 +6,21 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
   const [activeTab, setActiveTab] = useState<'audio' | 'ai' | 'display' | 'data' | 'notifications'>('audio');
   const [isTestingAudio, setIsTestingAudio] = useState(false);
   const [ndiStatus, setNdiStatus] = useState<{ installed: boolean; loading: boolean }>({ installed: true, loading: false });
+  const [nAtlasStatus, setNAtlasStatus] = useState<{
+    installed: boolean;
+    downloadConfigured: boolean;
+    inProgress: boolean;
+    progress: number | null;
+    error: string | null;
+    loading: boolean;
+  }>({
+    installed: false,
+    downloadConfigured: false,
+    inProgress: false,
+    progress: null,
+    error: null,
+    loading: false
+  });
 
   const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (b: boolean) => void }) => (
     <div 
@@ -26,6 +41,46 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
     }
   }, [activeTab]);
 
+  React.useEffect(() => {
+    if (activeTab !== 'ai' || !window.sermonSync?.getNAtlasStatus) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const refreshStatus = async (showLoading = false) => {
+      if (showLoading) {
+        setNAtlasStatus((s) => ({ ...s, loading: true }));
+      }
+
+      try {
+        const status = await window.sermonSync!.getNAtlasStatus();
+        if (!cancelled) {
+          setNAtlasStatus({
+            ...status,
+            loading: false
+          });
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setNAtlasStatus((s) => ({
+            ...s,
+            loading: false,
+            error: error?.message || 'Could not check N-ATLAS status.'
+          }));
+        }
+      }
+    };
+
+    refreshStatus(true);
+    const interval = window.setInterval(() => refreshStatus(false), 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeTab]);
+
   const handleInstallNDI = async () => {
     setNdiStatus(s => ({ ...s, loading: true }));
     try {
@@ -35,6 +90,32 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
       setNdiStatus({ installed, loading: false });
     } catch (e) {
       setNdiStatus(s => ({ ...s, loading: false }));
+    }
+  };
+
+  const handleInstallNAtlas = async () => {
+    if (!window.sermonSync?.installNAtlas || !window.sermonSync?.getNAtlasStatus) return;
+
+    setNAtlasStatus((s) => ({
+      ...s,
+      loading: true,
+      error: null
+    }));
+
+    try {
+      const result = await window.sermonSync.installNAtlas();
+      const status = await window.sermonSync.getNAtlasStatus();
+      setNAtlasStatus({
+        ...status,
+        loading: false,
+        error: result.success ? null : result.error || status.error
+      });
+    } catch (error: any) {
+      setNAtlasStatus((s) => ({
+        ...s,
+        loading: false,
+        error: error?.message || 'Could not install N-ATLAS.'
+      }));
     }
   };
 
@@ -148,6 +229,67 @@ export default function SettingsView({ settings, onUpdate, onSave }: any) {
                         <option value="deepgram">Deepgram Nova Cloud API</option>
                         <option value="whisper">OpenAI Whisper Cloud (Paid, Best Accuracy)</option>
                       </select>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/5 bg-[#1e1e1e] p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h4 className="text-white font-medium">N-ATLAS Add-on</h4>
+                          <p className="text-sm text-gray-400">
+                            Install or retry the Nigerian English offline engine after the main app setup.
+                          </p>
+                        </div>
+                        <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full ${
+                          nAtlasStatus.installed
+                            ? 'bg-emerald-500/15 text-emerald-400'
+                            : nAtlasStatus.inProgress
+                              ? 'bg-amber-500/15 text-amber-400'
+                              : 'bg-white/5 text-gray-400'
+                        }`}>
+                          {nAtlasStatus.installed ? 'Installed' : nAtlasStatus.inProgress ? 'Downloading' : 'Not Installed'}
+                        </span>
+                      </div>
+
+                      <div className="text-sm text-gray-300 space-y-1">
+                        {nAtlasStatus.downloadConfigured ? (
+                          <p>
+                            {nAtlasStatus.inProgress && nAtlasStatus.progress !== null
+                              ? `Download in progress: ${nAtlasStatus.progress}%`
+                              : nAtlasStatus.installed
+                                ? 'N-ATLAS is ready for offline Nigerian English transcription.'
+                                : 'N-ATLAS is optional. Install it when you want the offline local engine.'}
+                          </p>
+                        ) : (
+                          <p className="text-amber-400">
+                            N-ATLAS download is not configured in this build yet.
+                          </p>
+                        )}
+                        {nAtlasStatus.error && (
+                          <p className="text-rose-400">{nAtlasStatus.error}</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={handleInstallNAtlas}
+                          disabled={
+                            nAtlasStatus.loading ||
+                            nAtlasStatus.inProgress ||
+                            !nAtlasStatus.downloadConfigured
+                          }
+                          className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-500/30 disabled:text-white/60 text-black px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all"
+                        >
+                          {nAtlasStatus.inProgress
+                            ? 'Downloading N-ATLAS...'
+                            : nAtlasStatus.installed
+                              ? 'Reinstall N-ATLAS'
+                              : 'Install N-ATLAS'}
+                        </button>
+
+                        {nAtlasStatus.loading && !nAtlasStatus.inProgress && (
+                          <span className="text-sm text-gray-400">Checking status...</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

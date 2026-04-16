@@ -9,6 +9,10 @@ from flask_cors import CORS
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
+# Logging setup
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logger = logging.getLogger(__name__)
+
 try:
     # We use cyndilib for professional network broadcast output.
     # The IDE might show a warning if the virtual environment is not selected.
@@ -18,9 +22,6 @@ except ImportError:
     logger.error("   Run: .venv\\Scripts\\pip install cyndilib")
     sys.exit(1)
 
-# Logging setup
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)

@@ -4,6 +4,14 @@ declare global {
   interface Window {
     sermonSync?: {
       getAppVersion: () => Promise<string>;
+      getNAtlasStatus: () => Promise<{
+        installed: boolean;
+        downloadConfigured: boolean;
+        inProgress: boolean;
+        progress: number | null;
+        error: string | null;
+      }>;
+      installNAtlas: () => Promise<{ success: boolean; error?: string }>;
       send: (channel: string, data: any) => void;
       on: (channel: string, callback: (event: any, value: any) => void) => void;
       db?: {

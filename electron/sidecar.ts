@@ -1,8 +1,9 @@
 import { ChildProcess, spawn } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
 
-const isDev = process.env.NODE_ENV !== 'production';
+const isDev = !app.isPackaged;
 
 interface SidecarConfig {
   name: string;
@@ -59,6 +60,11 @@ export class SidecarManager {
     args.push('--port', config.port.toString());
     if (config.args) args.push(...config.args);
 
+    if (!fs.existsSync(execPath)) {
+      console.error(`[Sidecar] ${config.name} executable not found at ${execPath}`);
+      return;
+    }
+
     console.log(`[Sidecar] Starting ${config.name} on port ${config.port}...`);
     
     // On Windows, spawn handles spaces in paths correctly IF shell: false is used.
@@ -78,6 +84,11 @@ export class SidecarManager {
       } else {
         console.log(`[${config.name} Log] ${msg}`);
       }
+    });
+
+    proc.on('error', (error) => {
+      console.error(`[Sidecar] Failed to start ${config.name}:`, error);
+      this.processes.delete(config.name);
     });
 
     proc.on('close', (code) => {
@@ -110,7 +121,15 @@ export class SidecarManager {
       execPath = path.join(process.cwd(), '.venv', 'Scripts', 'python.exe');
       scriptArg = path.join(process.cwd(), 'services', config.script);
     } else {
-      execPath = path.join(process.resourcesPath, 'bin', config.binary);
+      const installedAddonPath =
+        config.name === 'N-ATLAS'
+          ? path.join(app.getPath('userData'), 'addons', 'n-atlas', config.binary)
+          : null;
+
+      execPath =
+        installedAddonPath && fs.existsSync(installedAddonPath)
+          ? installedAddonPath
+          : path.join(process.resourcesPath, 'bin', config.binary);
     }
 
     return { execPath, scriptArg };
