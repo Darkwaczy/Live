@@ -106,7 +106,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.png",
+      "icon": "build/icon.ico",
       "publisherName": "SermonSync Team",
       "cscLink": null,
       "forceCodeSigning": false
@@ -116,8 +116,8 @@
       "perMachine": true,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "build/icon.png",
-      "uninstallerIcon": "build/icon.png",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
       "createDesktopShortcut": true,
       "runAfterFinish": true
     }
