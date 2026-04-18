@@ -1471,9 +1471,16 @@ export default function App() {
                                 <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase">{displayVerseLive.reference}</h4>
                                 <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
                              </div>
-                          ) : liveState.current_text ? (
-                             <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10">
-                                <p className="text-xl font-black text-emerald-400 tracking-tight drop-shadow-glow italic font-serif">"{liveState.current_text}"</p>
+                          ) : (liveState.current_text || liveState.transcription_chunk) ? (
+                             <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10 flex flex-col items-center gap-2">
+                                {!liveState.current_text && liveState.transcription_chunk && (
+                                   <div className="px-2 py-0.5 bg-gray-500/20 text-gray-400 rounded text-[8px] font-black tracking-widest uppercase border border-white/5 animate-pulse">
+                                      Private Operator Feed
+                                   </div>
+                                )}
+                                <p className={`text-xl font-black tracking-tight drop-shadow-glow italic font-serif ${!liveState.current_text ? 'text-gray-400/80' : 'text-emerald-400'}`}>
+                                   "{liveState.current_text || liveState.transcription_chunk}"
+                                </p>
                              </div>
                           ) : airedLyric ? (
                             <div className="w-full text-center animate-in slide-in-from-bottom-4 duration-500 px-4 z-10">

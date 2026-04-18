@@ -185,7 +185,7 @@ export default function ProjectorPage() {
         )}
 
         {/* SCRIPTURE OVERLAY */}
-        {liveState.current_verse && (liveState.current_verse_text || liveState.current_text) && !liveState.current_lyric_line && !liveState.current_media && (
+        {liveState.current_verse && (liveState.current_verse_text) && !liveState.current_lyric_line && !liveState.current_media && (
           <div className="w-full max-w-[95%] mx-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
             <div className="glass-panel w-full p-16 bg-white/3 backdrop-blur-3xl border border-white/10 rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.6)] relative overflow-hidden">
               <div className="absolute inset-0 bg-linear-to-br from-white/10 via-transparent to-transparent opacity-30" />
@@ -197,7 +197,7 @@ export default function ProjectorPage() {
                   <div className="h-1.5 w-24 rounded-full bg-emerald-400 opacity-60" />
                 </div>
                 <p className="text-white text-6xl leading-[1.1] font-serif font-bold tracking-tight mx-auto drop-shadow-2xl w-full">
-                  "{liveState.current_verse_text || liveState.current_text}"
+                  "{liveState.current_verse_text}"
                 </p>
               </div>
             </div>

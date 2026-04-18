@@ -168,6 +168,8 @@ export function detectBibleVerse(text: string): BibleVerse[] {
     // Most popular Bible stories
     'prodigal son': { book: 'Luke', chapter: 15, verse_start: 11, verse_end: 32 },
     'jesus walked on water': { book: 'Matthew', chapter: 14, verse_start: 25, verse_end: 33 },
+    'jesus christ walked on water': { book: 'Matthew', chapter: 14, verse_start: 25, verse_end: 33 },
+    'walked on the sea': { book: 'Matthew', chapter: 14, verse_start: 25, verse_end: 33 },
     'children obey your parents': { book: 'Ephesians', chapter: 6, verse_start: 1, verse_end: 3 },
     'good samaritan': { book: 'Luke', chapter: 10, verse_start: 25, verse_end: 37 },
     'david and goliath': { book: '1 Samuel', chapter: 17, verse_start: 1, verse_end: 58 },
@@ -421,6 +423,7 @@ If NO verses or specific stories are found, return exactly this:
 RULES:
 - General preaching ("God is good") without a specific story/quote = []
 - DO NOT default to famous verses unless the text specifically describes them.
+- If you are unsure, return []. DO NOT guess.
 - Return ONLY the raw JSON array.
 
 SERMON TEXT:
@@ -461,8 +464,8 @@ SERMON TEXT:
       if (!parsed?.book || parsed.book === 'null') continue;
       
       const confidence = Number(parsed.confidence ?? 0);
-      if (confidence < 0.90) {
-        console.log(`[AI Verse] ❌ Rejected: ${parsed.book} (${(confidence * 100).toFixed(0)}%) - "${parsed.reason}"`);
+      if (confidence < 0.95) {
+        console.log(`[AI Verse] ❌ Rejected (Low Confidence): ${parsed.book} (${(confidence * 100).toFixed(0)}%) - "${parsed.reason}"`);
         continue;
       }
 

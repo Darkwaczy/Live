@@ -174,7 +174,7 @@ export function useLiveState(
           let nextState = {
             ...prev,
             transcription_text: updatedTranscription,
-            current_text: cleanChunk,
+            transcription_chunk: cleanChunk, // Private feed for the mirror
             updated_at: new Date().toISOString(),
             detection_history: newDetections
           };
@@ -419,13 +419,14 @@ export function useLiveState(
     if (preRollBufferRef.current.length > 0) {
       const combinedChunks = preRollBufferRef.current.map(b => b.chunk).join(' ');
       setLiveState(prev => {
-         const updatedTranscription = prev.transcription_text 
+          const updatedTranscription = prev.transcription_text 
             ? `${prev.transcription_text.trim()} ${combinedChunks}`
             : combinedChunks;
-         return {
+          return {
             ...prev,
             transcription_text: updatedTranscription,
-         } as any;
+            transcription_chunk: combinedChunks,
+          } as any;
       });
       preRollBufferRef.current = [];
     }
@@ -560,23 +561,22 @@ export function useLiveState(
 
       return {
         ...prev,
-        // PRIVACY FIX: Raw transcription (preview_text) stays laptop-only. 
-        // It should never be promoted to the TV during goLive.
-        current_text: prev.is_point ? prev.preview_text : '', 
+        // PROMOTION: Moved from Preview/Staged area to Live Area
+        current_text: (prev.preview_text || !prev.preview_verse) ? prev.preview_text : '', 
         current_verse: prev.preview_verse,
-        current_verse_text: prev.preview_verse_text, // PROMOTION: staged text → live text
+        current_verse_text: prev.preview_verse_text, 
         current_media: prev.preview_media,
         current_lyric_line: nextCurrentLyricLine,
         current_lyric_index: nextCurrentLyricIndex,
         preview_lyric_line: nextPreviewLyricLine,
         preview_lyric_index: nextPreviewLyricIndex,
-        is_point: !prev.preview_lyric_line && !!prev.preview_text,
+        is_point: !!prev.preview_text && !prev.preview_verse && !prev.preview_lyric_line,
         media_muted: prev.preview_media ? (prev.preview_media_muted ?? true) : prev.media_muted,
         media_playing: prev.preview_media ? (prev.preview_media_playing ?? true) : prev.media_playing,
         media_volume: prev.preview_media ? (prev.preview_media_volume ?? 1.0) : prev.media_volume,
         media_epoch: prev.preview_media ? Date.now() : prev.media_epoch,
         preview_verse: nextPreviewVerse,
-        preview_verse_text: null, // Clear staged text after air
+        preview_verse_text: null, 
         preview_text: '',
         preview_media: null,
         is_live_dirty: true,

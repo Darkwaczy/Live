@@ -28,6 +28,7 @@ export interface LiveState {
   preview_lyric_index?: number;        // Index of preview lyric
   preview_text?: string;
   transcription_text?: string;
+  transcription_chunk?: string; // New private field for latest transcribed chunk
   preview_verse?: BibleVerse | null;
   preview_verse_text?: string | null;   // Staged verse text
   current_verse_text?: string | null;   // Active verse text on TV
