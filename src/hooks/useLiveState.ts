@@ -173,6 +173,8 @@ export function useLiveState(
 
           let nextState = {
             ...prev,
+            transcription_text: updatedTranscription,
+            current_text: cleanChunk,
             updated_at: new Date().toISOString(),
             detection_history: newDetections
           };

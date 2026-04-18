@@ -100,21 +100,20 @@ def ndi_worker():
             start_time = time.time()
             
             if is_visible:
-                # Optimized: Only re-render if state changed? 
-                # For now, just generate every frame for smooth transparency handling
                 frame_data = create_frame(current_text, current_subtext, current_theme)
-                video_frame.data = frame_data
+                video_frame.data = frame_data.reshape(-1) # CRITICAL: Flatten to 1D continuous array to prevent BufferError
                 sender.send_video(video_frame)
             else:
-                # Send a single blank transparent frame to "clear" the stream
                 blank_frame = np.zeros((HEIGHT, WIDTH, 4), dtype=np.uint8)
-                video_frame.data = blank_frame
+                video_frame.data = blank_frame.reshape(-1)
                 sender.send_video(video_frame)
             
             sleep_time = frame_time - (time.time() - start_time)
             if sleep_time > 0:
                 time.sleep(sleep_time)
     finally:
+        if sender:
+            sender.close()
         ndi.destroy()
 
 # --- API Endpoints ---

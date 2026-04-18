@@ -8,9 +8,6 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
-    watch: {
-      usePolling: true
-    },
     headers: {
       "Cross-Origin-Embedder-Policy": "unsafe-none",
       "Cross-Origin-Opener-Policy": "same-origin",
@@ -30,7 +27,6 @@ export default defineConfig({
     }
   },
   worker: {
-    format: 'es',
-    plugins: () => [react()]
+    format: 'es'
   }
 });

@@ -777,11 +777,10 @@ export default function App() {
     setNewNote('');
     
     try {
-      if (window.sermonSync?.db?.saveNote) {
-        await window.sermonSync.db.saveNote(noteObj);
-      } else {
-         await saveNote(noteObj);
+      if (window.sermonSync?.send) {
+        window.sermonSync.send('notes:save', noteObj);
       }
+      await saveNote(noteObj);
     } catch (err) {
       console.error('Note persistence error', err);
     }
@@ -907,9 +906,10 @@ export default function App() {
     
     // Attempt local storage fallback
     try {
-      if (window.sermonSync?.db?.saveNote) {
-        window.sermonSync.db.saveNote(noteObj);
+      if (window.sermonSync?.send) {
+        window.sermonSync.send('notes:save', noteObj);
       }
+      saveNote(noteObj);
     } catch (e) {}
   };
 
@@ -1134,7 +1134,12 @@ export default function App() {
                       <Activity size={14} className="text-(--accent-color) animate-pulse" />
                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-(--text-primary)">Transcript</h3>
                    </div>
-                   {isListening && <span className="text-[8px] font-bold text-(--accent-color)/60 uppercase tracking-widest">Live</span>}
+                   <div className="flex items-center gap-2">
+                     <button onClick={handleSnapshotToNotes} className="px-2 py-1 bg-white/5 hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-400 border border-white/10 rounded uppercase text-[8px] font-black tracking-widest transition-colors flex items-center gap-1" title="Snapshot to Notes">
+                       <Save size={10} /> 
+                     </button>
+                     {isListening && <span className="text-[8px] font-bold text-(--accent-color)/60 uppercase tracking-widest">Live</span>}
+                   </div>
                 </div>
                 
                 <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 no-scrollbar bg-(--bg-primary)/50">

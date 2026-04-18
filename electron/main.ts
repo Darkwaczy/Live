@@ -233,12 +233,19 @@ function createWindow() {
     height: 920,
     minWidth: 1024,
     minHeight: 768,
+    show: false, // Wait until ready
+    autoHideMenuBar: true, // Suppresses the empty legacy Windows menu bar
+    backgroundColor: '#121212', // Obsidian dark theme background
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
     }
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow) mainWindow.show();
   });
 
   if (isDev) {
@@ -303,6 +310,10 @@ ipcMain.handle('db:save-note', async (event, note) => {
   return db.saveNote(note);
 });
 
+ipcMain.on('notes:save', (event, note) => {
+  db.saveNote(note);
+});
+
 ipcMain.handle('db:get-notes', async (event, sessionId) => {
   return db.getNotes(sessionId);
 });
@@ -347,6 +358,7 @@ ipcMain.handle('app:open-projector', async () => {
     height: bounds.height,
     fullscreen: !!externalDisplay, // Fullscreen on the TV, normal window if only laptop
     autoHideMenuBar: true,
+    show: false, // Wait until DOM is ready to prevent blinding flash
     backgroundColor: '#000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -354,6 +366,10 @@ ipcMain.handle('app:open-projector', async () => {
       nodeIntegration: false,
       sandbox: false
     }
+  });
+
+  projectorWindow.once('ready-to-show', () => {
+    if (projectorWindow) projectorWindow.show();
   });
 
   const urlPath = isDev ? 'http://localhost:5173?projector' : `file://${path.join(__dirname, '../dist/index.html?projector')}`;

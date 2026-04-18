@@ -35,3 +35,8 @@ node_modules/
 .venv/
 bin/
 services/model_cache/
+
+# Additional ignores
+scratch/
+__pycache__/
+*.pyc

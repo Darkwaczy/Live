@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from '../src/App';  // ✅ let TS resolve
+import App from './App';  // ✅ let TS resolve
 import './index.css';
 
 window.onerror = (message, source, lineno, colno, error) => {
