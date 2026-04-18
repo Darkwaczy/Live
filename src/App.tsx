@@ -2709,7 +2709,8 @@ export default function App() {
       </main>
 
       {/* Full Screen Projector Mode (Redesigned for Premium Cinematic Experience) */}
-      <div className={`fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden transition-all duration-700 ${isProjector ? 'opacity-100 z-100 pointer-events-auto' : 'opacity-0 -z-50 pointer-events-none'}`}>
+      {isProjector && (
+        <div className={`fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden transition-all duration-700 opacity-100 z-100 pointer-events-auto`}>
           
           {/* ATMOSPHERIC BACKGROUND OVERLAY */}
           <div 
@@ -2991,6 +2992,7 @@ export default function App() {
             </div>
           )}
         </div>
+      )}
     </div>
   );
 }

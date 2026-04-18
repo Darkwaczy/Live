@@ -140,5 +140,9 @@ if __name__ == '__main__':
     ndi_thread = threading.Thread(target=ndi_worker, daemon=True)
     ndi_thread.start()
     
-    logger.info(f"📡 API Controller listening on port {args.port}")
-    app.run(host='0.0.0.0', port=args.port, debug=False, threaded=True)
+    try:
+        logger.info(f"📡 API Controller listening on port {args.port}")
+        app.run(host='0.0.0.0', port=args.port, debug=False, threaded=True)
+    except Exception as e:
+        logger.error(f"❌ FATAL: Could not start NDI bridge on port {args.port}: {e}")
+        sys.exit(1)
