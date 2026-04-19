@@ -535,28 +535,38 @@ export default function App() {
       try {
         const res = await fetch(`/bibles/${version}.json`);
         if (!res.ok) throw new Error(`Content not found: /bibles/${version}.json`);
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('Not a JSON file or missing translation.');
-        }
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          // Enrich with full names from bibleBooks if missing (maps 1:1 for standard 66 books)
-          const enriched = data.map((b: any, idx: number) => ({
-            ...b,
-            name: b.name || b.book || bibleBooks[idx] || b.abbrev
-          }));
-          setBibleData(enriched);
-          if (!enriched.find((b: any) => b.name === selectedBook || b.book === selectedBook)) {
-            setSelectedBook(enriched[0]?.name || enriched[0]?.book || 'Genesis');
-            setSelectedChapter(1);
+        
+        const rawText = await res.text();
+        // Strip BOM (efbbbf) if present at the start of the file
+        const cleanText = rawText.replace(/^\uFEFF/, "");
+        
+        try {
+          const data = JSON.parse(cleanText);
+          if (Array.isArray(data)) {
+            // Enrich with full names from bibleBooks if missing (maps 1:1 for standard 66 books)
+            const enriched = data.map((b: any, idx: number) => ({
+              ...b,
+              name: b.name || b.book || bibleBooks[idx] || b.abbrev
+            }));
+            setBibleData(enriched);
+            if (!enriched.find((b: any) => b.name === selectedBook || b.book === selectedBook)) {
+              setSelectedBook(enriched[0]?.name || enriched[0]?.book || 'Genesis');
+              setSelectedChapter(1);
+            }
+            return;
           }
-          return;
+        } catch (parseErr: any) {
+          const isTruncated = rawText.length < 2000000; // A full bible usually > 4MB
+          throw new Error(isTruncated ? 
+            `Bible file ${version}.json appears truncated or cut off (${(rawText.length/1024).toFixed(0)}KB). Please restore the full file.` : 
+            `JSON Error in ${version}.json: ${parseErr.message}`
+          );
         }
         setBibleData([]);
-      } catch (err) {
+      } catch (err: any) {
         setBibleData([]);
-        console.warn('Bible data load failed:', err);
+        console.error('Bible load failed:', err.message);
+        showToast(`Bible Error: ${err.message}`);
       }
     };
 
@@ -598,7 +608,15 @@ export default function App() {
         return;
       }
 
-      // 3. Fallback to API
+      // 3. Fallback to API (ONLY for supported public domain versions)
+      const supportedApiVersions = ['kjv', 'bbe', 'web', 'asv', 'oeb'];
+      if (!supportedApiVersions.includes(version.toLowerCase())) {
+        console.warn(`External API does not support ${version}. Offline file is required.`);
+        setIsBibleLoading(false);
+        setChapterVerses([]);
+        return;
+      }
+
       try {
         const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(selectedBook)}+${selectedChapter}?translation=${version.toLowerCase()}`);
         if (!apiRes.ok) throw new Error("API Retrieval Failed");
@@ -652,18 +670,25 @@ export default function App() {
 
   useEffect(() => {
     const fetchVerse = async (ref: string, version: string, isSecondary: boolean) => {
+      // 0. Skip API for copyrighted versions to avoid 404/CORS spam
+      const supportedApiVersions = ['kjv', 'bbe', 'web', 'asv', 'oeb'];
+
       try {
-        const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(ref)}?translation=${version}`);
-        if (!apiRes.ok) throw new Error("API failed");
-        const apiData = await apiRes.json();
-        if (apiData.text) {
-          const result = { reference: apiData.reference || ref, text: apiData.text.replace(/\n/g, ' ').trim(), translation: version };
-          if (!isSecondary) {
-            setFetchedVerse(result);
-            setPreviewVerseText(result.text); // Sync to TV
+        if (supportedApiVersions.includes(version.toLowerCase())) {
+          const apiRes = await fetch(`https://bible-api.com/${encodeURIComponent(ref)}?translation=${version}`);
+          if (apiRes.ok) {
+            const apiData = await apiRes.json();
+            if (apiData.text) {
+              const result = { reference: apiData.reference || ref, text: apiData.text.replace(/\n/g, ' ').trim(), translation: version };
+              if (!isSecondary) {
+                setFetchedVerse(result);
+                setPreviewVerseText(result.text); // Sync to TV
+              } else {
+                setSecondaryFetchedVerse(result);
+              }
+              return true;
+            }
           }
-          else setSecondaryFetchedVerse(result);
-          return true;
         }
       } catch (e) {}
 
