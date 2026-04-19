@@ -541,9 +541,14 @@ export default function App() {
         }
         const data = await res.json();
         if (Array.isArray(data)) {
-          setBibleData(data);
-          if (!data.find((b: any) => b.name === selectedBook || b.book === selectedBook)) {
-            setSelectedBook(data[0]?.name || data[0]?.book || 'Genesis');
+          // Enrich with full names from bibleBooks if missing (maps 1:1 for standard 66 books)
+          const enriched = data.map((b: any, idx: number) => ({
+            ...b,
+            name: b.name || b.book || bibleBooks[idx] || b.abbrev
+          }));
+          setBibleData(enriched);
+          if (!enriched.find((b: any) => b.name === selectedBook || b.book === selectedBook)) {
+            setSelectedBook(enriched[0]?.name || enriched[0]?.book || 'Genesis');
             setSelectedChapter(1);
           }
           return;
@@ -567,7 +572,12 @@ export default function App() {
 
       // 1. Try local data first
       if (bibleData.length > 0) {
-        const book = bibleData.find((b: any) => (b.name || b.book || '').toLowerCase() === selectedBook.toLowerCase());
+        // More resilient lookup: check name, book, and abbrev
+        const book = bibleData.find((b: any) => 
+          (b.name || '').toLowerCase() === selectedBook.toLowerCase() || 
+          (b.book || '').toLowerCase() === selectedBook.toLowerCase() ||
+          (b.abbrev || '').toLowerCase() === selectedBook.toLowerCase()
+        );
         if (book && book.chapters && book.chapters[selectedChapter - 1]) {
           const verses = book.chapters[selectedChapter - 1].map((text: string, i: number) => ({
             verse: i + 1,
@@ -664,7 +674,12 @@ export default function App() {
         const verse = liveState.preview_verse;
         if (!verse) return false;
         
-        const book = bibleDataLocal.find((b: any) => (b.name || b.book || '').toLowerCase() === verse.book.toLowerCase());
+        const book = bibleDataLocal.find((b: any, idx: number) => 
+          (b.name || '').toLowerCase() === verse.book.toLowerCase() || 
+          (b.book || '').toLowerCase() === verse.book.toLowerCase() ||
+          (b.abbrev || '').toLowerCase() === verse.book.toLowerCase() ||
+          (bibleBooks[idx] || '').toLowerCase() === verse.book.toLowerCase()
+        );
         if (book && book.chapters && book.chapters[verse.chapter - 1]) {
            const text = book.chapters[verse.chapter - 1][verse.verse_start - 1];
            const result = { reference: ref, text, translation: version };
@@ -1142,46 +1157,52 @@ export default function App() {
                    </div>
                 </div>
                 
-                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 no-scrollbar bg-(--bg-primary)/50">
+                <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 no-scrollbar bg-(--bg-primary)/50 relative">
 
-                   {/* LIVE INTERIM — prominent, sticky at top as words come in */}
-                   {interimText && (
-                     <div className="sticky top-0 z-10 mb-1 px-3 py-2.5 rounded-xl bg-(--accent-color)/10 border border-(--accent-color)/30 shadow-lg backdrop-blur-sm">
-                       <div className="flex items-center gap-1.5 mb-1">
-                         <span className="w-1.5 h-1.5 rounded-full bg-(--accent-color) animate-pulse inline-block" />
-                         <span className="text-[8px] font-black text-(--accent-color) uppercase tracking-widest">Speaking now</span>
-                       </div>
-                       <p className="text-sm font-semibold text-white leading-snug">{interimText}</p>
-                     </div>
-                   )}
-
-                   {/* CONFIRMED sentences — stacked below */}
+                   {/* TRANSCRIPTION FLOW — Stacked with spacer to start from bottom */}
                    {sentences.length === 0 && !interimText ? (
                      <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
                         <FileText size={24} className="mb-2" />
                         <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>
                      </div>
                    ) : (
-                     sentences.map((line: string, i: number) => {
-                       const isRecent = i >= sentences.length - 3;
-                       const approxTime = new Date(Date.now() - (sentences.length - i) * 2000)
-                         .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                       return (
-                         <div key={i} className="animate-in slide-in-from-bottom-1 duration-200">
-                           <div className="flex items-center justify-between mb-0.5">
-                             <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500/40">
-                               Live Feed
-                             </span>
-                             <span className="text-[8px] font-mono text-gray-600">[{approxTime}]</span>
+                     <>
+                       <div className="flex-1" />
+                       {sentences.map((line: string, i: number) => {
+                         const isRecent = i >= sentences.length - 3;
+                         const approxTime = new Date(Date.now() - (sentences.length - i) * 2000)
+                           .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                         return (
+                           <div key={i} className="animate-in slide-in-from-bottom-1 duration-200 px-1">
+                             <div className="flex items-center justify-between mb-0.5">
+                               <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500/40">
+                                 Live Feed
+                               </span>
+                               <span className="text-[8px] font-mono text-gray-600">[{approxTime}]</span>
+                             </div>
+                             <p className={`text-xs leading-relaxed transition-all ${
+                               isRecent ? 'text-gray-200 font-medium' : 'text-gray-500 font-normal'
+                             }`}>
+                               {line.trim()}{line.endsWith('.') ? '' : '.'}
+                             </p>
                            </div>
-                           <p className={`text-xs leading-relaxed transition-all ${
-                             isRecent ? 'text-gray-200 font-medium' : 'text-gray-500 font-normal'
-                           }`}>
-                             {line.trim()}{line.endsWith('.') ? '' : '.'}
-                           </p>
+                         );
+                       })}
+
+                       {/* LIVE INTERIM — pinned to the bottom for a premium "docked" experience */}
+                       {interimText && (
+                         <div className="sticky bottom-[-13px] -mx-3 z-10 mt-auto px-4 py-4 bg-linear-to-t from-(--bg-primary) via-(--bg-primary)/98 to-(--bg-primary)/90 border-t border-(--accent-color)/30 backdrop-blur-xl shadow-[0_-15px_30px_rgba(0,0,0,0.8)] animate-in fade-in slide-in-from-bottom-4 duration-300">
+                           <div className="flex items-center gap-2 mb-1.5">
+                             <div className="relative">
+                               <span className="w-2 h-2 rounded-full bg-(--accent-color) animate-pulse inline-block" />
+                               <span className="absolute inset-0 w-2 h-2 rounded-full bg-(--accent-color) animate-ping inline-block" />
+                             </div>
+                             <span className="text-[9px] font-black text-(--accent-color) uppercase tracking-[0.2em]">Live Transcription</span>
+                           </div>
+                           <p className="text-sm font-bold text-white leading-relaxed drop-shadow-sm">{interimText}</p>
                          </div>
-                       );
-                     })
+                       )}
+                     </>
                    )}
                  </div>
              </div>
