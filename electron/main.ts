@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import http from 'http';
@@ -227,6 +228,44 @@ async function autoInstallNAtlasIfNeeded() {
   }
 }
 
+function initAutoUpdater() {
+  autoUpdater.logger = console;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', () => {
+    console.log('[Updater] Update available. Downloading in background...');
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log(`[Updater] Update ${info.version} downloaded.`);
+    if (mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update Ready',
+        message: `Version ${info.version} has been downloaded and is ready to install.`,
+        buttons: ['Restart Now', 'Later']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      });
+    }
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[Updater] Error during update check:', err);
+  });
+
+  // Check for updates every hour
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(e => console.error("Periodic update check failed", e));
+  }, 60 * 60 * 1000);
+
+  // Initial check
+  autoUpdater.checkForUpdatesAndNotify().catch(e => console.error("Initial update check failed", e));
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -278,6 +317,10 @@ app.on('ready', () => {
   SidecarManager.getInstance().startAll().catch(err => {
     console.error('[Main] Failed to start sidecars:', err);
   });
+
+  if (!isDev) {
+    initAutoUpdater();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -28,6 +28,7 @@
     "@supabase/supabase-js": "^2.0.0",
     "clsx": "^2.1.1",
     "electron-store": "^8.0.0",
+    "electron-updater": "^6.8.3",
     "lucide-react": "^1.7.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
@@ -73,6 +74,13 @@
     "productName": "SermonSync",
     "copyright": "Copyright © 2026 SermonSync Team",
     "compression": "maximum",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Darkwaczy",
+        "repo": "Live"
+      }
+    ],
     "directories": {
       "buildResources": "build",
       "output": "release"
