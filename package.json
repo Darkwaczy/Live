@@ -13,7 +13,7 @@
     "dev": "concurrently \"npm:dev:electron\" \"npm:dev:react\"",
     "dev:react": "vite",
     "dev:electron": "npm run build:electron:main && wait-on http://localhost:5173 && electron .",
-    "build": "npm run build:react && npm run build:electron:main && npm run build:electron",
+    "build": "npm run build:react && node -e \"if(process.env.VERCEL) process.exit(0); process.exit(1)\" || (npm run build:electron:main && npm run build:electron)",
     "build:react": "vite build",
     "build:electron:main": "tsc -p tsconfig.node.json --outDir dist-electron",
     "build:electron": "electron-builder",
