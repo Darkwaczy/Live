@@ -102,6 +102,10 @@
         "to": "bin/ndi-broadcast-service.exe"
       },
       {
+        "from": "sidecar-dist/n-atlas-service.exe",
+        "to": "bin/n-atlas-service.exe"
+      },
+      {
         "from": "node_modules/sql.js/dist/sql-wasm.wasm",
         "to": "sql-wasm.wasm"
       },
