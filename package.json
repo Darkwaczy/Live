@@ -1,6 +1,6 @@
 {
   "name": "sermonsync",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "SermonSync: AI-powered Sermon Transcription and Bible Tagging.",
   "private": true,
   "main": "dist-electron/electron/main.js",
