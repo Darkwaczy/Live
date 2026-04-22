@@ -42,6 +42,7 @@ export function useLiveState(
     preview_media_playing: true,
     preview_media_volume: 1.0,
     detection_history: [],
+    transcription_feed: [],
     history: [],
     updated_at: new Date().toISOString()
   });
@@ -89,15 +90,24 @@ export function useLiveState(
         }
 
         // FINAL: Process stable sentence
+        const cleanChunk = chunk.trim();
+        
+        // Clear interim text now that we have a final chunk
         setInterimText('');
-        setLiveState((prev) => {
-          const cleanChunk = chunk.trim();
-          if (!cleanChunk) return prev;
+        
+        if (!cleanChunk) return;
 
-          // REPETITION FILTER (Prevents duplicate phrases)
+        setLiveState((prev) => {
+          // REPETITION FILTER (Prevents accidental identical loops, but allows distinct sentences)
+          const now = Date.now();
           if (cleanChunk === lastPhraseRef.current) {
-             console.log("[useLiveState] Skipping duplicate phrase:", cleanChunk);
-             return prev;
+             // If we already added this exact text recently, it's likely an engine echo
+             const currentFeed = Array.isArray(prev.transcription_feed) ? prev.transcription_feed : [];
+             const lastEntry = currentFeed[currentFeed.length - 1];
+             if (lastEntry && lastEntry.text === cleanChunk && (now - lastEntry.timestamp < 15000)) {
+                console.log("[useLiveState] Filtering engine echo:", cleanChunk);
+                return prev;
+             }
           }
           lastPhraseRef.current = cleanChunk;
 
@@ -114,10 +124,12 @@ export function useLiveState(
             'okay! thank you'
           ];
           
-          if (hallucinations.some(h => lowerChunk === h || lowerChunk.startsWith(h))) {
+          // Use exact match to avoid catching valid speech that merely starts with these phrases
+          if (hallucinations.some(h => lowerChunk === h)) {
             console.log(`[useLiveState] Hallucination detected: "${cleanChunk}". Filtered.`);
             return prev;
           }
+
 
           // Build the growing transcription buffer for context
           // Use transcription_text (the dedicated private feed) so the rolling window
@@ -125,6 +137,15 @@ export function useLiveState(
           const updatedTranscription = prev.transcription_text
             ? `${prev.transcription_text.trim()} ${cleanChunk}`
             : cleanChunk;
+            
+          // Add to the dedicated feed array for stable UI rendering
+          const feedEntry = {
+             id: `feed-${now}-${Math.random().toString(36).slice(2, 9)}`,
+             text: cleanChunk,
+             timestamp: now
+          };
+          const currentFeed = Array.isArray(prev.transcription_feed) ? prev.transcription_feed : [];
+          const updatedFeed = [...currentFeed, feedEntry].slice(-100);
 
           // Rolling window: last 80 words gives much richer context for verse patterns
           const rollingWindow = updatedTranscription.split(' ').slice(-80).join(' ');
@@ -172,8 +193,9 @@ export function useLiveState(
           };
 
           let nextState = {
-            ...prev,
+             ...prev,
             transcription_text: updatedTranscription,
+            transcription_feed: updatedFeed,
             transcription_chunk: cleanChunk, // Private feed for the mirror
             updated_at: new Date().toISOString(),
             detection_history: newDetections
@@ -486,6 +508,8 @@ export function useLiveState(
     setLiveState(prev => ({ 
       ...prev, 
       current_text: '', 
+      transcription_text: '',
+      transcription_feed: [],
       current_verse: null,
       current_song_id: null,
       current_media: null,

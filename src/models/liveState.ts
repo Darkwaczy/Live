@@ -36,6 +36,11 @@ export interface LiveState {
   current_media?: string | null;  // URL for airing images/videos
   is_live_dirty: boolean;
   is_analyzing: boolean;
+  transcription_feed: Array<{
+    id: string;
+    text: string;
+    timestamp: number;
+  }>;
   detection_history: Array<{
     id: string;
     verse: BibleVerse;

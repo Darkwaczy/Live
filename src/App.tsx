@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { 
   Menu, Play, Pause, SkipForward, SkipBack, 
   BookOpen, Music, FileText, Settings, 
   Monitor, Cast, LayoutGrid, ChevronRight, X, Save, AlertCircle,
-  Activity, Radio, Search, Heart,
+  Activity, Radio, Search, Heart, Mic, Square,
   ChevronLeft, RefreshCw, Volume2, VolumeX, ListOrdered, FastForward, ArrowUp, ArrowDown, Plus,
   Check,
   Edit2,
@@ -30,11 +30,14 @@ import { loadEssentialLyrics, searchLyrics, addPastedSong, setInitialPastedSongs
 import { Song } from './models/song';
 import SettingsView from './components/SettingsView';
 import { BroadcastService } from './services/broadcastService';
+import { recorderService, RecorderStatus } from './services/sermonRecorderService';
+import { cloudStorageService } from './services/cloudStorageService';
+import { recoveryService } from './services/recoveryService';
 
 const SESSION_ID = 'service-001';
 
 type ViewMode = 'live' | 'history' | 'documents' | 'settings';
-type RightPanelTab = 'schedule' | 'scriptures' | 'lyrics' | 'notes' | 'broadcast';
+type RightPanelTab = 'schedule' | 'scriptures' | 'lyrics' | 'notes' | 'broadcast' | 'archive';
 const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass }: { lyric: string, spokenText: string, colorClass: string, animationClass: string, sizeClass: string }) => {
   const words = lyric.split(' ');
   const recentSpoken = spokenText.toLowerCase().replace(/[^a-z0-9 \']/g, '').split(' ').filter(w => w.length > 0).slice(-20);
@@ -116,7 +119,7 @@ export default function App() {
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('notes');
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string, type: 'info' | 'error' | 'success' } | null>(null);
   // Live Paste Lyrics Modal
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteTitle, setPasteTitle] = useState('');
@@ -165,6 +168,23 @@ export default function App() {
     churchLogo: '', // Start empty to allow detection of personal brand
     theme: 'obsidian',
   });
+  
+  const [recoverySessions, setRecoverySessions] = useState<string[]>([]);
+  const [isRecovering, setIsRecovering] = useState(false);
+
+  const [recorderStatus, setRecorderStatus] = useState<RecorderStatus>({
+    isRecording: false,
+    isPaused: false,
+    duration: 0,
+    rms: 0
+  });
+
+  const vuLevel = recorderStatus.rms * 2.55;
+
+  // Track Recorder Status
+  useEffect(() => {
+    recorderService.onStatusUpdate(setRecorderStatus);
+  }, []);
 
   // Load Persisted Settings on Init
   useEffect(() => {
@@ -322,6 +342,25 @@ export default function App() {
          setRightPanelTab('notes');
       }
       
+      
+      // Auto-Recorder Trigger
+      if (nextItem.type === 'sermon') {
+         recorderService.start().catch(err => showToast(`Recorder Error: ${err.message}`));
+         setRightPanelTab('archive');
+      } else if (currentPlanIndex > 0 && servicePlan[currentPlanIndex].type === 'sermon') {
+         // Stop recording if the previous item was a sermon
+         const previousSermon = servicePlan[currentPlanIndex];
+         recorderService.stop().then(async (blob) => {
+            showToast(`Sermon Captured. Syncing to Supabase...`);
+            const result = await cloudStorageService.uploadSermon(blob, previousSermon.title);
+            if (result.success) {
+               showToast(`Success: Sermon Archived to Cloud`);
+            } else {
+               showToast(`Upload Failed: ${result.error}`, "error");
+            }
+         });
+      }
+
       showToast(`Advanced to: ${nextItem.title}`);
     }
   };
@@ -464,16 +503,11 @@ export default function App() {
     }
   }, [liveState, settings.speechEngine, settings.detectVerses]);
 
-  // Helpers for transcription column
-  const sentences = useMemo(() => {
-    const text = (liveState.transcription_text || liveState.current_text || '');
-    return text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-  }, [liveState.transcription_text, liveState.current_text]);
-
-  const fullTranscript = (liveState.transcription_text || liveState.current_text || '') + (interimText ? ' ' + interimText : '');
-
+  // Live transcript: committed lines from finalized speech
   const transcriptScrollRef = React.useRef<HTMLDivElement>(null);
   const bibleScrollRef = React.useRef<HTMLDivElement>(null);
+
+  const fullTranscript = (liveState.transcription_text || liveState.current_text || '') + (interimText ? ' ' + interimText : '');
 
   useEffect(() => {
      if (transcriptScrollRef.current) {
@@ -571,7 +605,41 @@ export default function App() {
     };
 
     loadBibleData();
-  }, [settings.bibleVersion]);
+  }, [settings.bibleVersion, selectedBook]);
+
+  // RECOVERY CHECK: On mount, check for unfinished recording sessions
+  useEffect(() => {
+    const checkRecovery = async () => {
+      const sessions = await recoveryService.listSessions();
+      if (sessions.length > 0) {
+        setRecoverySessions(sessions);
+      }
+    };
+    checkRecovery();
+  }, []);
+
+  const handleRecover = async (sessionId: string) => {
+    setIsRecovering(true);
+    try {
+      const blob = await recoveryService.recoverSession(sessionId);
+      if (blob) {
+        showToast("Recovering sermon audio...");
+        const result = await cloudStorageService.uploadSermon(blob, `Recovered_${sessionId}`);
+        if (result.success) {
+          showToast("Sermon recovered & archived to cloud!");
+          await recoveryService.clearSession(sessionId);
+          setRecoverySessions(prev => prev.filter(id => id !== sessionId));
+        } else {
+          showToast(`Recovery failed: ${result.error}`, "error");
+        }
+      }
+    } catch (err) {
+      console.error("Recovery error:", err);
+      showToast("Critical error during recovery", "error");
+    } finally {
+      setIsRecovering(false);
+    }
+  };
 
   // Update chapter verses when book or chapter changes
   useEffect(() => {
@@ -790,7 +858,7 @@ export default function App() {
   }, [applyLiveState, session.id]);
 
   useEffect(() => {
-    if (!liveState.current_text && !isListening) return;
+    if (!liveState.current_text && !liveState.transcription_text && !isListening) return;
     const save = async () => {
       try {
         await saveLiveState(liveState);
@@ -813,7 +881,10 @@ export default function App() {
       created_at: new Date().toISOString()
     };
     
-    setNotes((prev) => [noteObj, ...prev]);
+    setNotes((prev) => {
+      if (prev.some(n => n.id === noteObj.id)) return prev;
+      return [noteObj, ...prev];
+    });
     setNewNote('');
     
     try {
@@ -919,8 +990,8 @@ export default function App() {
      }
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
+  const showToast = (msg: string, type: 'info' | 'error' | 'success' = 'info') => {
+    setToastMessage({ text: msg, type });
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -940,7 +1011,10 @@ export default function App() {
       created_at: new Date().toISOString()
     };
     
-    setNotes(prev => [noteObj, ...prev]);
+    setNotes(prev => {
+      if (prev.some(n => n.id === noteObj.id)) return prev;
+      return [noteObj, ...prev];
+    });
     clearText();
     showToast('Saved transcript block to Notes and cleared screen!');
     
@@ -953,6 +1027,36 @@ export default function App() {
     } catch (e) {}
   };
 
+  const startRecording = async () => {
+    try {
+      await recorderService.start();
+      showToast("Sermon Recording Started", "success");
+      setRightPanelTab('archive');
+    } catch (err: any) {
+      showToast(`Recorder Error: ${err.message}`, "error");
+    }
+  };
+
+  const stopRecording = async () => {
+    const currentSermonTitle = servicePlan[currentPlanIndex]?.title || 'Manual Recording';
+    try {
+      showToast("Processing Audio...", "info");
+      const blob = await recorderService.stop();
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${new Date().toISOString().slice(0, 10)}_${currentSermonTitle.replace(/[^a-z0-9]/gi, '_')}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast("Audio file downloaded securely!", "success");
+    } catch (err: any) {
+      showToast(`Recording error: ${err.message}`, "error");
+    }
+  };
 
   const handleNext = () => setManualLineOffset(prev => prev + 1);
   const handlePrev = () => setManualLineOffset(prev => prev - 1);
@@ -983,9 +1087,13 @@ export default function App() {
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
-           {toastMessage}
-           <button onClick={() => setToastMessage(null)} className="hover:bg-white/20 rounded-full p-1"><X size={16}/></button>
+        <div className={`absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 border ${
+          toastMessage.type === 'error' ? 'bg-red-500 border-red-400 text-white' : 
+          toastMessage.type === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 
+          'bg-emerald-500 text-white border-emerald-400'
+        }`}>
+           <span className="text-xs font-bold tracking-wide">{toastMessage.text}</span>
+           <button onClick={() => setToastMessage(null)} className="hover:bg-white/20 rounded-full p-1"><X size={14}/></button>
         </div>
       )}
 
@@ -1048,39 +1156,73 @@ export default function App() {
           </div>
         )}
 
+        {/* Recovery Toast */}
+        {recoverySessions.length > 0 && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 flex items-center gap-4 bg-emerald-600/90 backdrop-blur-md text-white px-6 py-4 rounded-2xl shadow-2xl border border-emerald-400/30">
+            <div className="flex flex-col">
+               <span className="text-sm font-black uppercase tracking-widest">Unfinished recording found</span>
+               <span className="text-[10px] opacity-80">We found a sermon that wasn't saved due to a crash or close.</span>
+            </div>
+            <div className="flex gap-2">
+               <button 
+                 onClick={() => { recoverySessions.forEach(id => recoveryService.clearSession(id)); setRecoverySessions([]); }}
+                 className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-bold uppercase transition-all"
+               >
+                 Discard
+               </button>
+               <button 
+                 disabled={isRecovering}
+                 onClick={() => handleRecover(recoverySessions[0])}
+                 className="px-4 py-2 bg-white text-emerald-700 hover:bg-emerald-50 rounded-xl text-[10px] font-black uppercase shadow-lg transition-all flex items-center gap-2"
+               >
+                 {isRecovering ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                 {isRecovering ? 'Recovering...' : 'Recover & Upload'}
+               </button>
+            </div>
+          </div>
+        )}
+
         {/* Top Navbar */}
-        <header className="h-[72px] flex items-center justify-between px-6 border-b border-(--border-color) bg-transparent z-10 shrink-0 transition-colors gap-4 overflow-hidden">
-          <div className="flex items-center gap-6 shrink-0">
+        <header className="h-[56px] flex items-center justify-between px-6 border-b border-(--border-color) bg-transparent z-10 shrink-0 transition-colors gap-4 overflow-hidden">
+          <div className="flex items-center gap-4 shrink-0">
+            {recorderStatus.isRecording && (
+              <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/30 px-2.5 py-1 rounded-full animate-pulse mr-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                <span className="text-[9px] font-black text-red-400 tracking-widest">REC</span>
+                <span className="text-[9px] font-mono text-red-300 ml-1">{new Date(recorderStatus.duration * 1000).toISOString().substr(14, 5)}</span>
+              </div>
+            )}
+            
             <div className={`flex items-center gap-2 rounded-md px-2.5 py-1 transition-colors ${isOnline ? 'bg-emerald-500' : 'bg-gray-600'}`} title={isOnline ? "Connected to the Internet" : "Offline / Local Mode"}>
               <div className={`w-1.5 h-1.5 rounded-full bg-white ${isOnline ? 'animate-pulse' : ''}`}></div>
               <span className="text-[11px] font-bold text-white tracking-widest uppercase">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </div>
             
             <div className="flex items-center gap-1 bg-(--bg-secondary)/80 p-0.5 rounded-lg border border-(--border-color)">
-              <button onClick={isListening ? stop : start} className={`p-2 hover:bg-white/10 rounded-md transition-colors text-(--accent-color)`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
-                {isListening ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+              <button onClick={isListening ? stop : start} className={`p-1.5 hover:bg-white/10 rounded-md transition-colors text-(--accent-color)`} title={isListening ? "Pause Transcription" : "Start Transcription"}>
+                {isListening ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
               </button>
               
-              <div className="w-px h-5 bg-white/10 mx-1 mr-4"></div>
+              <div className="w-px h-4 bg-white/10 mx-1 mr-2"></div>
               
               <button 
                 onClick={goLive}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-md font-bold text-[10px] tracking-widest uppercase transition-all bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.2)] hover:shadow-[0_0_30px_rgba(220,38,38,0.35)] active:scale-95 ml-2"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-md font-bold text-[9px] tracking-widest uppercase transition-all bg-red-600 text-white shadow-lg active:scale-95 ml-1"
                 title="Send Screen to Air!"
               >
-                <SkipForward size={14} fill="currentColor" /> GO LIVE
+                <SkipForward size={12} fill="currentColor" /> GO LIVE
               </button>
             </div>
           </div>
 
           {/* MASTER CENTERED HARDWARE SWITCHER */}
-          <div className="flex items-center gap-0.5 bg-[#1a1a1c]/60 backdrop-blur-md p-0.5 rounded-lg border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)] scale-90 lg:scale-100 shrink-0 mx-auto">
+          <div className="flex items-center gap-0.5 bg-[#1a1a1c]/60 backdrop-blur-md p-0.5 rounded-lg border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)] scale-85 lg:scale-95 shrink-0 mx-auto">
             <button 
               onClick={clearText}
-              className="px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all text-gray-500 hover:text-white hover:bg-white/5 active:bg-white/10 flex items-center gap-1.5"
+              className="px-2.5 py-1 rounded-md font-black text-[8px] tracking-[0.15em] uppercase transition-all text-gray-500 hover:text-white hover:bg-white/5 active:bg-white/10 flex items-center gap-1"
               title="Clear Foreground Text"
             >
-              <X size={10} strokeWidth={3} className="text-gray-600" /> 
+              <X size={9} strokeWidth={3} className="text-gray-600" /> 
               <span>Clear</span>
             </button>
             
@@ -1088,10 +1230,10 @@ export default function App() {
 
             <button 
               onClick={() => setLogo(!liveState.is_logo)}
-              className={`px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all flex items-center gap-1.5 ${liveState.is_logo ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-gray-500 hover:text-blue-400 hover:bg-blue-500/5'}`}
+              className={`px-2.5 py-1 rounded-md font-black text-[8px] tracking-[0.15em] uppercase transition-all flex items-center gap-1 ${liveState.is_logo ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-gray-500 hover:text-blue-400 hover:bg-blue-500/5'}`}
               title="Show Church Logo"
             >
-              <LayoutGrid size={10} strokeWidth={2.5} /> 
+              <LayoutGrid size={9} strokeWidth={2.5} /> 
               <span>Theme</span>
             </button>
             
@@ -1099,39 +1241,45 @@ export default function App() {
 
             <button 
               onClick={() => setBlank(!liveState.is_blank)}
-              className={`px-3 py-1.5 rounded-md font-black text-[9px] tracking-[0.15em] uppercase transition-all flex items-center gap-1.5 ${liveState.is_blank ? 'bg-gray-800 text-white shadow-lg border border-gray-600' : 'text-gray-500 hover:text-white hover:bg-black'}`}
+              className={`px-2.5 py-1 rounded-md font-black text-[8px] tracking-[0.15em] uppercase transition-all flex items-center gap-1 ${liveState.is_blank ? 'bg-gray-800 text-white shadow-lg border border-gray-600' : 'text-gray-500 hover:text-white hover:bg-black'}`}
               title="Pitch Black Out"
             >
-              <div className={`w-2 h-2 rounded-[2px] transition-colors ${liveState.is_blank ? 'bg-red-500 animate-pulse' : 'bg-black border border-gray-600'}`}></div> 
+              <div className={`w-1.5 h-1.5 rounded-[1px] transition-colors ${liveState.is_blank ? 'bg-red-500 animate-pulse' : 'bg-black border border-gray-600'}`}></div> 
               <span>Blank</span>
             </button>
           </div>
 
           <div className="flex items-center gap-3 lg:gap-6 shrink-0">
-            <nav className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium text-gray-400 h-full">
+            <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs font-medium text-gray-400 h-full">
               <button 
                 onClick={() => { setRightPanelTab('schedule'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'schedule' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Schedule">
-                <ListOrdered size={18} /> <span className="hidden xl:inline">Schedule</span>
-                {rightPanelTab === 'schedule' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
+                className={`flex items-center gap-1.5 transition-colors h-[56px] relative ${rightPanelTab === 'schedule' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Schedule">
+                <ListOrdered size={16} /> <span className="hidden xl:inline">Schedule</span>
+                {rightPanelTab === 'schedule' && <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('scriptures'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'scriptures' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Scriptures">
-                <BookOpen size={18} /> <span className="hidden xl:inline">Scriptures</span>
-                {rightPanelTab === 'scriptures' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
+                className={`flex items-center gap-1.5 transition-colors h-[56px] relative ${rightPanelTab === 'scriptures' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Scriptures">
+                <BookOpen size={16} /> <span className="hidden xl:inline">Scriptures</span>
+                {rightPanelTab === 'scriptures' && <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('lyrics'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'lyrics' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Lyrics">
-                <Music size={18} /> <span className="hidden xl:inline">Lyrics</span>
-                {rightPanelTab === 'lyrics' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
+                className={`flex items-center gap-1.5 transition-colors h-[56px] relative ${rightPanelTab === 'lyrics' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Lyrics">
+                <Music size={16} /> <span className="hidden xl:inline">Lyrics</span>
+                {rightPanelTab === 'lyrics' && <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-(--accent-color) rounded-t-full`}></div>}
               </button>
               <button 
                 onClick={() => { setRightPanelTab('notes'); setIsRightPanelOpen(true); }}
-                className={`flex items-center gap-2 transition-colors h-[72px] relative ${rightPanelTab === 'notes' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Notes">
-                <FileText size={18} /> <span className="hidden xl:inline">Notes</span>
-                {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-1 bg-(--accent-color) rounded-t-full`}></div>}
+                className={`flex items-center gap-1.5 transition-colors h-[56px] relative ${rightPanelTab === 'notes' ? 'text-(--accent-color)' : 'hover:text-white'}`} title="Notes">
+                <FileText size={16} /> <span className="hidden xl:inline">Notes</span>
+                {rightPanelTab === 'notes' && <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-(--accent-color) rounded-t-full`}></div>}
+              </button>
+              <button 
+                onClick={() => { setRightPanelTab('archive'); setIsRightPanelOpen(true); }}
+                className={`flex items-center gap-1.5 transition-colors h-[56px] relative ${rightPanelTab === 'archive' ? 'text-red-400' : 'hover:text-white'}`} title="Capture Sermon Audio">
+                <Radio size={16} className={recorderStatus.isRecording ? 'text-red-400 animate-pulse' : ''} /> <span className="hidden xl:inline">Recorder</span>
+                {rightPanelTab === 'archive' && <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-red-400 rounded-t-full`}></div>}
               </button>
             </nav>
 
@@ -1184,49 +1332,42 @@ export default function App() {
                 
                 <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 no-scrollbar bg-(--bg-primary)/50 relative">
 
-                   {/* TRANSCRIPTION FLOW — Stacked with spacer to start from bottom */}
-                   {sentences.length === 0 && !interimText ? (
+                   {(!liveState.transcription_feed || liveState.transcription_feed.length === 0) && !interimText ? (
                      <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
                         <FileText size={24} className="mb-2" />
                         <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Feed Initialized</p>
                      </div>
                    ) : (
                      <>
-                       <div className="flex-1" />
-                       {sentences.map((line: string, i: number) => {
-                         const isRecent = i >= sentences.length - 3;
-                         const approxTime = new Date(Date.now() - (sentences.length - i) * 2000)
-                           .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                         return (
-                           <div key={i} className="animate-in slide-in-from-bottom-1 duration-200 px-1">
-                             <div className="flex items-center justify-between mb-0.5">
-                               <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500/40">
-                                 Live Feed
-                               </span>
-                               <span className="text-[8px] font-mono text-gray-600">[{approxTime}]</span>
-                             </div>
-                             <p className={`text-xs leading-relaxed transition-all ${
-                               isRecent ? 'text-gray-200 font-medium' : 'text-gray-500 font-normal'
-                             }`}>
-                               {line.trim()}{line.endsWith('.') ? '' : '.'}
-                             </p>
-                           </div>
-                         );
-                       })}
+                        {Array.isArray(liveState.transcription_feed) && liveState.transcription_feed.map((sentence: any, i: number, arr: any[]) => {
+                          const isRecent = i >= arr.length - 2;
+                          const timeStr = new Date(sentence.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                          return (
+                            <div key={sentence.id} className="animate-in slide-in-from-bottom-1 duration-200 px-1 mb-3">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500/60">
+                                  Live Feed
+                                </span>
+                                <span className="text-[8px] font-mono text-gray-400">[{timeStr}]</span>
+                              </div>
+                              <p className={`text-xs leading-relaxed transition-all ${
+                                isRecent ? 'text-white font-black' : 'text-gray-400 font-normal'
+                              }`}>
+                                {sentence.text.trim()}{sentence.text.trim().match(/[.!?]$/) ? '' : '.'}
+                              </p>
+                            </div>
+                          );
+                        })}
 
-                       {/* LIVE INTERIM — pinned to the bottom for a premium "docked" experience */}
-                       {interimText && (
-                         <div className="sticky bottom-[-13px] -mx-3 z-10 mt-auto px-4 py-4 bg-linear-to-t from-(--bg-primary) via-(--bg-primary)/98 to-(--bg-primary)/90 border-t border-(--accent-color)/30 backdrop-blur-xl shadow-[0_-15px_30px_rgba(0,0,0,0.8)] animate-in fade-in slide-in-from-bottom-4 duration-300">
-                           <div className="flex items-center gap-2 mb-1.5">
-                             <div className="relative">
-                               <span className="w-2 h-2 rounded-full bg-(--accent-color) animate-pulse inline-block" />
-                               <span className="absolute inset-0 w-2 h-2 rounded-full bg-(--accent-color) animate-ping inline-block" />
-                             </div>
-                             <span className="text-[9px] font-black text-(--accent-color) uppercase tracking-[0.2em]">Live Transcription</span>
-                           </div>
-                           <p className="text-sm font-bold text-white leading-relaxed drop-shadow-sm">{interimText}</p>
-                         </div>
-                       )}
+                        {interimText && (
+                          <div className="mt-1 px-1 border-l-2 border-emerald-500 pl-2 bg-emerald-500/5 py-2 rounded-r">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                              <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Listening...</span>
+                            </div>
+                            <p className="text-xs font-semibold text-white/90 leading-relaxed italic">{interimText}</p>
+                          </div>
+                        )}
                      </>
                    )}
                  </div>
@@ -1517,15 +1658,10 @@ export default function App() {
                                 <h4 className="text-(--accent-color) font-black text-xs mb-2 tracking-[0.2em] uppercase">{displayVerseLive.reference}</h4>
                                 <p className="text-white text-xl font-bold font-serif italic line-clamp-4 leading-relaxed">"{displayVerseLive.text}"</p>
                              </div>
-                          ) : (liveState.current_text || liveState.transcription_chunk) ? (
+                          ) : liveState.current_text ? (
                              <div className="w-full text-center animate-in fade-in duration-500 px-4 z-10 flex flex-col items-center gap-2">
-                                {!liveState.current_text && liveState.transcription_chunk && (
-                                   <div className="px-2 py-0.5 bg-gray-500/20 text-gray-400 rounded text-[8px] font-black tracking-widest uppercase border border-white/5 animate-pulse">
-                                      Private Operator Feed
-                                   </div>
-                                )}
-                                <p className={`text-xl font-black tracking-tight drop-shadow-glow italic font-serif ${!liveState.current_text ? 'text-gray-400/80' : 'text-emerald-400'}`}>
-                                   "{liveState.current_text || liveState.transcription_chunk}"
+                                <p className="text-xl font-black tracking-tight drop-shadow-glow italic font-serif text-emerald-400">
+                                   "{liveState.current_text}"
                                 </p>
                              </div>
                           ) : airedLyric ? (
@@ -1713,14 +1849,14 @@ export default function App() {
           {/* Right Panel */}
           {isRightPanelOpen && (
             <aside className="w-80 max-w-[25%] min-w-[280px] bg-[#161616] border-l border-white/5 flex flex-col shadow-2xl shrink z-20 animate-in slide-in-from-right-8 duration-300">
-              <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/5 font-medium text-sm text-gray-300">
+              <div className="h-[56px] flex items-center justify-between px-6 border-b border-white/5 font-medium text-xs text-gray-300">
                 <button 
                   onClick={() => setIsRightPanelOpen(false)}
                   className="flex items-center gap-2 hover:text-white transition-colors capitalize">
-                  <ChevronRight size={18} /> {rightPanelTab}
+                  <ChevronRight size={16} /> {rightPanelTab}
                 </button>
-                <button onClick={() => setProjector(true)} title="Launch Projector from Panel" className="p-1.5 hover:bg-white/5 rounded-md transition-colors text-gray-400 hover:text-white">
-                  <LayoutGrid size={18} />
+                <button onClick={() => setProjector(true)} title="Launch Projector from Panel" className="p-1 hover:bg-white/5 rounded-md transition-colors text-gray-400 hover:text-white">
+                  <LayoutGrid size={16} />
                 </button>
               </div>
               
@@ -1729,37 +1865,37 @@ export default function App() {
                 {/* Schedule Tab */}
                 {rightPanelTab === 'schedule' && (
                   <div className="flex flex-col h-full overflow-hidden space-y-4 animate-in slide-in-from-right-4">
-                     <div className="shrink-0 flex items-center justify-between pb-4 border-b border-white/5">
-                        <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                           <ListOrdered size={18} className="text-(--accent-color)" /> Service Plan
+                     <div className="shrink-0 flex items-center justify-between pb-3 border-b border-white/5">
+                        <h3 className="text-white font-bold text-base flex items-center gap-2">
+                           <ListOrdered size={16} className="text-(--accent-color)" /> Service Plan
                         </h3>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
                            <button 
                               onClick={() => { if(confirm("Reset to standard rundown?")) resetToMasterRundown(); }}
-                              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+                              className="flex items-center gap-1 px-1.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
                            >
-                              <RefreshCw size={12} /> Reset
+                              <RefreshCw size={10} /> Reset
                            </button>
                            <button 
                               onClick={() => setIsEditingPlan(!isEditingPlan)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors ${
                                 isEditingPlan ? 'bg-emerald-500 text-black' : 'bg-white/5 text-gray-400 hover:text-white'
                               }`}
                            >
-                              {isEditingPlan ? <Check size={14} /> : <Edit2 size={14} />}
+                              {isEditingPlan ? <Check size={12} /> : <Edit2 size={12} />}
                               {isEditingPlan ? 'Done' : 'Edit'}
                            </button>
                         </div>
                      </div>
                      
                      {expandedBlockId && (
-                        <div className="flex items-center gap-2 mb-4 animate-in slide-in-from-left-4 duration-300">
+                        <div className="flex items-center gap-2 mb-2 animate-in slide-in-from-left-4 duration-300">
                            <button 
                               onClick={() => setExpandedBlockId(null)}
-                              className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all"
+                              className="p-1.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-lg transition-all"
                               title="Back to Rundown"
                            >
-                              <ArrowLeft size={16} />
+                              <ArrowLeft size={14} />
                            </button>
                         </div>
                      )}
@@ -1819,26 +1955,26 @@ export default function App() {
                            return (
                               <div 
                                 key={item.id}
-                                className={`rounded-xl border transition-all relative overflow-hidden ${
+                                className={`rounded-lg border transition-all relative overflow-hidden ${
                                    isLive 
-                                     ? 'ring-2 ring-(--accent-color) border-(--accent-color)/50' 
+                                     ? 'ring-1 ring-(--accent-color) border-(--accent-color)/50' 
                                      : 'border-white/5'
                                 } ${
-                                   isExpanded ? 'bg-[#1c1c1f] shadow-2xl scale-[1.02] -mx-1 z-10 p-2' : 'bg-[#161618] hover:bg-[#1c1c1f]'
+                                   isExpanded ? 'bg-[#1c1c1f] shadow-2xl scale-[1.01] -mx-0.5 z-10 p-1.5' : 'bg-[#161618] hover:bg-[#1c1c1f]'
                                 }`}
                               >
                                  {/* Folder Header / List View */}
                                  {!isExpanded && (
                                     <div 
                                        onClick={() => setExpandedBlockId(item.id)}
-                                       className="p-4 flex items-center justify-between cursor-pointer select-none group"
+                                       className="p-2.5 flex items-center justify-between cursor-pointer select-none group"
                                     >
-                                       <div className="flex items-center gap-3">
-                                          <div className={`w-8 h-8 flex items-center justify-center rounded-lg font-black text-xs ${isLive ? 'bg-(--accent-color) text-black' : 'bg-white/10 text-gray-400 group-hover:bg-white/20'}`}>
+                                       <div className="flex items-center gap-2.5">
+                                          <div className={`w-7 h-7 flex items-center justify-center rounded-md font-black text-xs ${isLive ? 'bg-(--accent-color) text-black' : 'bg-white/10 text-gray-400 group-hover:bg-white/20'}`}>
                                              {idx + 1}
                                           </div>
-                                          <div className="flex flex-col">
-                                             <h4 className={`font-bold text-base transition-colors ${isLive ? 'text-white' : 'text-gray-400'}`}>
+                                          <div className="flex flex-col min-w-0">
+                                             <h4 className={`font-bold text-sm transition-colors truncate ${isLive ? 'text-white' : 'text-gray-400'}`}>
                                                 {item.title}
                                              </h4>
                                              <div className="flex items-center gap-2">
@@ -1870,21 +2006,21 @@ export default function App() {
 
                                  {/* Dedicated Workspace Interior */}
                                  {isExpanded && (
-                                    <div className="px-4 pt-4 pb-8 bg-black/20 rounded-xl animate-in fade-in duration-500">
-                                       <div className="flex items-center gap-4 mb-6">
-                                          <div className="flex flex-col">
-                                             <h2 className="text-xl font-black text-white">{item.title}</h2>
+                                    <div className="px-3 pt-3 pb-6 bg-black/20 rounded-lg animate-in fade-in duration-500">
+                                       <div className="flex items-center gap-3 mb-4">
+                                          <div className="flex flex-col min-w-0">
+                                             <h2 className="text-base font-black text-white truncate">{item.title}</h2>
                                           </div>
                                        </div>
 
-                                       <div className="space-y-6">
+                                       <div className="space-y-4">
                                           {/* Songs */}
                                           {(item.type === 'worship' || item.type === 'praise') && (
-                                             <div className="space-y-2">
+                                             <div className="space-y-1.5">
                                                 {item.songs && item.songs.length > 0 && (
-                                                   <div className="space-y-1.5">
+                                                   <div className="space-y-1">
                                                       {item.songs.map((song, sIdx) => (
-                                                         <div key={sIdx} className="flex gap-2">
+                                                         <div key={sIdx} className="flex gap-1.5">
                                                             <button 
                                                                onClick={() => { 
                                                                   loadSong(song); 
@@ -1892,19 +2028,19 @@ export default function App() {
                                                                   setActiveView('live');
                                                                   showToast(`Loaded: ${song.title}`); 
                                                                }}
-                                                               className="flex-1 text-left bg-black/40 hover:bg-emerald-500/10 px-3 py-2 rounded-lg border border-white/5 shadow-inner flex items-center justify-between group/song transition-all"
+                                                               className="flex-1 text-left bg-black/40 hover:bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-white/5 flex items-center justify-between group/song transition-all min-w-0"
                                                             >
                                                                <div className="flex items-center gap-2 min-w-0">
-                                                                  <span className="text-[10px] font-black text-emerald-500/50">{sIdx + 1}.</span>
-                                                                  <span className="text-xs font-bold text-gray-300 group-hover/song:text-emerald-400 transition-colors truncate">{song.title}</span>
+                                                                  <span className="text-[9px] font-black text-emerald-500/50">{sIdx + 1}.</span>
+                                                                  <span className="text-[11px] font-bold text-gray-300 group-hover/song:text-emerald-400 transition-colors truncate">{song.title}</span>
                                                                </div>
-                                                               <Music size={12} className="text-emerald-500 opacity-50 group-hover/song:opacity-100 transition-opacity" />
+                                                               <Music size={10} className="text-emerald-500 opacity-50 group-hover/song:opacity-100 transition-opacity" />
                                                             </button>
                                                             <button 
                                                                onClick={() => { const nu = [...servicePlan]; nu[idx].songs = nu[idx].songs?.filter((_, i) => i !== sIdx); saveServicePlan(nu); }}
-                                                               className="px-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg border border-red-500/20 transition-colors"
+                                                               className="px-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg border border-red-500/20 transition-colors"
                                                             >
-                                                               <X size={12} />
+                                                               <X size={10} />
                                                             </button>
                                                          </div>
                                                       ))}
@@ -1912,9 +2048,9 @@ export default function App() {
                                                 )}
                                                 <button 
                                                    onClick={() => setSongPickerBlockId(item.id)}
-                                                   className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500/5 border border-dashed border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all"
+                                                   className="w-full flex items-center justify-center gap-1 py-2 bg-emerald-500/5 border border-dashed border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 rounded-lg text-[9px] uppercase font-black tracking-widest transition-all"
                                                 >
-                                                   <Plus size={14} /> Add Song
+                                                   <Plus size={12} /> Add Song
                                                 </button>
                                              </div>
                                           )}
@@ -2240,6 +2376,100 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Sermon Archive Tab */}
+                {rightPanelTab === 'archive' && (
+                   <div className="flex flex-col h-full overflow-hidden space-y-4 animate-in slide-in-from-right-4">
+                      <div className="shrink-0 flex items-center justify-between pb-3 border-b border-white/5">
+                         <h3 className="text-white font-bold text-base flex items-center gap-2">
+                            <Radio size={16} className={recorderStatus.isRecording ? 'text-red-500 animate-pulse' : 'text-gray-500'} /> 
+                            Sermon Recorder
+                         </h3>
+                      </div>
+
+                      <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-3.5 shadow-inner">
+                         <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Live Input Level</span>
+                            <span className={`text-[10px] font-mono font-bold ${recorderStatus.isRecording ? 'text-red-400' : 'text-gray-500'}`}>
+                               {recorderStatus.isRecording 
+                                  ? new Date(recorderStatus.duration * 1000).toISOString().substr(14, 5) 
+                                  : '00:00'}
+                            </span>
+                         </div>
+                         
+                         {/* VU METER SLIM */}
+                         <div className="flex items-end gap-[1.5px] h-10 px-1">
+                            {Array.from({ length: 40 }).map((_, i) => (
+                               <div 
+                                  key={i} 
+                                  className="flex-1 rounded-t-full transition-all duration-75"
+                                  style={{ 
+                                     height: `${Math.max(10, Math.min(100, (vuLevel / 255) * 100 * (0.5 + Math.random() * 0.5)))}%`,
+                                     backgroundColor: i > 30 ? 'rgb(239, 68, 68)' : (i > 20 ? 'rgb(245, 158, 11)' : 'rgb(16, 185, 129)'),
+                                     opacity: (vuLevel / 255) > (i / 40) ? 1 : 0.15
+                                  }}
+                               />
+                            ))}
+                         </div>
+
+                         <div className="flex flex-col gap-2">
+                            {recorderStatus.isRecording ? (
+                               <div className="flex items-center gap-2">
+                                  <button 
+                                     onClick={() => recorderStatus.isPaused ? recorderService.resume() : recorderService.pause()}
+                                     className={`flex-1 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-lg border ${
+                                        recorderStatus.isPaused 
+                                           ? 'bg-blue-500/10 text-blue-500 border-blue-500/30 hover:bg-blue-500 hover:text-white' 
+                                           : 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500 hover:text-white'}`}
+                                  >
+                                     {recorderStatus.isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />}
+                                     {recorderStatus.isPaused ? 'Resume' : 'Pause'}
+                                  </button>
+                                  <button 
+                                     onClick={stopRecording}
+                                     className="flex-1 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-lg bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white"
+                                  >
+                                     <Square size={12} fill="currentColor" />
+                                     Stop & Save
+                                  </button>
+                               </div>
+                            ) : (
+                               <button 
+                                  onClick={startRecording}
+                                  className="w-full py-2.5 rounded-lg font-black text-[10px] uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg bg-emerald-500 text-black border border-emerald-400/50 hover:bg-emerald-400"
+                               >
+                                  <Mic size={14} />
+                                  Start Recording
+                               </button>
+                            )}
+
+                            {recorderStatus.isRecording && (
+                               <p className={`text-[8px] text-center font-medium uppercase tracking-widest ${recorderStatus.isPaused ? 'text-amber-500/60' : 'text-red-500/60 animate-pulse'}`}>
+                                  {recorderStatus.isPaused ? 'Recording Paused' : 'Recording High-Fidelity Opus @ 128kbps'}
+                                </p>
+                            )}
+                         </div>
+                      </div>
+
+                      {/* STATUS INFO */}
+                      <div className="mt-1 space-y-2">
+                         <div className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex items-center gap-3">
+                            <Save size={16} className="text-emerald-500/50" />
+                            <div className="flex-1">
+                               <h4 className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Safety Backup</h4>
+                               <p className="text-[8px] text-gray-500 font-medium leading-none">Auto-saving chunks every 5s</p>
+                            </div>
+                         </div>
+                         <div className="bg-blue-500/5 border border-blue-500/10 p-3 rounded-lg flex items-center gap-3">
+                            <RefreshCw size={16} className="text-blue-500/50" />
+                            <div className="flex-1">
+                               <h4 className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Local Export</h4>
+                               <p className="text-[8px] text-gray-500 font-medium leading-none">Direct Download to PC</p>
+                            </div>
+                         </div>
+                      </div>
+                   </div>
+                )}
+
                 {/* Broadcast Hub (The News Ticker Editor) */}
                 {rightPanelTab === 'broadcast' && (
                   <div className="space-y-6 animate-in slide-in-from-right-4">
@@ -2253,22 +2483,22 @@ export default function App() {
                        <input 
                          type="checkbox" 
                          checked={liveState.ticker_enabled ?? true} 
-                         onChange={(e) => setLiveState((s: LiveState) => ({ ...s, ticker_enabled: e.target.checked, updated_at: new Date().toISOString() }))}
+                         onChange={(e) => setLiveState((s: any) => ({ ...s, ticker_enabled: e.target.checked, updated_at: new Date().toISOString() }))}
                          className="accent-emerald-500 h-5 w-5 bg-black cursor-pointer"
                        />
                      </div>
 
-                     <div className="bg-[#1e1e1e] p-5 rounded-2xl border border-white/5 space-y-3">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Add Scrolling Headline</label>
+                     <div className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Add Scrolling Headline</label>
                         <input 
                           type="text" 
-                          placeholder="Type breaking news..."
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
+                          placeholder="Type news..."
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
                           onKeyDown={(e) => {
                              if (e.key === 'Enter') {
                                 const msg = (e.target as HTMLInputElement).value;
                                 if (msg) {
-                                   setLiveState((s: LiveState) => ({ ...s, ticker_items: [...(s.ticker_items || []), msg], updated_at: new Date().toISOString() }));
+                                   setLiveState((s: any) => ({ ...s, ticker_items: [...(s.ticker_items || []), msg], updated_at: new Date().toISOString() }));
                                    (e.target as HTMLInputElement).value = '';
                                 }
                              }
@@ -2276,25 +2506,25 @@ export default function App() {
                         />
                      </div>
 
-                     <div className="space-y-3">
+                     <div className="space-y-2">
                         <div className="flex items-center justify-between px-1">
-                           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Queue</span>
+                           <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Queue</span>
                            <button 
-                             onClick={() => setLiveState((s: LiveState) => ({ ...s, ticker_items: [], updated_at: new Date().toISOString() }))}
-                             className="text-[10px] uppercase text-red-500 hover:text-red-400 font-black"
+                             onClick={() => setLiveState((s: any) => ({ ...s, ticker_items: [], updated_at: new Date().toISOString() }))}
+                             className="text-[9px] uppercase text-red-500 hover:text-red-400 font-black"
                            >
-                             Clear All
+                             Clear
                            </button>
                         </div>
-                        <div className="space-y-2 max-h-[350px] overflow-y-auto no-scrollbar pb-10">
-                           {liveState.ticker_items?.map((item, i) => (
-                             <div key={i} className="group relative bg-[#1c1c1f] hover:bg-[#252525] p-3 rounded-xl border border-white/5 transition-all">
-                                <p className="text-[13px] text-gray-200 pr-8">{item}</p>
+                        <div className="space-y-1.5 max-h-[300px] overflow-y-auto no-scrollbar pb-6">
+                           {liveState.ticker_items?.map((item: string, i: number) => (
+                             <div key={i} className="group relative bg-[#1c1c1f] hover:bg-[#252525] p-2.5 rounded-lg border border-white/5 transition-all">
+                                <p className="text-xs text-gray-200 pr-8 leading-tight">{item}</p>
                                 <button 
-                                  onClick={() => setLiveState((s: LiveState) => ({ ...s, ticker_items: s.ticker_items?.filter((_, idx: number) => idx !== i), updated_at: new Date().toISOString() }))}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-red-500 font-black text-[10px] opacity-0 group-hover:opacity-100 transition-all"
+                                  onClick={() => setLiveState((s: any) => ({ ...s, ticker_items: s.ticker_items?.filter((_: any, idx: number) => idx !== i), updated_at: new Date().toISOString() }))}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-red-500 font-black text-[9px] opacity-0 group-hover:opacity-100 transition-all"
                                 >
-                                  DELETE
+                                  DEL
                                 </button>
                              </div>
                            ))}
@@ -2306,15 +2536,15 @@ export default function App() {
 
                 {/* Scriptures Tab */}
                 {rightPanelTab === 'scriptures' && (
-                  <div className="flex flex-col h-full overflow-hidden space-y-4">
+                  <div className="flex flex-col h-full overflow-hidden space-y-3">
                     {/* TOP CONTROLS: QUICK-FIRE & FILTERS */}
-                    <div className="shrink-0 flex flex-col gap-2 mt-1">
+                    <div className="shrink-0 flex flex-col gap-1.5 mt-1">
                        <div className="relative group flex items-center">
-                          <Activity size={12} className="absolute left-2 text-emerald-500 animate-pulse" />
+                          <Activity size={10} className="absolute left-2 text-emerald-500 animate-pulse" />
                           <input 
                             type="text"
-                            placeholder="Quick e.g. Gen 10:3, 1 John 3:16"
-                            className="w-full bg-[#1c1c1f] border border-emerald-500/20 rounded-md pl-7 pr-12 py-1.5 text-xs text-white focus:border-emerald-500 outline-none transition-all font-mono font-medium"
+                            placeholder="Quick Verse (e.g. Gen 1:1)"
+                            className="w-full bg-[#1c1c1f] border border-emerald-500/20 rounded pl-7 pr-12 py-1 text-[11px] text-white focus:border-emerald-500 outline-none transition-all font-mono"
                             onKeyDown={(e) => {
                                if (e.key === 'Enter') {
                                   const val = (e.target as HTMLInputElement).value.trim();
@@ -2396,15 +2626,15 @@ export default function App() {
                       
                       <div 
                         ref={bibleScrollRef}
-                        className="flex-1 space-y-2 overflow-y-auto no-scrollbar pb-6 pr-1"
+                        className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar pb-6 pr-1"
                       >
                         {isBibleLoading ? (
-                           <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                              <RefreshCw size={32} className="text-emerald-500 animate-spin" />
-                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Retrieving Revelation...</p>
+                           <div className="flex flex-col items-center justify-center py-10 space-y-2">
+                              <RefreshCw size={24} className="text-emerald-500 animate-spin" />
+                              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500">Retrieving Revelation...</p>
                            </div>
                         ) : chapterVerses.length > 0 ? (
-                          chapterVerses.map((v) => {
+                          chapterVerses.map((v: any) => {
                             const isLive = liveState.current_verse?.book === selectedBook && 
                                            liveState.current_verse?.chapter === selectedChapter && 
                                            liveState.current_verse?.verse_start === v.verse;
@@ -2435,24 +2665,24 @@ export default function App() {
                                      goLive();
                                   }
                                 }}
-                                className={`w-full text-left px-2 py-1.5 rounded-sm border-l-2 transition-all duration-75 min-h-[40px] group
+                                className={`w-full text-left px-2 py-1 rounded border-l-2 transition-all duration-75 min-h-[32px] group
                                   ${isLive 
                                     ? 'bg-(--accent-color)/15 border-(--accent-color)' 
                                     : isPreview 
                                       ? 'bg-white/5 border-(--accent-color)/40' 
                                       : 'bg-transparent border-transparent hover:bg-white/5'}`}
                               >
-                                <div className="flex items-start gap-2">
-                                   <span className={`text-[9px] font-black italic shrink-0 mt-px w-3 text-right ${isLive ? 'text-(--accent-color)' : 'text-gray-500'}`}>{v.verse}</span>
-                                   <p className={`text-[12px] leading-tight transition-colors ${isLive ? 'text-white font-medium' : 'text-gray-400 group-hover:text-gray-200'}`}>{v.text}</p>
+                                <div className="flex items-start gap-1.5">
+                                   <span className={`text-[8px] font-black italic shrink-0 mt-0.5 w-3 text-right ${isLive ? 'text-(--accent-color)' : 'text-gray-500'}`}>{v.verse}</span>
+                                   <p className={`text-[11px] leading-snug transition-colors ${isLive ? 'text-white font-medium' : 'text-gray-400 group-hover:text-gray-200'}`}>{v.text}</p>
                                 </div>
                               </button>
                             );
                           })
                         ) : (
-                          <div className="text-center py-12 bg-white/1 rounded-2xl border border-dashed border-white/5">
-                            <RefreshCw size={24} className="mx-auto text-gray-600 opacity-20 mb-2 animate-spin-slow" />
-                            <p className="text-gray-500 text-[10px] uppercase tracking-widest italic">Verse data unavailable</p>
+                          <div className="text-center py-8 bg-white/1 rounded-xl border border-dashed border-white/5">
+                            <RefreshCw size={18} className="mx-auto text-gray-600 opacity-20 mb-1 animate-spin-slow" />
+                            <p className="text-gray-500 text-[8px] uppercase tracking-widest italic">Verse data unavailable</p>
                           </div>
                         )}
                       </div>
@@ -2475,7 +2705,7 @@ export default function App() {
                     ) : (
                       <>
                         <div className="space-y-4">
-                          {liveState.history.slice(-10).reverse().map((item, idx) => (
+                          {liveState.history.slice(-10).reverse().map((item: any, idx: number) => (
                             <div key={idx} className="p-4 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-right-2">
                                <div className="flex items-center justify-between mb-1">
                                   <span className={`text-[10px] font-bold uppercase tracking-wider ${item.type === 'scripture' ? 'text-emerald-400' : 'text-blue-400'}`}>{item.type}</span>
@@ -2489,7 +2719,7 @@ export default function App() {
                         <button 
                           onClick={() => {
                             const content = `SERMON SUMMARY: ${session.name}\nDate: ${new Date().toLocaleDateString()}\n\n` + 
-                              liveState.history.map(h => `[${new Date(h.timestamp).toLocaleTimeString()}] ${h.type.toUpperCase()}: ${h.reference || ''} ${h.content}`).join('\n');
+                              liveState.history.map((h: any) => `[${new Date(h.timestamp).toLocaleTimeString()}] ${h.type.toUpperCase()}: ${h.reference || ''} ${h.content}`).join('\n');
                             const blob = new Blob([content], { type: 'text/plain' });
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement('a');
@@ -2509,13 +2739,13 @@ export default function App() {
                 {/* Notes Tab (Consolidated) */}
                 {rightPanelTab === 'notes' && (
                   <div className="space-y-4 pb-20">
-                    <h3 className="text-white font-bold text-lg mb-2">Session Notes</h3>
+                    <h3 className="text-white font-bold text-base mb-1">Session Notes</h3>
                     {notes.length === 0 ? (
-                       <p className="text-gray-500 text-sm italic">No notes captured yet. Save snippets from the transcript or type below.</p>
+                       <p className="text-gray-500 text-[11px] italic">No snippets captured yet.</p>
                     ) : (
-                      <div className="space-y-3">
-                        {notes.map(n => (
-                          <div key={n.id} className="bg-[#1e1e1e] p-4 rounded-xl border border-white/5 shadow-sm text-[13px] text-gray-300 leading-relaxed animate-in fade-in slide-in-from-bottom-2">
+                      <div className="space-y-2">
+                        {Array.from(new Map(notes.map(n => [n.id, n])).values()).map((n: any) => (
+                          <div key={n.id} className="bg-[#1e1e1e] p-3 rounded-lg border border-white/5 shadow-sm text-[11px] text-gray-300 leading-normal animate-in fade-in slide-in-from-bottom-2">
                              {n.content}
                           </div>
                         ))}
@@ -2534,6 +2764,7 @@ export default function App() {
                        >
                          Live Paste
                        </button>
+                    </div>
 
                      {/* Live Paste Modal */}
                      {showPasteModal && (
@@ -2580,7 +2811,7 @@ export default function App() {
                                  if (!title || !lyrics) return;
                                  const lines = lyrics.split('\n').filter(l => l.trim().length > 0);
                                  const newId = `pasted-${Date.now()}`;
-                                 const newSong: Song = {
+                                 const newSong = {
                                    id: newId,
                                    title,
                                    artist: 'Operator',
@@ -2604,14 +2835,13 @@ export default function App() {
                          </div>
                        </div>
                      )}
-                    </div>
 
                     {/* SEARCH BAR */}
                     <div className="relative group">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-emerald-500 transition-colors" size={14} />
                       <input 
                         type="text"
-                        placeholder="Search 10,000 songs..."
+                        placeholder="Search songs..."
                         value={lyricSearchQuery}
                         onChange={async (e) => {
                            const q = e.target.value;
@@ -2619,18 +2849,13 @@ export default function App() {
                            const results = await searchLyrics(q, selectedLyricCategory);
                            setLyricSearchResults(results);
                         }}
-                        className="w-full bg-[#1c1c1f] border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
+                        className="w-full bg-[#1c1c1f] border border-white/5 rounded-lg pl-9 pr-4 py-2 text-xs text-white focus:border-emerald-500/50 outline-none transition-all shadow-inner"
                       />
                     </div>
 
                     {/* CATEGORY CHIPS */}
-                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
                        {['All', 'African Praise', 'Contemporary Praise', 'Worship Essentials', 'Pasted'].map(cat => {
-                         // Count against the full loaded dataset for accurate badges
-                         const count = cat === 'All' 
-                           ? 1000 // Approximate or we could get real count
-                           : (cat === 'African Praise' ? 420 : (cat === 'Contemporary Praise' ? 310 : 270));
-                         
                          return (
                            <button
                              key={cat}
@@ -2639,7 +2864,7 @@ export default function App() {
                                const results = await searchLyrics(lyricSearchQuery, cat === 'Pasted' ? undefined : (cat === 'All' ? undefined : cat));
                                setLyricSearchResults(results);
                              }}
-                             className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm flex items-center gap-2
+                             className={`whitespace-nowrap px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5
                                ${selectedLyricCategory === cat 
                                  ? 'bg-emerald-500 text-black shadow-emerald-500/20' 
                                  : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white border border-white/5'}`}
@@ -2651,31 +2876,33 @@ export default function App() {
                     </div>
                     
                     {!currentSong || !settings.detectSongs ? (
-                      <div className="space-y-3">
-                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 px-1">Discover / Selection</p>
-                         <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto no-scrollbar pb-10">
-                            {lyricSearchResults.map(song => (
-                               <button 
-                                 key={song.id}
-                                 onClick={() => {
-                                   loadSong(song);
-                                   showToast(`Loaded: ${song.title}`);
-                                 }}
-                                 className="flex flex-col items-start p-4 bg-white/3 hover:bg-white/8 border border-white/5 rounded-xl transition-all group relative overflow-hidden text-left"
-                               >
-                                  <div className="flex items-center justify-between w-full mb-1">
-                                     <span className="text-white font-bold text-sm group-hover:text-emerald-400 transition-colors">{song.title}</span>
-                                     <Music className="text-white/20 group-hover:text-emerald-400/50 transition-colors" size={14} />
-                                  </div>
-                                  <div className="flex items-center justify-between w-full">
-                                    <span className="text-gray-500 text-[10px] uppercase tracking-wider font-medium">{song.artist || 'Traditional'}</span>
-                                    {song.tags?.map(t => (
-                                      <span key={t} className="bg-emerald-500/10 text-emerald-400/80 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/10">{t}</span>
-                                    ))}
-                                  </div>
-                                  <div className="absolute inset-x-0 bottom-0 h-0.5 bg-emerald-500 transform translate-y-full group-hover:translate-y-0 transition-transform"></div>
-                               </button>
-                            ))}
+                       <div className="space-y-2">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 px-1">Discover / Selection</p>
+                          <div className="grid grid-cols-1 gap-2 max-h-[50vh] overflow-y-auto no-scrollbar pb-10">
+                             {lyricSearchResults.map((song: any) => (
+                                <button 
+                                  key={song.id}
+                                  onClick={() => {
+                                    loadSong(song);
+                                    showToast(`Loaded: ${song.title}`);
+                                  }}
+                                  className="flex flex-col items-start p-3 bg-white/3 hover:bg-white/8 border border-white/5 rounded-lg transition-all group relative overflow-hidden text-left"
+                                >
+                                   <div className="flex items-center justify-between w-full mb-0.5">
+                                      <span className="text-white font-bold text-xs group-hover:text-emerald-400 transition-colors truncate pr-2">{song.title}</span>
+                                      <Music className="text-white/20 group-hover:text-emerald-400/50 transition-colors shrink-0" size={12} />
+                                   </div>
+                                   <div className="flex items-center justify-between w-full">
+                                     <span className="text-gray-500 text-[9px] uppercase tracking-wider font-medium">{song.artist || 'Traditional'}</span>
+                                     <div className="flex gap-1">
+                                       {song.tags?.slice(0, 2).map((t: string) => (
+                                         <span key={t} className="bg-emerald-500/5 text-emerald-400/60 text-[7px] px-1 py-0.5 rounded border border-emerald-500/10 uppercase font-black">{t}</span>
+                                       ))}
+                                     </div>
+                                   </div>
+                                   <div className="absolute inset-x-0 bottom-0 h-0.5 bg-emerald-500 transform translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                                </button>
+                             ))}
                             {lyricSearchResults.length === 0 && (
                                <div className="text-center py-12 bg-white/1 rounded-2xl border border-dashed border-white/5">
                                   <Search size={32} className="mx-auto text-gray-600 opacity-10 mb-2" />
@@ -2696,7 +2923,7 @@ export default function App() {
                            </button>
                         </div>
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1 pb-10">
-                         {currentSong?.lyrics?.map((lyricLine) => {
+                         {currentSong?.lyrics?.map((lyricLine: any) => {
                             const isLive = lyricLine.order === liveState.current_lyric_index;
                             const isPreview = lyricLine.order === liveState.preview_lyric_index;
                             return (
@@ -2737,14 +2964,14 @@ export default function App() {
               </div>
 
               {rightPanelTab === 'notes' && (
-                <div className="p-5 border-t border-white/5 bg-[#161616]">
+                <div className="p-3 border-t border-white/5 bg-[#161616]">
                   <input 
                     type="text" 
                     value={newNote}
                     onChange={e => setNewNote(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSaveNote()}
                     placeholder="Add a note..." 
-                    className="w-full bg-[#1c1c1f] text-sm text-white placeholder-gray-500 rounded-lg px-4 py-3 outline-none border border-white/5 focus:border-emerald-500/50 transition-colors shadow-inner"
+                    className="w-full bg-[#1c1c1f] text-xs text-white placeholder-gray-500 rounded-lg px-3 py-2 outline-none border border-white/5 focus:border-emerald-500/50 transition-colors shadow-inner"
                   />
                 </div>
               )}
@@ -2939,21 +3166,17 @@ export default function App() {
             )}
 
             {/* FALLBACK: CONTINUOUS TRANSCRIPTION (Atmospheric) */}
-            {!liveState.is_point && !displayVerseLive && !liveState.current_lyric_line && (!mainLyric || !settings.showLyrics || liveState.current_song_id) && settings.showTranscript && (
+            {/* FALLBACK: Projector remains clean when nothing is aired. Live transcription is dashboard-only as requested. */}
+            {!liveState.is_point && !displayVerseLive && !liveState.current_lyric_line && (!mainLyric || !settings.showLyrics || liveState.current_song_id) && settings.showTranscript && isListening && (
               <div className="px-12 animate-in fade-in duration-1000 max-w-7xl">
-                <blockquote className="text-white/90 text-[64px] leading-[1.15] font-medium italic tracking-tight drop-shadow-2xl font-serif">
-                   {/* Ghost word fix: Show only stable final words in the big feed */}
-                   {liveState.current_text.split(' ').slice(-60).join(' ') || (isListening ? '...' : '')}
-                </blockquote>
-                {isListening && (
-                   <div className="mt-12 flex items-center justify-center gap-4 opacity-40">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                      <span className="text-sm font-black uppercase tracking-[0.5em] text-white/50 italic">Listening Live Session</span>
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse delay-150"></div>
-                   </div>
-                )}
+                 <div className="flex items-center justify-center gap-4 opacity-10">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.5em] text-white/50 italic">Live Session Active</span>
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse delay-150"></div>
+                 </div>
               </div>
             )}
+
 
             {/* STAGE ONLY ELEMENTS (Timer, Metadata) */}
             {projectionRole === 'stage' && (
