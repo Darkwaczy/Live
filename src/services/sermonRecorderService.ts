@@ -5,6 +5,8 @@ export interface RecorderStatus {
   isPaused: boolean;
   duration: number;
   rms: number; // Volume levels for the VU meter
+  isSilent: boolean; // Silence detection flag
+  analyser?: AnalyserNode; // Exposed for waveform rendering
 }
 
 class SermonRecorderService {
@@ -15,11 +17,22 @@ class SermonRecorderService {
   private startTime: number = 0;
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private filterNode: BiquadFilterNode | null = null;
+  private compressor: DynamicsCompressorNode | null = null;
+  private gainNode: GainNode | null = null;
   private animationFrame: number | null = null;
   private stream: MediaStream | null = null;
   private sessionId: string | null = null;
   private totalPausedTime: number = 0;
   private pauseStartTime: number | null = null;
+  private silenceStartTime: number | null = null;
+  private isSilent: boolean = false;
+  
+  public config = {
+    noiseReduction: true,
+    volumeLeveling: true,
+    highQuality: true
+  };
 
   async start(stream?: MediaStream) {
     if (this.mediaRecorder?.state === 'recording') return;
@@ -36,21 +49,51 @@ class SermonRecorderService {
         } 
       });
 
-      // Setup Monitoring (VU Meter)
+      // Setup Processing Pipeline
       this.audioContext = new AudioContext();
       const source = this.audioContext.createMediaStreamSource(this.stream);
+      
+      // 1. Noise Reduction (High Pass to cut low hums)
+      this.filterNode = this.audioContext.createBiquadFilter();
+      this.filterNode.type = 'highpass';
+      this.filterNode.frequency.value = this.config.noiseReduction ? 80 : 0; 
+      
+      // 2. Volume Leveling (Compressor)
+      this.compressor = this.audioContext.createDynamicsCompressor();
+      if (this.config.volumeLeveling) {
+        this.compressor.threshold.setValueAtTime(-24, this.audioContext.currentTime);
+        this.compressor.knee.setValueAtTime(30, this.audioContext.currentTime);
+        this.compressor.ratio.setValueAtTime(12, this.audioContext.currentTime);
+        this.compressor.attack.setValueAtTime(0.003, this.audioContext.currentTime);
+        this.compressor.release.setValueAtTime(0.25, this.audioContext.currentTime);
+      }
+      
+      // 3. Analyser (Waveform/VU)
       this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 256;
-      source.connect(this.analyser);
+      this.analyser.fftSize = 1024; // Larger for better waveform
+      
+      // 4. Output Gain
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.gain.value = this.config.volumeLeveling ? 1.5 : 1.0; // Makeup gain
 
-      // Start Recording
+      // Connect: Source -> Filter -> Compressor -> Gain -> Destination
+      // Destination is a MediaStreamDestination so we record the PROCESSED audio
+      const destination = this.audioContext.createMediaStreamDestination();
+      
+      source.connect(this.filterNode);
+      this.filterNode.connect(this.compressor);
+      this.compressor.connect(this.gainNode);
+      this.gainNode.connect(this.analyser);
+      this.gainNode.connect(destination);
+
+      // Start Recording from the PROCESSED stream
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
         ? 'audio/webm;codecs=opus' 
         : 'audio/webm';
         
-      this.mediaRecorder = new MediaRecorder(this.stream, {
+      this.mediaRecorder = new MediaRecorder(destination.stream, {
         mimeType,
-        audioBitsPerSecond: 128000
+        audioBitsPerSecond: this.config.highQuality ? 256000 : 128000
       });
 
       this.sessionId = `sermon_${new Date().toISOString().replace(/[:.]/g, '-')}`;
@@ -117,10 +160,11 @@ class SermonRecorderService {
 
     if (this.statusCallback) {
       this.statusCallback({
-        isRecording: false,
-        isPaused: false,
-        duration: 0,
-        rms: 0
+          isRecording: false,
+          isPaused: false,
+          duration: 0,
+          rms: 0,
+          isSilent: false
       });
     }
   }
@@ -158,6 +202,18 @@ class SermonRecorderService {
       }
       const rms = Math.sqrt(sum / bufferLength);
 
+      // Silence Detection (Threshold at -50dB approx)
+      const now = Date.now();
+      if (rms < 0.01 && this.mediaRecorder?.state === 'recording') {
+        if (!this.silenceStartTime) this.silenceStartTime = now;
+        if (now - this.silenceStartTime > 5000) {
+           this.isSilent = true;
+        }
+      } else {
+        this.silenceStartTime = null;
+        this.isSilent = false;
+      }
+
       let effectiveDuration = Date.now() - this.startTime - this.totalPausedTime;
       if (this.pauseStartTime) {
         effectiveDuration -= (Date.now() - this.pauseStartTime);
@@ -167,7 +223,9 @@ class SermonRecorderService {
         isRecording: true,
         isPaused: this.mediaRecorder?.state === 'paused' || false,
         duration: Math.floor(effectiveDuration / 1000),
-        rms: this.mediaRecorder?.state === 'paused' ? 0 : rms * 100 // Scale for UI
+        rms: this.mediaRecorder?.state === 'paused' ? 0 : rms * 100, // Scale for UI
+        isSilent: this.isSilent,
+        analyser: this.analyser || undefined
       });
 
       this.animationFrame = requestAnimationFrame(update);

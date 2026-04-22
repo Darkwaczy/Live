@@ -84,6 +84,69 @@ const KaraokeLine = ({ lyric, spokenText, colorClass, animationClass, sizeClass 
   );
 };
 
+const WaveformVisualizer = ({ analyser, isRecording, isPaused }: { analyser?: AnalyserNode, isRecording: boolean, isPaused: boolean }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !analyser || !isRecording || isPaused) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    let animationId: number;
+
+    const draw = () => {
+      animationId = requestAnimationFrame(draw);
+      analyser.getByteTimeDomainData(dataArray);
+
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#10b981'; // Emerald
+      ctx.beginPath();
+
+      const sliceWidth = canvas.width * 1.0 / bufferLength;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = v * canvas.height / 2;
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+      }
+
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+      
+      // Add a subtle glow
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#10b98166';
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animationId);
+  }, [analyser, isRecording, isPaused]);
+
+  return (
+    <canvas 
+      ref={canvasRef} 
+      width={300} 
+      height={60} 
+      className="w-full h-16 bg-black/40 rounded-lg border border-white/5 overflow-hidden"
+    />
+  );
+};
+
 export default function App() {
   // Check if we are in standalone projector mode
   const isProjectorMode = typeof window !== 'undefined' && window.location.search.includes('projector');
@@ -176,7 +239,13 @@ export default function App() {
     isRecording: false,
     isPaused: false,
     duration: 0,
-    rms: 0
+    rms: 0,
+    isSilent: false
+  });
+
+  const [sermonMetadata, setSermonMetadata] = useState({
+    title: '',
+    preacher: ''
   });
 
   const vuLevel = recorderStatus.rms * 2.55;
@@ -1038,15 +1107,16 @@ export default function App() {
   };
 
   const stopRecording = async () => {
-    const currentSermonTitle = servicePlan[currentPlanIndex]?.title || 'Manual Recording';
     try {
       showToast("Processing Audio...", "info");
       const blob = await recorderService.stop();
-      
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${new Date().toISOString().slice(0, 10)}_${currentSermonTitle.replace(/[^a-z0-9]/gi, '_')}.webm`;
+      const dateStr = new Date().toISOString().split('T')[0];
+      const safeTitle = sermonMetadata.title.replace(/[^a-z0-9]/gi, '_') || 'Sermon';
+      const safePreacher = sermonMetadata.preacher.replace(/[^a-z0-9]/gi, '_') || 'Pastor';
+      a.download = `${dateStr}_${safeTitle}_${safePreacher}.webm`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1766,22 +1836,6 @@ export default function App() {
                      </div>
                   </div>
                 )}
-
-                {/* LYRICS KARAOKE CARD — commented out
-                {settings.showLyrics && settings.detectSongs && currentSong && currentSong.lyrics && currentSong.lyrics.length > 0 && (
-                   <div className="absolute bottom-6 left-10 right-10 p-6 bg-[#161b22]/90 border border-white/5 flex flex-col gap-4 z-10 rounded-3xl backdrop-blur-xl">
-                      <div className="flex items-center gap-3 text-gray-400 mb-2">
-                         <Music size={16} /> <span className="text-xs uppercase tracking-wider font-semibold">{currentSong.title}</span>
-                         <div className="flex-1 h-0.5 bg-white/10 mx-4 rounded-full overflow-hidden"><div className={`h-full w-2/5 rounded-full bg-(--accent-color)`} /></div>
-                      </div>
-                      <div className="relative pl-8">
-                         <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-[2px] rounded-r-md bg-(--accent-color)"></div>
-                         <KaraokeLine lyric={mainLyric || '...'} spokenText={fullTranscript} colorClass="text-(--accent-color)" animationClass={settings.highlightAnimation} sizeClass="text-[26px]" />
-                         {nextLyric && <p className="text-xl text-gray-400 italic font-serif opacity-80 mt-2">{nextLyric}</p>}
-                      </div>
-                   </div>
-                )}
-                */}
               </div>
             ) : activeView === 'history' ? (
               <div className="flex-1 flex flex-col p-10 overflow-hidden bg-(--bg-primary) animate-in fade-in duration-500">
@@ -2386,87 +2440,135 @@ export default function App() {
                          </h3>
                       </div>
 
-                      <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-3.5 shadow-inner">
-                         <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Live Input Level</span>
-                            <span className={`text-[10px] font-mono font-bold ${recorderStatus.isRecording ? 'text-red-400' : 'text-gray-500'}`}>
-                               {recorderStatus.isRecording 
-                                  ? new Date(recorderStatus.duration * 1000).toISOString().substr(14, 5) 
-                                  : '00:00'}
-                            </span>
-                         </div>
-                         
-                         {/* VU METER SLIM */}
-                         <div className="flex items-end gap-[1.5px] h-10 px-1">
-                            {Array.from({ length: 40 }).map((_, i) => (
-                               <div 
-                                  key={i} 
-                                  className="flex-1 rounded-t-full transition-all duration-75"
-                                  style={{ 
-                                     height: `${Math.max(10, Math.min(100, (vuLevel / 255) * 100 * (0.5 + Math.random() * 0.5)))}%`,
-                                     backgroundColor: i > 30 ? 'rgb(239, 68, 68)' : (i > 20 ? 'rgb(245, 158, 11)' : 'rgb(16, 185, 129)'),
-                                     opacity: (vuLevel / 255) > (i / 40) ? 1 : 0.15
-                                  }}
+                      <div className="flex-1 flex flex-col p-4 space-y-5 overflow-y-auto no-scrollbar">
+                       <div className="bg-black/20 p-5 rounded-2xl border border-white/5 shadow-inner">
+                          <div className="flex items-center justify-between mb-4">
+                             <div className="flex items-center gap-2">
+                                <Radio size={14} className={recorderStatus.isRecording ? "text-red-500 animate-pulse" : "text-gray-500"} />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${recorderStatus.isSilent ? 'text-red-400 animate-pulse' : 'text-gray-400'}`}>
+                                  {recorderStatus.isSilent ? 'Silence Detected' : 'Live Input Level'}
+                                </span>
+                             </div>
+                             <span className="text-[10px] font-mono text-gray-500">{Math.floor(recorderStatus.duration / 60)}:{String(recorderStatus.duration % 60).padStart(2, '0')}</span>
+                          </div>
+
+                          <div className="mb-4">
+                            <WaveformVisualizer 
+                              analyser={recorderStatus.analyser} 
+                              isRecording={recorderStatus.isRecording} 
+                              isPaused={recorderStatus.isPaused}
+                            />
+                          </div>
+                          
+                          <div className="relative h-1.5 w-full bg-white/5 rounded-full overflow-hidden mb-6 flex gap-0.5 px-0.5 items-center">
+                             {Array.from({ length: 30 }).map((_, i) => (
+                                <div 
+                                   key={i}
+                                   className={`h-1 flex-1 rounded-full transition-all duration-75 ${
+                                      (recorderStatus.rms > (i / 30) * 100) 
+                                         ? (i > 22 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]')
+                                         : 'bg-white/5'
+                                   }`}
+                                />
+                             ))}
+                          </div>
+
+                          <button 
+                             onClick={recorderStatus.isRecording ? stopRecording : startRecording}
+                             className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase text-[11px] tracking-[0.2em] transition-all duration-300 shadow-lg ${
+                                recorderStatus.isRecording 
+                                   ? 'bg-red-500/20 text-red-500 border border-red-500/30 hover:bg-red-500/30' 
+                                   : 'bg-emerald-500 text-black hover:bg-emerald-400 hover:scale-[1.02] active:scale-95'
+                             }`}
+                          >
+                             {recorderStatus.isRecording ? (
+                                <>
+                                   <Square size={16} fill="currentColor" />
+                                   Stop Recording
+                                </>
+                             ) : (
+                                <>
+                                   <Mic size={16} fill="currentColor" />
+                                   Start Recording
+                                </>
+                             )}
+                          </button>
+                          
+                          {recorderStatus.isRecording && (
+                            <button 
+                               onClick={() => recorderStatus.isPaused ? recorderService.resume() : recorderService.pause()}
+                               className="w-full mt-2 py-3 rounded-xl bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 font-black uppercase text-[10px] tracking-widest transition-all"
+                            >
+                               {recorderStatus.isPaused ? 'Resume' : 'Pause'}
+                            </button>
+                          )}
+                       </div>
+
+                       {/* PRO SETTINGS SECTION */}
+                       <div className="space-y-4">
+                          <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-4">
+                            <h4 className="text-[9px] font-black uppercase tracking-widest text-emerald-500/80 mb-2">Recording Metadata</h4>
+                            <div className="space-y-3">
+                               <input 
+                                 type="text" 
+                                 placeholder="Sermon Title"
+                                 value={sermonMetadata.title}
+                                 onChange={e => setSermonMetadata(prev => ({ ...prev, title: e.target.value }))}
+                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:border-emerald-500/50 outline-none transition-all"
                                />
-                            ))}
-                         </div>
-
-                         <div className="flex flex-col gap-2">
-                            {recorderStatus.isRecording ? (
-                               <div className="flex items-center gap-2">
-                                  <button 
-                                     onClick={() => recorderStatus.isPaused ? recorderService.resume() : recorderService.pause()}
-                                     className={`flex-1 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-lg border ${
-                                        recorderStatus.isPaused 
-                                           ? 'bg-blue-500/10 text-blue-500 border-blue-500/30 hover:bg-blue-500 hover:text-white' 
-                                           : 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500 hover:text-white'}`}
-                                  >
-                                     {recorderStatus.isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />}
-                                     {recorderStatus.isPaused ? 'Resume' : 'Pause'}
-                                  </button>
-                                  <button 
-                                     onClick={stopRecording}
-                                     className="flex-1 py-2.5 rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-lg bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white"
-                                  >
-                                     <Square size={12} fill="currentColor" />
-                                     Stop & Save
-                                  </button>
-                               </div>
-                            ) : (
-                               <button 
-                                  onClick={startRecording}
-                                  className="w-full py-2.5 rounded-lg font-black text-[10px] uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg bg-emerald-500 text-black border border-emerald-400/50 hover:bg-emerald-400"
-                               >
-                                  <Mic size={14} />
-                                  Start Recording
-                               </button>
-                            )}
-
-                            {recorderStatus.isRecording && (
-                               <p className={`text-[8px] text-center font-medium uppercase tracking-widest ${recorderStatus.isPaused ? 'text-amber-500/60' : 'text-red-500/60 animate-pulse'}`}>
-                                  {recorderStatus.isPaused ? 'Recording Paused' : 'Recording High-Fidelity Opus @ 128kbps'}
-                                </p>
-                            )}
-                         </div>
-                      </div>
-
-                      {/* STATUS INFO */}
-                      <div className="mt-1 space-y-2">
-                         <div className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-lg flex items-center gap-3">
-                            <Save size={16} className="text-emerald-500/50" />
-                            <div className="flex-1">
-                               <h4 className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Safety Backup</h4>
-                               <p className="text-[8px] text-gray-500 font-medium leading-none">Auto-saving chunks every 5s</p>
+                               <input 
+                                 type="text" 
+                                 placeholder="Preacher"
+                                 value={sermonMetadata.preacher}
+                                 onChange={e => setSermonMetadata(prev => ({ ...prev, preacher: e.target.value }))}
+                                 className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:border-emerald-500/50 outline-none transition-all"
+                               />
                             </div>
-                         </div>
-                         <div className="bg-blue-500/5 border border-blue-500/10 p-3 rounded-lg flex items-center gap-3">
-                            <RefreshCw size={16} className="text-blue-500/50" />
-                            <div className="flex-1">
-                               <h4 className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Local Export</h4>
-                               <p className="text-[8px] text-gray-500 font-medium leading-none">Direct Download to PC</p>
+                          </div>
+
+                          <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                            <h4 className="text-[9px] font-black uppercase tracking-widest text-emerald-500/80 mb-3">Audio Processing</h4>
+                            <div className="space-y-3">
+                               <label className="flex items-center justify-between cursor-pointer group">
+                                  <span className="text-[10px] text-gray-400 group-hover:text-white transition-colors">Noise Reduction</span>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={recorderService.config.noiseReduction}
+                                    onChange={e => {
+                                      recorderService.config.noiseReduction = e.target.checked;
+                                      setDraftSettings(prev => ({ ...prev })); // Trigger re-render
+                                    }}
+                                    className="accent-emerald-500 w-4 h-4"
+                                  />
+                               </label>
+                               <label className="flex items-center justify-between cursor-pointer group">
+                                  <span className="text-[10px] text-gray-400 group-hover:text-white transition-colors">Volume Leveling</span>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={recorderService.config.volumeLeveling}
+                                    onChange={e => {
+                                      recorderService.config.volumeLeveling = e.target.checked;
+                                      setDraftSettings(prev => ({ ...prev })); // Trigger re-render
+                                    }}
+                                    className="accent-emerald-500 w-4 h-4"
+                                  />
+                               </label>
+                               <label className="flex items-center justify-between cursor-pointer group">
+                                  <span className="text-[10px] text-gray-400 group-hover:text-white transition-colors">Pro Quality (256kbps)</span>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={recorderService.config.highQuality}
+                                    onChange={e => {
+                                      recorderService.config.highQuality = e.target.checked;
+                                      setDraftSettings(prev => ({ ...prev })); // Trigger re-render
+                                    }}
+                                    className="accent-emerald-500 w-4 h-4"
+                                  />
+                               </label>
                             </div>
-                         </div>
-                      </div>
+                          </div>
+                       </div>
+                    </div>
                    </div>
                 )}
 

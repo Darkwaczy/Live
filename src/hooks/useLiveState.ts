@@ -508,8 +508,6 @@ export function useLiveState(
     setLiveState(prev => ({ 
       ...prev, 
       current_text: '', 
-      transcription_text: '',
-      transcription_feed: [],
       current_verse: null,
       current_song_id: null,
       current_media: null,
@@ -522,6 +520,15 @@ export function useLiveState(
       is_blank: false,
       is_logo: false,
       updated_at: new Date().toISOString() 
+    }));
+  }, []);
+
+  const clearTranscription = useCallback(() => {
+    setLiveState(prev => ({
+       ...prev,
+       transcription_text: '',
+       transcription_feed: [],
+       updated_at: new Date().toISOString()
     }));
   }, []);
 
