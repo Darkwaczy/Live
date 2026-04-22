@@ -765,6 +765,7 @@ export function useLiveState(
     start,
     stop,
     clearText,
+    clearTranscription,
     clearPreview,
     applyLiveState,
     goLive,

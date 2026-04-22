@@ -454,7 +454,7 @@ export default function App() {
 
   const { 
     liveState, interimText, currentSong, currentLine, currentVerse, isListening, 
-    start, stop, clearText: originalClearText, applyLiveState, error, setError, goLive: originalGoLive, directAir, setPreviewVerse, setSecondaryVerse, setPreviewVerseText, removeDetection, setBlank, setLogo, loadSong, airLyricLine, setLiveState
+    start, stop, clearText: originalClearText, clearTranscription, applyLiveState, error, setError, goLive: originalGoLive, directAir, setPreviewVerse, setSecondaryVerse, setPreviewVerseText, removeDetection, setBlank, setLogo, loadSong, airLyricLine, setLiveState
   } = useLiveState(
     session.id, 
     settings.speechEngine as 'web'|'worker'|'whisper'|'groq'|'deepgram', 
@@ -1084,8 +1084,8 @@ export default function App() {
       if (prev.some(n => n.id === noteObj.id)) return prev;
       return [noteObj, ...prev];
     });
-    clearText();
-    showToast('Saved transcript block to Notes and cleared screen!');
+    clearTranscription(); // Only clear transcription when explicitly saving
+    showToast('Saved transcript block to Notes and cleared history!');
     
     // Attempt local storage fallback
     try {
